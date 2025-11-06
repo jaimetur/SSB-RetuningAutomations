@@ -1,4 +1,4 @@
-name: Build RetuningAutomations
+name: ▶️ Build RetuningAutomations
 
 on:
   workflow_dispatch:
