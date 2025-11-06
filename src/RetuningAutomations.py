@@ -22,9 +22,9 @@ from typing import Optional
 import textwrap
 
 # Import our different Classes
-from PrePostRelations import PrePostRelations
-from CreateExcelFromLogs import CreateExcelFromLogs
-from CleanUp import CleanUp
+from src.modules.PrePostRelations import PrePostRelations
+from src.modules.CreateExcelFromLogs import CreateExcelFromLogs
+from src.modules.CleanUp import CleanUp
 
 # ================================ VERSIONING ================================ #
 

@@ -15,7 +15,7 @@ import subprocess
 import glob
 from pathlib import Path
 
-from RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
+from src.RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
 
 global OPERATING_SYSTEM
 global ARCHITECTURE

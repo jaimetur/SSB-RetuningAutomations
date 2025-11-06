@@ -161,7 +161,7 @@ def write_github_outputs(binary_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(description="Build executable with PyInstaller for RetuningAutomations.py")
-    parser.add_argument("--main", default="RetuningAutomations.py",
+    parser.add_argument("--main", default="./src/RetuningAutomations.py",
                         help="Entry-point main module filename (default: RetuningAutomations.py)")
     parser.add_argument("--onefile", action="store_true", default=True,
                         help="Force PyInstaller onefile build (default: True)")
