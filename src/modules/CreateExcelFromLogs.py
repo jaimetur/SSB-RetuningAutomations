@@ -15,7 +15,7 @@ class CreateExcelFromLogs:
       - Intenta múltiples codificaciones: utf-8-sig, utf-16, utf-16-le, utf-16-be, cp1252.
       - Delimitador preferente: TAB. Solo si no hay tabs en ninguna línea, intenta coma.
       - Si tampoco hay coma, separa por espacios.
-      - Elimina filas totalmente vacías y líneas "N instance(s)".
+      - Elimina filas totalmente vacías y líneas 'N instance(s)'.
       - Añade hoja 'Summary'.
       - Limita filas a ~1,048,576 (límite de Excel).
 
@@ -89,13 +89,11 @@ class CreateExcelFromLogs:
     # ---------------------- lectura robusta de texto ---------------------- #
     def _read_text_file(self, path: str) -> Tuple[List[str], Optional[str]]:
         encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
-        last_err = None
         for enc in encodings:
             try:
                 with open(path, "r", encoding=enc, errors="strict") as f:
                     return [ln.rstrip("\n") for ln in f], enc
-            except Exception as e:
-                last_err = e
+            except Exception:
                 continue
         # último intento permisivo
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -161,7 +159,7 @@ class CreateExcelFromLogs:
     @staticmethod
     def _sanitize_sheet_name(name: str) -> str:
         # Excel: máx 31 chars, sin : \ / ? * [ ]
-        name = re.sub(r'[:\\/\?\*\[\]]', "_", name)
+        name = re.sub(r'[:\\/?*\[\]]', "_", name)
         name = name.strip().strip("'")
         return (name or "Sheet")[:31]
 

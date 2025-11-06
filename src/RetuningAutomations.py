@@ -327,7 +327,7 @@ def main():
         if module_fn is run_prepost:
             run_prepost(input_dir, freq_pre, freq_post)
         elif module_fn is run_excel_from_logs:
-            run_excel_from_logs(input_dir, freq_pre, freq_post)
+            run_excel_from_logs(input_dir)
         elif module_fn is run_cleanup:
             run_cleanup(input_dir, freq_pre, freq_post)
         else:

@@ -232,7 +232,7 @@ class PrePostRelations:
         Compare for each loaded table (GU/NR):
           - Discrepancies:
               * Frequency rule: if in Pre freq == freq_before, then in Post freq must be freq_after.
-                Otherwise it's a discrepancy (kept freq_before or changed to any other unexpected freq).
+                Otherwise, it's a discrepancy (kept freq_before or changed to any other unexpected freq).
               * Any other attribute difference between Pre and Post for common keys (excluding 'Pre/Post' and 'Date').
           - New in Post.
           - Missing in Post.
@@ -356,7 +356,7 @@ class PrePostRelations:
             freq_rule_mask = (pre_has_before & (~post_is_after)) | (pre_has_after & (~post_is_after))
 
             # Exclude meta + keys + frequency column from generic comparison
-            exclude_cols = set(["Pre/Post", "Date", freq_col]) | set(key_cols)
+            exclude_cols = {"Pre/Post", "Date", freq_col} | set(key_cols)
             shared_cols = [
                 c for c in pre_common_full.columns
                 if c in post_common_full.columns and c not in exclude_cols
@@ -522,7 +522,6 @@ class PrePostRelations:
                 # nombre de frecuencia original (case-insensitive)
                 freq_lc = freq_col.lower()
                 pre_side = side_cols.get(f"{freq_lc}_preside")
-                post_side = side_cols.get(f"{freq_lc}_postside")
                 if pre_side and (all_relations["Freq_Pre"] == "<empty>").any():
                     if table_name == "NRCellRelation":
                         fill = _extract_nr_freq(merged_all[pre_side])
