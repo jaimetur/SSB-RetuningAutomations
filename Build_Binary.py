@@ -158,7 +158,7 @@ def main(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     # Script Names
     TOOL_SOURCE_NAME = f"{TOOL_NAME}.py"
     TOOL_VERSION_WITHOUT_V = get_clean_version(TOOL_VERSION)
-    TOOL_NAME_VERSION = f"{TOOL_NAME}_{TOOL_VERSION}"
+    TOOL_NAME_VERSION = f"{TOOL_NAME}_v{TOOL_VERSION}"
 
     # Obtener el directorio de trabajo
     root_dir = os.getcwd()
