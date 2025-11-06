@@ -71,6 +71,13 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ---
 
+## 💾 Download
+Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 architectures) as you prefer, directly from following link:
+
+- [Latest Stable Release](https://github.com/jaimetur/RetuningAutomations/releases/latest)
+
+---
+
 ## 🖥️ Run Modes
 
 ### GUI (no arguments)
