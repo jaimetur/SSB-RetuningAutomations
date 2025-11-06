@@ -1,0 +1,54 @@
+jobs:
+  build-binaries:
+    name: Build RetuningAutomations binaries
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows runners (x64 + ARM64 via --target-arch)
+          - os: windows-latest
+            arch: x64
+            py_arch: "64"
+          - os: windows-latest
+            arch: arm64
+            py_arch: "ARM64"
+
+          # Ubuntu runner x64 (native). For arm64 you would need an arm64 runner or QEMU.
+          - os: ubuntu-latest
+            arch: x64
+            py_arch: ""
+
+          # macOS: macos-14 is arm64; macos-13 is x64 (Intel)
+          - os: macos-14
+            arch: arm64
+            py_arch: ""
+          - os: macos-13
+            arch: x64
+            py_arch: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Build binary
+        env:
+          TARGET_ARCH: ${{ matrix.py_arch }}  # Only used on Windows
+        run: |
+          python _compile_pyinstaller.py
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RetuningAutomations-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/*
