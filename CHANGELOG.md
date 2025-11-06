@@ -4,6 +4,28 @@
 
 ---
 
+## Release: v0.2.2
+- ### Release Date: 2025-11-06
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    
+  - #### 🐛 Bug fixes:
+
+  - #### 📚 Documentation: 
+    - Created DOWNLOAD.md
+    - Created CONTRIBUTING.md
+    - Created CODE_OF_CONDUCT.md
+    
+  - #### 🚀 Enhancements:
+    - Improvements on GitHub Automatic Release creation.
+    - Added Splash Logo on Windows executable while loading.
+
+---
+
 ## Release: v0.2.1
 - ### Release Date: 2025-11-06
 

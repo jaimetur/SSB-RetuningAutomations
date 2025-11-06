@@ -21,7 +21,7 @@ It ships a single launcher that can run in **GUI** mode (no arguments) or **CLI*
 2. **Create Excel from Logs** — parses raw log folders and builds a curated Excel workbook (module scaffold ready).  
 3. **Clean-Up** — helper utilities to tidy intermediate outputs (module scaffold ready).
 
-The tool automatically adds a **timestamped + versioned suffix** to outputs, which makes artifacts fully traceable (e.g., `20251106-153245_v0.2.1`).
+The tool automatically adds a **timestamped + versioned suffix** to outputs, which makes artifacts fully traceable (e.g., `20251106-153245_v0.2.0`).
 
 ---
 
@@ -45,8 +45,8 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 - 📁 Output Example Structure: 
   ```
   <InputFolder>/
-  ├─ LogsCombined_<timestamp>_v0.2.1.xlsx
-  └─ CellRelationConsistencyChecks_<timestamp>_v0.2.1/
+  ├─ LogsCombined_<timestamp>_v0.2.0.xlsx
+  └─ CellRelationConsistencyChecks_<timestamp>_v0.2.0/
      ├─ CellRelation.xlsx
      └─ CellRelationConsistencyChecks.xlsx
   ```
@@ -127,7 +127,7 @@ python RetuningAutomations.py --module prepost   -i "C:\Projects\Retuning\Round_
 - Writes:
   - `CellRelation.xlsx`
   - `CellRelationDiscrepancies.xlsx`
-  - Under: `CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.1/`
+  - Under: `CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/`
 
 **B. Pre/Post without frequencies (tables only):**
 ```bash
@@ -157,7 +157,7 @@ The loader in `PrePostRelations.loadPrePost(input_dir)` expects the needed table
 ### Output structure
 ```
 <INPUT_FOLDER>/
-└─ CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.1/
+└─ CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/
    ├─ CellRelation.xlsx
    └─ CellRelationDiscrepancies.xlsx        # only when both frequencies provided
 ```
@@ -170,13 +170,13 @@ For `CreateExcelFromLogs`, the module itself returns the **path** of the artifac
 
 - The launcher prints a banner on start:
   ```
-  RetuningAutomations_v0.2.1 - 2025-11-06
+  RetuningAutomations_v0.2.0 - 2025-11-05
   Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retuning
   ©️ 2025 by Jaime Tur (jaime.tur@ericsson.com)
   ```
 - All generated artifacts include a **timestamp + tool version** suffix, e.g.:
   ```
-  20251106-153245_v0.2.1
+  20251106-153245_v0.2.0
   ```
   ensuring reproducibility and traceability across deliveries.
 

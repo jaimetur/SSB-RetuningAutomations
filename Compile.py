@@ -21,8 +21,8 @@ Usage examples:
     TARGET_ARCH=ARM64 python compile.py       # Windows-only
 
 Notes:
-- Keep RetuningAutomations.py with a top-level variable: VERSION = "0.2.1"
-- The filename will include a leading 'v' (e.g., RetuningAutomations_v0.2.1.exe)
+- Keep RetuningAutomations.py with a top-level variable: VERSION = "x.x.x"
+- The filename will include a leading 'v' (e.g., RetuningAutomations_v0.2.0.exe)
 """
 
 import argparse
@@ -51,7 +51,7 @@ def detect_platform_and_ext() -> tuple[str, str]:
 def read_version_from_main(main_path: Path) -> str:
     """Extract VERSION from the main module. VERSION must not include the 'v'."""
     text = main_path.read_text(encoding="utf-8", errors="ignore")
-    # Look for a top-level assignment like: VERSION = "0.2.1"
+    # Look for a top-level assignment like: VERSION = "x.x.x"
     m = re.search(r'^\s*TOOL_VERSION\s*=\s*["\']([^"\']+)["\']', text, flags=re.MULTILINE)
     if not m:
         raise RuntimeError(f"VERSION variable not found in {main_path}")

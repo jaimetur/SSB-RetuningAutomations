@@ -30,7 +30,7 @@ from src.modules.CleanUp import CleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "RetuningAutomations"
-TOOL_VERSION        = "0.2.1"
+TOOL_VERSION        = "0.2.2"
 TOOL_DATE           = "2025-11-06"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
 COPYRIGHT_TEXT      = "(c) 2025 - Jaime Tur (jaime.tur@ericsson.com)"

@@ -447,7 +447,7 @@ jobs:
         id: extract_version                   # Importante añadir el ID para que outputs pueda encontrar la variable
         run: |
           # 1️⃣ Obtenemos el valor sin la “v”
-          TOOL_VERSION=$(grep -oP '^TOOL_VERSION_WITHOUT_V\s*=\s*"\K[^"]+' ./src/Core/GlobalVariables.py)
+          TOOL_VERSION=$(grep -oP '^TOOL_VERSION\s*=\s*"\K[^"]+' ./src/RetuningAutomations.py)
           
           # 2️⃣ Lo ponemos en el entorno de los siguientes steps (opcional)
           echo "TOOL_VERSION=${TOOL_VERSION}" >> "$GITHUB_ENV"
