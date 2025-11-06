@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-binaries:
-    name: Build RetuningAutomations
+    name: ▶️ Build RetuningAutomations
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
