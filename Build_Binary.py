@@ -15,7 +15,8 @@ import subprocess
 import glob
 from pathlib import Path
 
-from src.RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
+from RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
+from Utils.Utils import clear_screen, get_os, get_arch
 
 global OPERATING_SYSTEM
 global ARCHITECTURE
@@ -27,12 +28,12 @@ global tool_name_with_version_os_arch
 global script_zip_file
 global archive_path_relative
 
+# --- Global Variables ---
+COMPILE_IN_ONE_FILE = True
+# ------------------------
+
 def include_extrafiles_and_zip(input_file, output_file):
     extra_files_to_subdir = [
-        {
-            'subdir': '', # Para indicar que estos ficheros van al directorio raiz del script
-            'files': ["./Config.ini"]
-        },
         {
             'subdir': 'assets/logos',# Estos ficheros van al subdirectorio 'assets'
             # 'files': ["./assets/logos/logo.png"]
@@ -136,47 +137,6 @@ def extract_release_body(input_file, output_file, download_file):
         outfile.writelines(download_content)
 
 
-def add_roadmap_to_readme(readme_file, roadmap_file):
-    """
-    Reemplaza el bloque ROADMAP en el archivo README con el contenido de otro archivo ROADMAP.
-    Si el bloque no existe, lo inserta antes de la línea que contiene "## Credits".
-
-    :param readme_file: Ruta al archivo README.md.
-    :param roadmap_file: Ruta al archivo ROADMAP.md.
-    """
-    # Leer el contenido del archivo README
-    with open(readme_file, "r", encoding="utf-8") as f:
-        readme_lines = f.readlines()
-    # Leer el contenido del archivo ROADMAP
-    with open(roadmap_file, "r", encoding="utf-8") as f:
-        roadmap_content = f.read().strip() + "\n\n"  # Asegurar un salto de línea final
-    # Buscar el bloque ROADMAP existente
-    start_index, end_index = None, None
-    for i, line in enumerate(readme_lines):
-        if line.strip() == "## 📅 ROADMAP":
-            start_index = i
-        if start_index is not None and line.strip() == "## 🎖️ Credits":
-            end_index = i
-            break
-    if start_index is not None and end_index is not None:
-        # Sustituir el bloque ROADMAP existente
-        print("'ROADMAP' block found")
-        updated_readme = readme_lines[:start_index] + [roadmap_content] + readme_lines[end_index:]
-    else:
-        # Buscar la línea donde comienza "## 🎖️ Credits" para insertar el bloque ROADMAP antes
-        credits_index = next((i for i, line in enumerate(readme_lines) if line.strip() == "## 🎖️ Credits:"), None)
-        if credits_index is not None:
-            print ("'CREDITS' block found but 'ROADMAP' block not found")
-            updated_readme = readme_lines[:credits_index] + [roadmap_content] + readme_lines[credits_index:]
-        else:
-            # Si no se encuentra "## 🎖️ Credits", simplemente añadir al final del archivo
-            print ("'CREDITS' block not found")
-            updated_readme = readme_lines + [roadmap_content]
-    # Escribir el contenido actualizado en el archivo README
-    with open(readme_file, "w", encoding="utf-8") as f:
-        f.writelines(updated_readme)
-
-
 def main(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     # =======================
     # Create global variables
@@ -192,8 +152,8 @@ def main(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     global archive_path_relative
 
     # Detect the operating system and architecture
-    OPERATING_SYSTEM = get_os(use_logger=False)
-    ARCHITECTURE = get_arch(use_logger=False)
+    OPERATING_SYSTEM = get_os()
+    ARCHITECTURE = get_arch()
 
     # Script Names
     TOOL_SOURCE_NAME = f"{TOOL_NAME}.py"
@@ -241,16 +201,10 @@ def main(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     download_filepath = os.path.join(root_dir, 'DOWNLOAD.md')
     changelog_filepath = os.path.join(root_dir, 'CHANGELOG.md')
     current_release_filepath = os.path.join(root_dir, 'RELEASE-NOTES.md')
-    roadmap_filepath = os.path.join(root_dir, 'ROADMAP.md')
-    readme_filepath = os.path.join(root_dir, 'README.md')
 
     # Extraer el cuerpo de la Release actual de CHANGELOG.md
     extract_release_body(input_file=changelog_filepath, output_file=current_release_filepath, download_file=download_filepath)
     print(f"File '{current_release_filepath}' created successfully!.")
-
-    # Añadimos el ROADMAP en el fichero README
-    # add_roadmap_to_readme(readme_filepath, roadmap_filepath)
-    # print(f"File 'README.md' updated successfully with ROADMAP.md")
 
     # Guardar build_info.txt en un fichero de texto
     with open(os.path.join(root_dir, 'build_info.txt'), 'w') as file:
@@ -288,29 +242,17 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     # Inicializamos variables
     TOOL_NAME_WITH_VERSION_OS_ARCH    = f"{TOOL_NAME_VERSION}_{OPERATING_SYSTEM}_{ARCHITECTURE}"
     splash_image                        = "assets/logos/logo_01.png" # Splash image for windows
-    gpth_folder                         = FOLDERNAME_GPTH
-    exif_folder                         = FOLDERNAME_EXIFTOOL
-    gpth_tool                           = os.path.join(gpth_folder, f"gpth-{GPTH_VERSION}-{OPERATING_SYSTEM}-{ARCHITECTURE}.ext")
-    exif_tool                           = os.path.join(exif_folder, "<ZIP_NAME>.zip")
-    exif_folder_dest                    = exif_folder
+
     if OPERATING_SYSTEM == 'windows':
         script_compiled = f'{TOOL_NAME}.exe'
         script_compiled_with_version_os_arch_extension = f"{TOOL_NAME_WITH_VERSION_OS_ARCH}.exe"
-        gpth_tool = gpth_tool.replace(".ext", ".exe")
-        exif_tool = exif_tool.replace('<ZIP_NAME>', 'windows')
+
     else:
         if compiler=='pyinstaller':
             script_compiled = f'{TOOL_NAME}'
         else:
             script_compiled = f'{TOOL_NAME}.bin'
         script_compiled_with_version_os_arch_extension = f"{TOOL_NAME_WITH_VERSION_OS_ARCH}.run"
-
-
-    # Usar resolve_internal_path para acceder a archivos o directorios que se empaquetarán en el modo de ejecutable binario:
-    gpth_tool_path = resolve_internal_path(gpth_tool)
-
-    # Ensure exec permissions for gpth binary file
-    ensure_executable(gpth_tool_path)
 
     # Guardar build_info.txt en un fichero de texto
     with open(os.path.join(root_dir, 'build_info.txt'), 'a') as file:
@@ -388,18 +330,6 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     # ===============================================================================================================================================
     elif compiler=='nuitka':
         print("Compiling with Nuitka...")
-        # # Force C Compiler based on the Platform used (is better left Nuita find the best C Compilar installed on the system)
-        # if ARCHITECTURE in ["amd64", "x86_64", "x64"]:
-        #     os.environ['CC'] = 'gcc'
-        # elif ARCHITECTURE in ["arm64", "aarch64"]:
-        #     if sys.platform == "linux":
-        #         os.environ['CC'] = 'aarch64-linux-gnu-gcc'
-        #     elif sys.platform == "darwin":
-        #         os.environ['CC'] = 'clang'  # explícito para macOS
-        # else:
-        #     print(f"Unknown architecture: {ARCHITECTURE}")
-        #     return False
-        # print("")
 
         # Build and Dist Folders for Nuitka
         dist_path = "./nuitka_dist"
@@ -447,25 +377,6 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
             f"--product-version={TOOL_VERSION_WITHOUT_V.split('-')[0]}",
 
         ])
-
-        # If INCLUDE_EXIF_TOOL flag is True, then Unzip, Change Permissions and Add Exif Tool files to the binary file
-        if INCLUDE_EXIF_TOOL:
-            # Unzip Exif_tool and include it to compiled binary with Nuitka
-            print("\nUnzipping EXIF Tool to include it in binary compiled file...")
-            # exif_folder_tmp = unzip_to_temp(exif_tool)
-            # Better avoid use of unzip_to_temp() function to reduce the prob of anti-virus detection
-            exif_folder_tmp = f"exif_tool_extracted"
-            unzip(exif_tool, exif_folder_tmp)
-
-            # Dar permiso de ejecución a exiftool
-            exiftool_bin = Path(exif_folder_tmp) / "exiftool"
-            if exiftool_bin.exists():
-                ensure_executable(exiftool_bin)
-
-            # Add Exif Tool files to the binary
-            nuitka_command.extend([f'--include-data-files={exif_folder_tmp}={exif_folder_dest}/=**/*.*'])
-            nuitka_command.extend([f'--include-data-dir={exif_folder_tmp}={exif_folder_dest}'])
-            # nuitka_command.extend(['--include-data-dir=../exif_tool=exif_tool'])
 
         # Now set runtime tmp dir to an specific folder within /var/tmp or %TEMP% to reduce the prob of anti-virus detection.
         if OPERATING_SYSTEM != 'windows':
