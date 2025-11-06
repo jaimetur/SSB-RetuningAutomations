@@ -15,10 +15,7 @@ import subprocess
 import glob
 from pathlib import Path
 
-from Core.GlobalVariables import TOOL_NAME, TOOL_VERSION, GPTH_VERSION, INCLUDE_EXIF_TOOL, COPYRIGHT_TEXT, COMPILE_IN_ONE_FILE, FOLDERNAME_GPTH, FOLDERNAME_EXIFTOOL, TOOL_DESCRIPTION
-from Utils.GeneralUtils import clear_screen, print_arguments_pretty, get_os, get_arch, ensure_executable
-from Utils.FileUtils import unzip_to_temp, zip_folder, unzip
-from Utils.StandaloneUtils import resolve_internal_path
+from RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
 
 global OPERATING_SYSTEM
 global ARCHITECTURE
@@ -307,8 +304,7 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
         else:
             script_compiled = f'{TOOL_NAME}.bin'
         script_compiled_with_version_os_arch_extension = f"{TOOL_NAME_WITH_VERSION_OS_ARCH}.run"
-        gpth_tool = gpth_tool.replace(".ext", ".bin")
-        exif_tool = exif_tool.replace('<ZIP_NAME>', 'others')
+
 
     # Usar resolve_internal_path para acceder a archivos o directorios que se empaquetarán en el modo de ejecutable binario:
     gpth_tool_path = resolve_internal_path(gpth_tool)
@@ -320,14 +316,11 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
     with open(os.path.join(root_dir, 'build_info.txt'), 'a') as file:
         file.write('COMPILER=' + str(compiler) + '\n')
         file.write('SCRIPT_COMPILED=' + os.path.abspath(script_compiled_with_version_os_arch_extension) + '\n')
-        file.write('GPTH_TOOL=' + gpth_tool + '\n')
-        file.write('EXIF_TOOL=' + exif_tool + '\n')
         print('')
         print(f'COMPILER: {compiler}')
         print(f'COMPILE_IN_ONE_FILE: {compile_in_one_file}')
         print(f'SCRIPT_COMPILED: {script_compiled}')
-        print(f'GPTH_TOOL: {gpth_tool}')
-        print(f'EXIF_TOOL: {exif_tool}')
+
 
     print("")
     print("=================================================================================================")
@@ -364,44 +357,13 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
             pyinstaller_command.extend(['--onedir'])
 
         # Add splash image to .exe file (only supported in windows)
-        if OPERATING_SYSTEM == 'windows':
-            pyinstaller_command.extend(("--splash", splash_image))
+        # if OPERATING_SYSTEM == 'windows':
+        #     pyinstaller_command.extend(("--splash", splash_image))
 
         # Add following generic arguments to Pyinstaller:
         pyinstaller_command.extend(["--noconfirm"])
         pyinstaller_command.extend(("--distpath", dist_path))
         pyinstaller_command.extend(("--workpath", build_path))
-        pyinstaller_command.extend(("--add-data", gpth_tool + ':gpth_tool'))
-
-        # If INCLUDE_EXIF_TOOL flag is True, then Unzip, Change Permissions and Add Exif Tool files to the binary file
-        if INCLUDE_EXIF_TOOL:
-            # Unzip Exif_tool and include it to compiled binary with Pyinstaller
-            print("\nUnzipping EXIF Tool to include it in binary compiled file...")
-            # exif_folder_tmp = unzip_to_temp(exif_tool)
-            # Better avoid use of unzip_to_temp() function to reduce the prob of anti-virus detection
-            exif_folder_tmp = f"exif_tool_extracted"
-            unzip(exif_tool, exif_folder_tmp)
-
-            # Dar permiso de ejecución a exiftool
-            exiftool_bin = Path(exif_folder_tmp) / "exiftool"
-            if exiftool_bin.exists():
-                ensure_executable(exiftool_bin)
-
-            # Add Exif Tool files to the binary
-            pyinstaller_command.extend(("--add-data", f"{exif_folder_tmp}:{exif_folder_dest}"))
-
-            # walk exif_folder_tmp to add all the files and subfolder to the binary file (I didn't find other way to do this with Pyinstaller)
-            for path in Path(exif_folder_tmp).rglob('*'):
-                if path.is_dir():
-                    # Verificar si contiene al menos un archivo
-                    has_files = any(f.is_file() for f in path.iterdir())
-                    if not has_files:
-                        continue  # Saltar carpetas sin archivos
-                    relative_path = path.relative_to(exif_folder_tmp).as_posix()
-                    dest_path = f"{exif_folder_dest}/{relative_path}"
-                    src_path = path.as_posix()
-                    # Añadir todos los archivos directamente dentro de esa carpeta
-                    pyinstaller_command.extend(("--add-data", f"{src_path}:{dest_path}"))
 
         # In linux set runtime tmp dir to /var/tmp for Synology compatibility (/tmp does not have access rights in Synology NAS)
         if OPERATING_SYSTEM == 'linux':

@@ -180,20 +180,6 @@ jobs:
           # Exportar en una sola línea (obligatorio)
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
 
-  # ==========================================================================================================================
-  # JOB Docker packaging (single run)
-  # ==========================================================================================================================
-  build-docker:
-    name: 🐳 Build Docker
-    uses: ./.github/workflows/build_docker.yml
-    needs: set-input-matrix
-    with:
-      final_release: ${{ inputs.final_release }}
-    secrets:
-      TOKEN_GITHUB: ${{ secrets.TOKEN_GITHUB }}
-      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-      DOCKERHUB_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-
 
   # ==========================================================================================================================
   # JOB build
