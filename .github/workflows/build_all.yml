@@ -1,9 +1,7 @@
 name: Build RetuningAutomations
 
 on:
-  # Lánzalo manualmente desde la pestaña "Actions"
   workflow_dispatch:
-  # O cuando hagas push a main o crees un tag (p.ej. v0.2.1)
   push:
     branches: [ "main" ]
     tags: [ "v*" ]
@@ -24,12 +22,12 @@ jobs:
             arch: arm64
             py_arch: "ARM64"
 
-          # Ubuntu runner x64 (native). Para arm64 necesitarías runner arm64 o QEMU.
+          # Ubuntu runner x64 (native)
           - os: ubuntu-latest
             arch: x64
             py_arch: ""
 
-          # macOS: macos-14 es arm64; macos-13 es x64 (Intel)
+          # macOS: macos-14 is arm64; macos-13 is x64 (Intel)
           - os: macos-14
             arch: arm64
             py_arch: ""
@@ -38,24 +36,45 @@ jobs:
             py_arch: ""
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Show workspace structure (debug)
+        shell: bash
+        run: |
+          echo "Current working directory:"
+          pwd
+          echo "Repository content (depth 2):"
+          find . -maxdepth 2 -type f -print
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install build deps
+      - name: Upgrade pip & install PyInstaller
+        shell: bash
         run: |
           python -m pip install --upgrade pip
           pip install pyinstaller
 
-      - name: Build binary
-        env:
-          TARGET_ARCH: ${{ matrix.py_arch }}  # Only used on Windows
+      - name: Install project dependencies (if requirements.txt exists)
+        shell: bash
         run: |
-          python compile.py
+          if [ -f requirements.txt ]; then
+            echo "requirements.txt found — installing dependencies..."
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found — skipping dependency installation."
+          fi
+
+      - name: Build binary with PyInstaller
+        env:
+          TARGET_ARCH: ${{ matrix.py_arch }}  # Only used on Windows by _compile_pyinstaller.py
+        shell: bash
+        run: |
+          echo "Executing compiler script: _compile_pyinstaller.py"
+          python _compile_pyinstaller.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
