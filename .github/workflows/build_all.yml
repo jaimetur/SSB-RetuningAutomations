@@ -1,5 +1,9 @@
 name: ▶️ Build Binaries for Multiple Platforms
 
+permissions:
+  contents: write   # needed to create/delete tags and releases
+  discussions: write
+
 on:
   # ──────────────── 1) Disparador manual desde GitHub Actions ────────────────
   workflow_dispatch:
@@ -238,6 +242,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.TOKEN_GITHUB }}
+          persist-credentials: true            # keep creds for later git push
+          fetch-depth: 0                       # fetch tags if needed
 
       # Set up Python
       - name: 🐍 Set up Python
