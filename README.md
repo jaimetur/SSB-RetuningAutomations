@@ -32,7 +32,7 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ## 🧩 Main Modules
 
-### 1) `Pr/ePost Relations Consistency Checks`
+### 1) `Pre/Post Relations Consistency Checks`
 **Purpose:** Load Pre/Post inputs from an **input folder**, compare relations between a **Pre frequency** and a **Post frequency**, and save results to Excel.
 
 **Key capabilities**
