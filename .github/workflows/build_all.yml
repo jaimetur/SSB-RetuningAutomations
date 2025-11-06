@@ -1,3 +1,13 @@
+name: Build RetuningAutomations
+
+on:
+  # Lánzalo manualmente desde la pestaña "Actions"
+  workflow_dispatch:
+  # O cuando hagas push a main o crees un tag (p.ej. v0.2.1)
+  push:
+    branches: [ "main" ]
+    tags: [ "v*" ]
+
 jobs:
   build-binaries:
     name: Build RetuningAutomations binaries
@@ -14,12 +24,12 @@ jobs:
             arch: arm64
             py_arch: "ARM64"
 
-          # Ubuntu runner x64 (native). For arm64 you would need an arm64 runner or QEMU.
+          # Ubuntu runner x64 (native). Para arm64 necesitarías runner arm64 o QEMU.
           - os: ubuntu-latest
             arch: x64
             py_arch: ""
 
-          # macOS: macos-14 is arm64; macos-13 is x64 (Intel)
+          # macOS: macos-14 es arm64; macos-13 es x64 (Intel)
           - os: macos-14
             arch: arm64
             py_arch: ""
@@ -45,7 +55,7 @@ jobs:
         env:
           TARGET_ARCH: ${{ matrix.py_arch }}  # Only used on Windows
         run: |
-          python _compile_pyinstaller.py
+          python compile.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
