@@ -1,10 +1,20 @@
+# -*- coding: utf-8 -*-
+
 import os
 import re
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Tuple
 
 import pandas as pd
 
+# NEW: import common helpers
+from src.modules.helpers import (
+    try_read_text_file_lines,
+    find_all_subnetwork_headers,
+    extract_mo_from_subnetwork_line,
+    split_line as helpers_split_line,
+    make_unique_columns as helpers_make_unique_columns,
+)
 
 class PrePostRelations:
     """
@@ -127,26 +137,14 @@ class PrePostRelations:
     @staticmethod
     def _read_text_file(path: str) -> Optional[List[str]]:
         """Robust text reader for .log/.txt using multiple encodings."""
-        if not os.path.isfile(path):
-            return None
-        encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
-        for enc in encodings:
-            try:
-                with open(path, "r", encoding=enc, errors="strict") as f:
-                    return [ln.rstrip("\n") for ln in f]
-            except Exception:
-                continue
-        # last permissive attempt
-        try:
-            with open(path, "r", encoding="utf-8", errors="replace") as f:
-                return [ln.rstrip("\n") for ln in f]
-        except Exception:
-            return None
+        # delegate to helpers to keep behavior but retain this docstring
+        return try_read_text_file_lines(path)
 
     @staticmethod
     def _find_all_subnetwork_headers(lines: List[str]) -> List[int]:
         """Return indices of every line that starts with 'SubNetwork'."""
-        return [i for i, ln in enumerate(lines) if ln.strip().startswith("SubNetwork")]
+        # delegate to helpers
+        return find_all_subnetwork_headers(lines)
 
     @staticmethod
     def _extract_mo_from_subnetwork_line(line: str) -> Optional[str]:
@@ -154,22 +152,14 @@ class PrePostRelations:
         Extract MO/table name from the 'SubNetwork,...,<MO>' line.
         Rule: last token after the last comma.
         """
-        if not line:
-            return None
-        if "," in line:
-            last = line.strip().split(",")[-1].strip()
-            return last or None
-        # Defensive fallback: last whitespace token
-        toks = line.strip().split()
-        return toks[-1].strip() if toks else None
+        # delegate to helpers
+        return extract_mo_from_subnetwork_line(line)
 
     @staticmethod
     def _split_line_generic(line: str, sep: Optional[str]) -> List[str]:
         """Split a line by sep; if sep is None, split by whitespace."""
-        import re as _re
-        if sep is None:
-            return _re.split(r"\s+", line.strip())
-        return line.split(sep)
+        # delegate to helpers
+        return helpers_split_line(line, sep)
 
     def _parse_table_slice_from_subnetwork(self, lines: List[str], header_idx: int, end_idx: int) -> pd.DataFrame:
         """
@@ -207,6 +197,7 @@ class PrePostRelations:
 
         # 3) Split header columns
         header_cols = [c.strip() for c in self._split_line_generic(header_line, data_sep)]
+        header_cols = helpers_make_unique_columns(header_cols)
 
         # 4) Build rows
         rows: List[List[str]] = []
@@ -658,27 +649,21 @@ class PrePostRelations:
             # add Freq_Pre and Freq_Post (second-chance fill from side columns if needed)
             all_relations["Freq_Pre"] = merged_all.get("Freq_Pre", "").replace("", "<empty>")
             all_relations["Freq_Post"] = merged_all.get("Freq_Post", "").replace("", "<empty>")
+
             if (all_relations["Freq_Pre"] == "<empty>").any():
-                # intenta recuperar desde columnas de frecuencia con sufijos, case-insensitive
                 side_cols = {c.lower(): c for c in merged_all.columns}
-                # nombre de frecuencia original (case-insensitive)
                 freq_lc = freq_col.lower()
                 pre_side = side_cols.get(f"{freq_lc}_preside")
                 if pre_side and (all_relations["Freq_Pre"] == "<empty>").any():
-                    if table_name == "NRCellRelation":
-                        fill = _extract_nr_freq(merged_all[pre_side])
-                    else:
-                        fill = _extract_gu_freq(merged_all[pre_side])
+                    fill = _extract_nr_freq(merged_all[pre_side]) if table_name == "NRCellRelation" else _extract_gu_freq(merged_all[pre_side])
                     all_relations.loc[all_relations["Freq_Pre"] == "<empty>", "Freq_Pre"] = fill.loc[all_relations["Freq_Pre"] == "<empty>"].replace("", "<empty>")
+
             if (all_relations["Freq_Post"] == "<empty>").any():
                 side_cols = {c.lower(): c for c in merged_all.columns}
                 freq_lc = freq_col.lower()
                 post_side = side_cols.get(f"{freq_lc}_postside")
                 if post_side and (all_relations["Freq_Post"] == "<empty>").any():
-                    if table_name == "NRCellRelation":
-                        fill = _extract_nr_freq(merged_all[post_side])
-                    else:
-                        fill = _extract_gu_freq(merged_all[post_side])
+                    fill = _extract_nr_freq(merged_all[post_side]) if table_name == "NRCellRelation" else _extract_gu_freq(merged_all[post_side])
                     all_relations.loc[all_relations["Freq_Post"] == "<empty>", "Freq_Post"] = fill.loc[all_relations["Freq_Post"] == "<empty>"].replace("", "<empty>")
 
             # append the rest (take PostSide if exists else PreSide)
@@ -696,7 +681,7 @@ class PrePostRelations:
 
             # ---------- pack results ----------
             results[table_name] = {
-                "discrepancies": discrepancies.reset_index(drop=True),
+                "discrepancies": pd.DataFrame(rows).pipe(_reorder_cols, table_name).reset_index(drop=True) if rows else pd.DataFrame(columns=["Date_Pre","Date_Post","Freq_Pre","Freq_Post"]),
                 "new_in_post": new_in_post.reset_index(drop=True),
                 "missing_in_post": missing_in_post.reset_index(drop=True),
                 "pair_stats": pair_stats.reset_index(drop=True),  # NEW/CHANGED: common keys with (Freq_Pre, Freq_Post, flags)
@@ -711,7 +696,7 @@ class PrePostRelations:
 
             print(f"\n{module_name} === {table_name} ===")
             print(f"{module_name} Key: {key_cols} | Freq column: {freq_col}")
-            print(f"{module_name} - Discrepancies: {len(discrepancies)}")
+            print(f"{module_name} - Discrepancies: {len(results[table_name]['discrepancies'])}")
             print(f"{module_name} - New in Post: {len(new_in_post)}")
             print(f"{module_name} - Missing in Post: {len(missing_in_post)}")
 
@@ -865,8 +850,6 @@ class PrePostRelations:
                     miss_by_pair = _pair_counts(miss_df)
 
                     # Build the full set of frequency pairs to report:
-                    #   - Include all pairs found in discrepancies/new/missing
-                    #   - Include neutral pairs (f,f) for every frequency seen in Pre or Post
                     neutral_pairs = {(f, f) for f in (set(pre_counts.keys()) | set(post_counts.keys()))}
                     all_pairs = set(params_by_pair) | set(freq_by_pair) | set(new_by_pair) | set(miss_by_pair) | neutral_pairs | pairs_present
 
@@ -945,5 +928,3 @@ class PrePostRelations:
                 pd.DataFrame(columns=["NodeId", "NRCellCUId", "NRCellRelationId"]).to_excel(writer, sheet_name="NR_missing", index=False)
                 pd.DataFrame(columns=["NodeId", "NRCellCUId", "NRCellRelationId"]).to_excel(writer, sheet_name="NR_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
-
-

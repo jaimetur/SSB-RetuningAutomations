@@ -16,7 +16,7 @@ import glob
 from pathlib import Path
 
 from RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
-from src.Utils.Utils import clear_screen, get_os, get_arch, print_arguments_pretty, zip_folder
+from src.utils.Utils import clear_screen, get_os, get_arch, print_arguments_pretty, zip_folder
 
 global OPERATING_SYSTEM
 global ARCHITECTURE

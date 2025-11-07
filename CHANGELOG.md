@@ -4,6 +4,26 @@
 
 ---
 
+## Release: v0.2.4
+- ### Release Date: 2025-11-07
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+    
+  - #### 🚀 Enhancements:
+    - Modules common helpers extracted from their classes and added to a new Python module called helpers.py for a better efficiency and maintainance.
+
+---
+
 ## Release: v0.2.3
 - ### Release Date: 2025-11-07
 

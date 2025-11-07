@@ -6,10 +6,21 @@ from typing import List, Tuple, Optional, Dict
 
 import pandas as pd
 
+# NEW: import common helpers
+from src.modules.helpers import (
+    try_read_text_file_with_encoding,
+    find_all_subnetwork_headers,
+    extract_mo_from_subnetwork_line,
+    split_line as helpers_split_line,
+    make_unique_columns as helpers_make_unique_columns,
+    sanitize_sheet_name,
+    unique_sheet_name,
+)
+
 
 class CreateExcelFromLogs:
     """
-    Generates an Excel in input_dir with one sheet per *.log / *.logs file.
+    Generates an Excel in input_dir with one sheet per *.log / *.logs / *.txt file.
 
     Robustness:
       - Tries multiple encodings: utf-8-sig, utf-16, utf-16-le, utf-16-be, cp1252.
@@ -42,7 +53,7 @@ class CreateExcelFromLogs:
 
         log_files = self._find_log_files(input_dir)
         if not log_files:
-            raise FileNotFoundError(f"No .log/.logs files found in: {input_dir}")
+            raise FileNotFoundError(f"No .log/.logs/.txt files found in: {input_dir}")
 
         excel_path = os.path.join(input_dir, f"LogsCombined_{versioned_suffix}.xlsx")
 
@@ -168,7 +179,7 @@ class CreateExcelFromLogs:
         files = []
         for name in os.listdir(folder):
             lower = name.lower()
-            if lower.endswith((".log", ".logs", ".txt")):  # <-- Added '.txt'
+            if lower.endswith((".log", ".logs", ".txt")):
                 p = os.path.join(folder, name)
                 if os.path.isfile(p):
                     files.append(p)
@@ -177,16 +188,8 @@ class CreateExcelFromLogs:
 
     # ----------------------- robust text reading -------------------------- #
     def _read_text_file(self, path: str) -> Tuple[List[str], Optional[str]]:
-        encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
-        for enc in encodings:
-            try:
-                with open(path, "r", encoding=enc, errors="strict") as f:
-                    return [ln.rstrip("\n") for ln in f], enc
-            except Exception:
-                continue
-        # last permissive attempt
-        with open(path, "r", encoding="utf-8", errors="replace") as f:
-            return [ln.rstrip("\n") for ln in f], None
+        # delegate to helpers version that also returns encoding
+        return try_read_text_file_with_encoding(path)
 
     # ---------------------------- log parser ------------------------------ #
     def _parse_log_lines(
@@ -322,51 +325,30 @@ class CreateExcelFromLogs:
     @staticmethod
     def _sanitize_sheet_name(name: str) -> str:
         # Excel: max 31 chars, cannot use : \ / ? * [ ]
-        name = re.sub(r'[:\\/?*\[\]]', "_", name)
-        name = name.strip().strip("'")
-        return (name or "Sheet")[:31]
+        # delegate to helpers to keep single source of truth
+        return sanitize_sheet_name(name)
 
     @staticmethod
     def _unique_sheet_name(base: str, used: set) -> str:
-        if base not in used:
-            return base
-        for k in range(1, 1000):
-            suffix = f" ({k})"
-            cand = (base[: max(0, 31 - len(suffix))] + suffix)
-            if cand not in used:
-                return cand
-        i, cand = 1, base
-        while cand in used:
-            cand = f"{base[:28]}_{i:02d}"
-            i += 1
-        return cand
+        # delegate to helpers
+        return unique_sheet_name(base, used)
 
     # ------------------------------- utils -------------------------------- #
     @staticmethod
     def _split_line(line: str, sep: Optional[str]) -> List[str]:
-        if sep is None:
-            return re.split(r"\s+", line.strip())
-        return line.split(sep)
+        # delegate to helpers
+        return helpers_split_line(line, sep)
 
     @staticmethod
     def _make_unique_columns(cols: List[str]) -> List[str]:
-        """Return a list of column names made unique by appending .1, .2, ... to duplicates."""
-        seen: Dict[str, int] = {}
-        unique = []
-        for c in cols:
-            if c not in seen:
-                seen[c] = 0
-                unique.append(c)
-            else:
-                seen[c] += 1
-                unique.append(f"{c}.{seen[c]}")
-        return unique
+        # delegate to helpers
+        return helpers_make_unique_columns(cols)
 
     # --------------------------- NEW: multi-table helpers --------------------------- #
     @staticmethod
     def _find_all_subnetwork_headers(lines: List[str]) -> List[int]:
         """Return a list of indices for all lines starting with 'SubNetwork'."""
-        return [i for i, ln in enumerate(lines) if ln.strip().startswith("SubNetwork")]
+        return find_all_subnetwork_headers(lines)
 
     @staticmethod
     def _extract_mo_from_subnetwork_line(line: str) -> Optional[str]:
@@ -374,14 +356,7 @@ class CreateExcelFromLogs:
         Extract the MO (sheet) name from the SubNetwork line itself:
         rule = last token after the last comma.
         """
-        if not line:
-            return None
-        if "," in line:
-            last = line.strip().split(",")[-1].strip()
-            return last or None
-        # Defensive fallback: last whitespace token
-        toks = line.strip().split()
-        return toks[-1].strip() if toks else None
+        return extract_mo_from_subnetwork_line(line)
 
     def _parse_table_slice_from_subnetwork(self, lines: List[str], header_idx: int, end_idx: int) -> Tuple[pd.DataFrame, str]:
         """
@@ -435,3 +410,15 @@ class CreateExcelFromLogs:
 
         note = "Slice parsed | " + ("Tab-separated" if data_sep == "\t" else ("Comma-separated" if data_sep == "," else "Whitespace-separated"))
         return df, note
+
+    # ---------------------------- SINGLE-TABLE FALLBACK ---------------------------- #
+    @staticmethod
+    def _find_subnetwork_header_index(lines: List[str]) -> Optional[int]:
+        for i, ln in enumerate(lines):
+            if ln.strip().startswith("SubNetwork"):
+                return i
+        return None
+
+    @staticmethod
+    def _read_text_file(path: str) -> Tuple[List[str], Optional[str]]:
+        return try_read_text_file_with_encoding(path)
