@@ -15,13 +15,19 @@
     
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
-
-  - #### 📚 Documentation: 
-    - Updated documentation with latest changes
     
   - #### 🚀 Enhancements:
     - Common methods and helpers from different Automation Modules extracted from their classes and added to a new Python module called common.py for a better efficiency and maintainance.
     - Smart sorting of MO names based on prefefined list `TABLES_ORDER` or log filename.
+    - Added timer to measure the execution time of each module.
+    - Module's Renaming. Current Module Names are:  
+      `1. Configuration Audit (Logs Parser)`  
+      `2. Consistency Check (Pre/Post Comparisson)`  
+      `3. Initial Clean-Up (During Maintenance Window)`  
+      `4. Final Clean-Up (After Retune is completed)`  
+
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
 
 ---
 
@@ -61,15 +67,15 @@
   - #### 🌟 New Features:
     
   - #### 🐛 Bug fixes:
+    
+  - #### 🚀 Enhancements:
+    - Improvements on GitHub Automatic Release creation.
+    - Added Splash Logo on Windows executable while loading.
 
   - #### 📚 Documentation: 
     - Created DOWNLOAD.md
     - Created CONTRIBUTING.md
     - Created CODE_OF_CONDUCT.md
-    
-  - #### 🚀 Enhancements:
-    - Improvements on GitHub Automatic Release creation.
-    - Added Splash Logo on Windows executable while loading.
 
 ---
 
@@ -86,16 +92,15 @@
   - #### 🐛 Bug fixes:
     - Fixed bug on Summary_Detailed that was creating pairs of frequencies where Freq_Pre or Freq_Post was empty.
 
-  - #### 📚 Documentation: 
-    - Created README.md
-    - Created CHANGELOG.md
-    - Created ROADMAP.md
-    
   - #### 🚀 Enhancements:
     - Created module to compile the tool and generate binaries files for the different OS and architecture.
     - Created GitHub repository.
     - Created GitHub workflow to automatically generate binaries for the different OS and architecture.
 
+  - #### 📚 Documentation: 
+    - Created README.md
+    - Created CHANGELOG.md
+    - Created ROADMAP.md
      
 ---
 
