@@ -16,7 +16,7 @@ from src.modules.CommonMethods import (
     natural_logfile_key,
 )
 
-class CreateExcelFromLogs:
+class ConfigurationAudit:
     """
     Generates an Excel in input_dir with one sheet per *.log / *.logs / *.txt file.
     (Funcionalidad intacta.)

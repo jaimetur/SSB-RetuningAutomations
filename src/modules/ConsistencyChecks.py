@@ -23,7 +23,7 @@ from src.modules.CommonMethods import (
     enforce_nr_columns,
 )
 
-class PrePostRelations:
+class ConsistencyChecks:
     """
     Loads and compares GU/NR relation tables before (Pre) and after (Post) a refarming process.
     (Se mantiene la funcionalidad exacta.)
@@ -41,15 +41,15 @@ class PrePostRelations:
     @staticmethod
     def _detect_prepost(folder_name: str) -> Optional[str]:
         name = folder_name.lower()
-        if any(tok in name for tok in PrePostRelations.PRE_TOKENS):
+        if any(tok in name for tok in ConsistencyChecks.PRE_TOKENS):
             return "Pre"
-        if any(tok in name for tok in PrePostRelations.POST_TOKENS):
+        if any(tok in name for tok in ConsistencyChecks.POST_TOKENS):
             return "Post"
         return None
 
     @staticmethod
     def _extract_date(folder_name: str) -> Optional[str]:
-        m = PrePostRelations.DATE_RE.search(folder_name)
+        m = ConsistencyChecks.DATE_RE.search(folder_name)
         if not m:
             return None
         s = m.group("date")
