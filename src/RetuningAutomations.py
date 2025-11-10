@@ -29,8 +29,8 @@ from pathlib import Path
 
 
 # Import our different Classes
-from src.modules.ConsistencyChecks import PrePostRelations
-from src.modules.ConfigurationAudit import CreateExcelFromLogs
+from src.modules.ConsistencyChecks import ConsistencyChecks
+from src.modules.ConfigurationAudit import ConfigurationAudit
 from src.modules.InitialCleanUp import InitialCleanUp
 from src.modules.FinalCleanUp import FinalCleanUp
 
@@ -238,7 +238,7 @@ def run_configuration_audit(input_dir: str) -> None:
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
-    app = CreateExcelFromLogs()
+    app = ConfigurationAudit()
     out = app.run(input_dir, module_name=module_name, versioned_suffix=versioned_suffix, tables_order=TABLES_ORDER)
 
     if out:
@@ -256,7 +256,7 @@ def run_consistency_checks(input_dir: str, freq_pre: Optional[str], freq_post: O
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
     output_dir = os.path.join(input_dir, f"CellRelationConsistencyChecks_{versioned_suffix}")
 
-    app = PrePostRelations()
+    app = ConsistencyChecks()
     app.loadPrePost(input_dir)
 
     results = None
