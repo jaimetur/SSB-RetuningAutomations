@@ -32,7 +32,17 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ## 🧩 Main Modules
 
-### 1) `Pre/Post Relations Consistency Checks`
+### `1. Configuration Audit (Logs Parser)`
+**Purpose:** Scan the log folder and build a consolidated Excel workbook.
+
+**Notes**
+- Public API in place (`ConfigurationAudit.run(input_dir, ...)`).  
+- Produces a versioned artifact (timestamp + tool version) when it writes output.  
+- Parsing/formatting rules can be extended to your specific log structure.
+
+---
+
+### `2. Consistency Check (Pre/Post Comparisson)`
 **Purpose:** Load Pre/Post inputs from an **input folder**, compare relations between a **Pre frequency** and a **Post frequency**, and save results to Excel.
 
 **Key capabilities**
@@ -53,20 +63,18 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ---
 
-### 2) `Create Excel From Logs`
-**Purpose:** Scan the log folder and build a consolidated Excel workbook.
+### `3. Initial Clean-Up (During Maintenance Window)`
+**Purpose:** Utility to sanitize intermediate outputs (delete/add relations, change parameters, etc.) during Maintainance Window (after retuning).
 
-**Notes in v0.2.1**
-- Public API in place (`CreateExcelFromLogs.run(input_dir, ...)`).  
-- Produces a versioned artifact (timestamp + tool version) when it writes output.  
-- Parsing/formatting rules can be extended to your specific log structure.
+**Notes**
+- Module scaffold present. Extend `CleanUp.run(...)` with your clean-up policies.
 
 ---
 
-### 3) `Clean-Up`
-**Purpose:** Utility to sanitize intermediate outputs (delete/add relations, change parameters, etc.).
+### `4. Final Clean-Up (When retune is finished)`
+**Purpose:** Utility to sanitize final cluster (delete profiles , etc.) when the retuning has finished.
 
-**Notes in v0.2.1**
+**Notes**
 - Module scaffold present. Extend `CleanUp.run(...)` with your clean-up policies.
 
 ---
