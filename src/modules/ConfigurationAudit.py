@@ -234,38 +234,73 @@ class ConfigurationAudit:
         ) -> pd.DataFrame:
             """
             Build a pivot counting 'values_field' grouped by index/columns.
+            Robust against duplicate column names (which can make a grouper non 1-D).
             If missing columns or empty df, return a friendly message.
             """
-            required = {index_field, columns_field, values_field}
-            if df is None or df.empty or not required.issubset(set(df.columns)):
-                # Return a small DataFrame explaining the situation
-                msg = "Table not found or required columns are missing"
-                details = f"Required: {sorted(required)} | Present: {sorted(df.columns.tolist()) if isinstance(df, pd.DataFrame) else 'None'}"
-                return pd.DataFrame({"Info": [msg, details]})
+            # Early exit when df is empty or not a DataFrame
+            if df is None or not isinstance(df, pd.DataFrame) or df.empty:
+                return pd.DataFrame({"Info": ["Table not found or empty"]})
+
+            # Normalize column names to strings
+            work = df.copy()
+            work.columns = pd.Index([str(c) for c in work.columns])
+
+            # If there are duplicate columns (e.g., two 'NodeId' columns), keep first occurrence
+            # to guarantee each grouper refers to a single 1-D Series.
+            if work.columns.duplicated().any():
+                work = work.loc[:, ~work.columns.duplicated(keep="first")]
+
+            # Helper to resolve the actual column name when original appears duplicated elsewhere
+            def _resolve(col_name: str) -> Optional[str]:
+                """
+                Return the exact column present in 'work' matching col_name.
+                If not found verbatim, try first column that starts with 'col_name_' (after make_unique_columns logic).
+                """
+                if col_name in work.columns:
+                    return col_name
+                # Try to locate a renamed/suffixed version (e.g., NodeId_1)
+                candidates = [c for c in work.columns if c == col_name or c.startswith(col_name + "_")]
+                return candidates[0] if candidates else None
+
+            idx_col = _resolve(index_field)
+            col_col = _resolve(columns_field)
+            val_col = _resolve(values_field)
+
+            required_resolved = {idx_col, col_col, val_col}
+            if None in required_resolved:
+                # Report which ones are missing with present columns for debugging
+                missing = {
+                    "index": index_field if idx_col is None else None,
+                    "columns": columns_field if col_col is None else None,
+                    "values": values_field if val_col is None else None,
+                }
+                missing_str = ", ".join([k for k, v in missing.items() if v is not None])
+                return pd.DataFrame({
+                    "Info": [f"Required columns missing or ambiguous: {missing_str}"],
+                    "PresentColumns": [", ".join(work.columns.tolist())],
+                })
 
             try:
-                # Ensure string-like columns are treated consistently
-                work = df.copy()
-                for col in [index_field, columns_field, values_field]:
+                # Ensure grouping columns are clean string dtype
+                for col in {idx_col, col_col, val_col}:
                     work[col] = work[col].astype(str).str.strip()
 
                 piv = pd.pivot_table(
                     work,
-                    index=index_field,
-                    columns=columns_field,
-                    values=values_field,
+                    index=idx_col,
+                    columns=col_col,
+                    values=val_col,
                     aggfunc="count",
                     fill_value=0,
                     margins=add_margins,
                     margins_name=margins_name,
                 )
-                # Reset index so it writes nicely to Excel
                 piv = piv.reset_index()
-                # If columns is a MultiIndex due to margins, flatten them
                 if isinstance(piv.columns, pd.MultiIndex):
                     piv.columns = [" ".join([str(x) for x in tup if str(x) != ""]).strip() for tup in piv.columns.values]
                 return piv
             except Exception as ex:
+                # Return a one-row DataFrame with the error to be written to Excel
                 return pd.DataFrame({"Error": [f"Pivot build failed: {ex}"]})
 
         # Define the three required pivots according to user spec
@@ -289,8 +324,8 @@ class ConfigurationAudit:
             margins_name="Total",
         )
 
-        # 3) "Summary GUtranFreq": from GUtranSyncSignalFrequency -> cols=GUtranSyncSignalFrequencyId, rows=NodeId, values=count of NodeId
-        #    (count of NodeId per GUtranSyncSignalFrequency found)
+        # 3) "Summary GUtranFreq": from GUtranSyncSignalFrequency -> cols=GUtranSyncSignalFrequencyId, rows=NodeId,
+        #    values=count of NodeId (count per GUtranSyncSignalFrequency found)
         pivot_gu_syncfreq = _safe_pivot_count(
             df=df_gu_syncfreq,
             index_field="NodeId",

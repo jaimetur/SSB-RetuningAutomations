@@ -216,11 +216,11 @@ def gui_config_dialog(
 # ================================ CLI PARSER ================================ #
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launcher for Pre/Post tools with GUI fallback.")
+    parser = argparse.ArgumentParser(description="Launcher Retuning Automations Tool with GUI fallback.")
     parser.add_argument(
         "--module",
-        choices=["excel", "prepost", "cleanup"],
-        help="Module to run: prepost|excel|cleanup. If omitted, GUI appears (unless --no-gui)."
+        choices=["configuration-audit", "consistency-check", "initial-cleanup", "final-cleanup"],
+        help="Module to run: configuration-audit|consistency-check|initial-cleanup|final-cleanup. If omitted, GUI appears (unless --no-gui)."
     )
     parser.add_argument("-i", "--input", help="Input folder to process")
     parser.add_argument("--freq-pre", help="Frequency before refarming (Pre)")
@@ -565,7 +565,7 @@ def main():
     try:
         run_consistency_checks(args.input, args.freq_pre or DEFAULT_FREQ_PRE, args.freq_post or DEFAULT_FREQ_POST)
     except Exception as e:
-        log_module_exception("prepost", e)
+        log_module_exception("consistency-check", e)
         # Same policy as above (choose A or B)
         # raise SystemExit(1)
         return
