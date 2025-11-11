@@ -199,9 +199,10 @@ class ConfigurationAudit:
         # =====================================================================
         # Collect dataframes for the specific MOs we need
         mo_collectors: Dict[str, List[pd.DataFrame]] = {
-            "NRCellDU": [],
-            "NRFreqRelation": [],
             "GUtranSyncSignalFrequency": [],
+            "NRCellDU": [],
+            "NRFrequency": [],
+            "NRFreqRelation": [],
         }
         for entry in table_entries:
             mo_name = str(entry.get("sheet_candidate", "")).strip()
@@ -210,51 +211,53 @@ class ConfigurationAudit:
                 if isinstance(df_mo, pd.DataFrame) and not df_mo.empty:
                     mo_collectors[mo_name].append(df_mo)
 
-        # Concatenate per-MO dataframes (aligning columns if needed)
-        df_nr_celldu = self._concat_or_empty(mo_collectors["NRCellDU"])
-        df_nr_freqrel = self._concat_or_empty(mo_collectors["NRFreqRelation"])
-        df_gu_syncfreq = self._concat_or_empty(mo_collectors["GUtranSyncSignalFrequency"])
-
         # ---- Build pivots ----
-        pivot_nr_cells = self._safe_pivot_count(
-            df=df_nr_celldu,
+        # Pivot GUtranSyncSignalFrequency
+        df_gu_sync_signal_freq = self._concat_or_empty(mo_collectors["GUtranSyncSignalFrequency"])
+        pivot_gu_sync_signal_freq = self._safe_crosstab_count(
+            df=df_gu_sync_signal_freq,
+            index_field="NodeId",
+            columns_field="arfcn",
+            add_margins=True,
+            margins_name="Total",
+        )
+        pivot_gu_sync_signal_freq = self._apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
+
+        # Pivot NRCellDU
+        df_nr_cell_du = self._concat_or_empty(mo_collectors["NRCellDU"])
+        pivot_nr_cells_du = self._safe_pivot_count(
+            df=df_nr_cell_du,
             index_field="NodeId",
             columns_field="ssbFrequency",
             values_field="NRCellDUId",
             add_margins=True,
             margins_name="Total",
         )
-        pivot_nr_cells = self._apply_frequency_column_filter(pivot_nr_cells, freq_filters)
+        pivot_nr_cells_du = self._apply_frequency_column_filter(pivot_nr_cells_du, freq_filters)
 
-        pivot_freq_rel = self._safe_pivot_count(
-            df=df_nr_freqrel,
+        # Pivot NRFrequency
+        df_nr_freq = self._concat_or_empty(mo_collectors["NRFrequency"])
+        pivot_nr_freq = self._safe_pivot_count(
+            df=df_nr_freq,
+            index_field="NodeId",
+            columns_field="arfcnValueNRDl",
+            values_field="NRFrequencyId",
+            add_margins=True,
+            margins_name="Total",
+        )
+        pivot_nr_freq = self._apply_frequency_column_filter(pivot_nr_freq, freq_filters)
+
+        # Pivot NRFreqRelation
+        df_nr_freq_rel = self._concat_or_empty(mo_collectors["NRFreqRelation"])
+        pivot_nr_freq_rel = self._safe_pivot_count(
+            df=df_nr_freq_rel,
             index_field="NodeId",
             columns_field="NRFreqRelationId",
             values_field="NRCellCUId",
             add_margins=True,
             margins_name="Total",
         )
-        pivot_freq_rel = self._apply_frequency_column_filter(pivot_freq_rel, freq_filters)
-
-        # pivot_gu_syncfreq = self._safe_pivot_count(
-        #     df=df_gu_syncfreq,
-        #     index_field="NodeId",
-        #     columns_field="arfcn",
-        #     values_field="NodeId",
-        #     add_margins=True,
-        #     margins_name="Total",
-        # )
-
-        # After (robust path without 'values'):
-        pivot_gu_syncfreq = self._safe_crosstab_count(
-            df=df_gu_syncfreq,
-            index_field="NodeId",
-            columns_field="arfcn",
-            add_margins=True,
-            margins_name="Total",
-        )
-
-        pivot_gu_syncfreq = self._apply_frequency_column_filter(pivot_gu_syncfreq, freq_filters)
+        pivot_nr_freq_rel = self._apply_frequency_column_filter(pivot_nr_freq_rel, freq_filters)
 
         # =====================================================================
         #                PHASE 5: Write the Excel file
@@ -264,13 +267,20 @@ class ConfigurationAudit:
             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
             # Extra summary sheets
-            pivot_nr_cells.to_excel(writer, sheet_name="Summary NR Cells", index=False)
-            pivot_freq_rel.to_excel(writer, sheet_name="Summary FreqRelation", index=False)
-            pivot_gu_syncfreq.to_excel(writer, sheet_name="Summary GUtranFreq", index=False)
+            pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
+            pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CelDU", index=False)
+            pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
+            pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
 
             # Then write each table in the final determined order
             for entry in table_entries:
                 entry["df"].to_excel(writer, sheet_name=entry["final_sheet"], index=False)
+
+            # <<< NEW: color the 'Summary*' tabs in green >>>
+            self._color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
+
+            # <<< NEW: enable filters (and freeze header row) on all sheets >>>
+            self._enable_header_filters(writer, freeze_header=True)
 
         print(f"{module_name} Wrote Excel with {len(table_entries)} sheet(s) in: '{excel_path}'")
         return excel_path
@@ -629,6 +639,46 @@ class ConfigurationAudit:
         except Exception:
             # Fallback: do not filter if selection fails for any reason
             return piv
+
+    def _color_summary_tabs(self, writer, prefix: str = "Summary", rgb_hex: str = "00B050") -> None:
+        """
+        Set tab color for every worksheet whose name starts with `prefix`.
+        Works with openpyxl-backed ExcelWriter.
+        - rgb_hex: 6-hex RGB (e.g., '00B050' = green).
+        """
+        try:
+            wb = writer.book  # openpyxl Workbook
+            for ws in wb.worksheets:
+                if ws.title.startswith(prefix):
+                    # Set tab color (expects hex without '#')
+                    ws.sheet_properties.tabColor = rgb_hex
+        except Exception:
+            # Hard-fail safe: never break file writing just for coloring tabs
+            pass
+
+    def _enable_header_filters(self, writer, freeze_header: bool = True) -> None:
+        """
+        Enable Excel AutoFilter on every worksheet for the used range.
+        Optionally freeze the header row (row 1) so data scrolls under it.
+        """
+        try:
+            wb = writer.book  # openpyxl Workbook
+            for ws in wb.worksheets:
+                # Skip empty sheets safely
+                if ws.max_row < 1 or ws.max_column < 1:
+                    continue
+
+                # Define used range for the filter, from A1 to last used cell
+                top_left = ws.cell(row=1, column=1).coordinate
+                bottom_right = ws.cell(row=ws.max_row, column=ws.max_column).coordinate
+                ws.auto_filter.ref = f"{top_left}:{bottom_right}"
+
+                # Optionally freeze header row
+                if freeze_header and ws.max_row >= 2:
+                    ws.freeze_panes = "A2"
+        except Exception:
+            # Never fail the export just for filters
+            pass
 
 
 # --------- kept local to preserve current behavior (module-level helper) ----
