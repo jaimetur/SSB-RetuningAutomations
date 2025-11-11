@@ -4,6 +4,25 @@
 
 ---
 
+## Release: v0.2.6
+- ### Release Date: 2025-11-12
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+
+  - #### 🚀 Enhancements:
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
 ## Release: v0.2.5
 - ### Release Date: 2025-11-11
 

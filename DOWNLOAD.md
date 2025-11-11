@@ -2,15 +2,15 @@
 Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 architectures) or Docker version (platform & architecture independent) as you prefer, directly from following links:
 
 **Linux:**:  
-  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_linux_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_linux_arm64.zip)  
+  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_linux_x64.zip)  
+  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_linux_arm64.zip)  
 
 **Mac OS:**
-  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_macos_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_macos_arm64.zip)  
+  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_macos_x64.zip)  
+  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_macos_arm64.zip)  
 
 **Windows:**  
-  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_windows_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.5/RetuningAutomations_v0.2.5_windows_arm64.zip)  
+  - [Download x64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_windows_x64.zip)  
+  - [Download arm64 version](https://github.com/jaimetur/RetuningAutomations/releases/download/v0.2.6/RetuningAutomations_v0.2.6_windows_arm64.zip)  
 
 
