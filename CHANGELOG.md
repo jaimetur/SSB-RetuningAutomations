@@ -4,6 +4,26 @@
 
 ---
 
+## Release: v0.2.5
+- ### Release Date: 2025-11-11
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - Configuration Audit now creates Pivot Table with useful Summary Information. 
+
+  - #### 🚀 Enhancements:
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
 ## Release: v0.2.4
 - ### Release Date: 2025-11-10
 
