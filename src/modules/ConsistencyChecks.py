@@ -292,8 +292,52 @@ class ConsistencyChecks:
                 for col in missing_in_post.columns:
                     missing_in_post[col] = missing_in_post[col].astype(str)
 
-            new_in_post_clean = drop_meta(new_in_post)
-            missing_in_post_clean = drop_meta(missing_in_post)
+            # --- minimal replacement for new/missing frequency pairing ---
+
+            def with_freq_pair(df_src: pd.DataFrame, tbl: str, kind: str) -> pd.DataFrame:
+                """
+                Build a light table for pair counting:
+                  - Compute base frequency from freq_col
+                  - For 'new': set Freq_Pre="" and Freq_Post=base
+                  - For 'missing': set Freq_Pre=base and Freq_Post=""
+                  - Drop only meta columns ('Pre/Post', 'Date'); keep freq_col if present
+                """
+                if df_src is None or df_src.empty:
+                    return df_src
+
+                df_tmp = df_src.copy()
+
+                # Ensure string dtype for safe operations
+                for col in df_tmp.columns:
+                    df_tmp[col] = df_tmp[col].astype(str)
+
+                # Compute base frequency using the proper extractor
+                if tbl == "NRCellRelation":
+                    base = extract_nr_freq_base(df_tmp.get(freq_col, pd.Series("", index=df_tmp.index)))
+                else:
+                    base = extract_gu_freq_base(df_tmp.get(freq_col, pd.Series("", index=df_tmp.index)))
+
+                # Assign Freq_Pre/Freq_Post according to kind
+                if kind == "new":
+                    # New in Post: Pre side must be empty, Post side carries the base
+                    df_tmp["Freq_Pre"] = ""
+                    df_tmp["Freq_Post"] = base
+                elif kind == "missing":
+                    # Missing in Post: Pre side carries the base, Post side must be empty
+                    df_tmp["Freq_Pre"] = base
+                    df_tmp["Freq_Post"] = ""
+                else:
+                    # Fallback (should not happen)
+                    df_tmp["Freq_Pre"] = ""
+                    df_tmp["Freq_Post"] = ""
+
+                # Drop only meta columns; keep freq_col for reference (harmless)
+                df_tmp = df_tmp.drop(columns=[c for c in ["Pre/Post", "Date"] if c in df_tmp.columns], errors="ignore")
+                return df_tmp
+
+            # Build cleaned tables for pair counting
+            new_in_post_clean = with_freq_pair(new_in_post, table_name, kind="new")
+            missing_in_post_clean = with_freq_pair(missing_in_post, table_name, kind="missing")
 
             # Pair stats
             pair_stats = pd.DataFrame({
