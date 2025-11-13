@@ -14,6 +14,7 @@
   - #### 🌟 New Features:
 
   - #### 🚀 Enhancements:
+    - Align Summary headers to left (#23)
     
   - #### 🐛 Bug fixes:
     - Minor bug fixing.

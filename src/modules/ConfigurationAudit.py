@@ -214,17 +214,6 @@ class ConfigurationAudit:
                     mo_collectors[mo_name].append(df_mo)
 
         # ---- Build pivots ----
-        # Pivot GUtranSyncSignalFrequency
-        df_gu_sync_signal_freq = self._concat_or_empty(mo_collectors["GUtranSyncSignalFrequency"])
-        pivot_gu_sync_signal_freq = self._safe_crosstab_count(
-            df=df_gu_sync_signal_freq,
-            index_field="NodeId",
-            columns_field="arfcn",
-            add_margins=True,
-            margins_name="Total",
-        )
-        pivot_gu_sync_signal_freq = self._apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
-
         # Pivot NRCellDU
         df_nr_cell_du = self._concat_or_empty(mo_collectors["NRCellDU"])
         pivot_nr_cells_du = self._safe_pivot_count(
@@ -261,6 +250,17 @@ class ConfigurationAudit:
         )
         pivot_nr_freq_rel = self._apply_frequency_column_filter(pivot_nr_freq_rel, freq_filters)
 
+        # Pivot GUtranSyncSignalFrequency
+        df_gu_sync_signal_freq = self._concat_or_empty(mo_collectors["GUtranSyncSignalFrequency"])
+        pivot_gu_sync_signal_freq = self._safe_crosstab_count(
+            df=df_gu_sync_signal_freq,
+            index_field="NodeId",
+            columns_field="arfcn",
+            add_margins=True,
+            margins_name="Total",
+        )
+        pivot_gu_sync_signal_freq = self._apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
+
         # =====================================================================
         #                PHASE 5: Write the Excel file
         # =====================================================================
@@ -269,10 +269,10 @@ class ConfigurationAudit:
             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
             # Extra summary sheets
-            pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
             pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CelDU", index=False)
             pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
             pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
+            pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
 
             # Then write each table in the final determined order
             for entry in table_entries:

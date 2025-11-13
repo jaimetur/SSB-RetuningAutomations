@@ -2,8 +2,8 @@
 
 import os
 import re
-from datetime import datetime
 from typing import List, Optional, Tuple, Dict, Iterable
+from openpyxl.styles import Alignment
 import pandas as pd
 
 # ============================ IO / TEXT ============================
@@ -245,10 +245,11 @@ def color_summary_tabs(writer, prefix: str = "Summary", rgb_hex: str = "00B050")
         pass
 
 
-def enable_header_filters(writer, freeze_header: bool = True) -> None:
+def enable_header_filters(writer, freeze_header: bool = True, align_left: bool = True) -> None:
     """
     Enable Excel AutoFilter on every worksheet for the used range.
     Optionally freeze the header row (row 1) so data scrolls under it.
+    Optionally align all cell text to the left.
     """
     try:
         wb = writer.book  # openpyxl Workbook
@@ -265,9 +266,19 @@ def enable_header_filters(writer, freeze_header: bool = True) -> None:
             # Optionally freeze header row
             if freeze_header and ws.max_row >= 2:
                 ws.freeze_panes = "A2"
+
+            # Optionally align all text to the left
+            if align_left:
+                left_alignment = Alignment(horizontal="left", vertical="top")
+                for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
+                    for cell in row:
+                        if cell.value is not None:
+                            cell.alignment = left_alignment
+
     except Exception:
-        # Never fail the export just for filters
+        # Never fail the export just for filters or alignment
         pass
+
 
 
 def sanitize_sheet_name(name: str) -> str:
