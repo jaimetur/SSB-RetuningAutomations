@@ -11,7 +11,7 @@ on:
       final_release:
         description: "Is this a Final Release?"
         required: true
-        default: false
+        default: true
         type: boolean
       compiler:
         description: "Select Compiler:"
