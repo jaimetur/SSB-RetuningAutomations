@@ -9,9 +9,18 @@ Main launcher with GUI/CLI to run one of:
 
 Behavior:
 - If run with NO args, opens a single Tkinter window to choose module,
-  input folder, and (optionally) frequencies (with defaults).
+  input folder(s), and (optionally) frequencies (with defaults).
 - If run with CLI args, behaves headless (unless you omit required fields, then
   will try GUI unless --no-gui).
+
+NEW:
+- When the user selects the SECOND item in the module combobox (index 1),
+  the GUI switches to a dual-input layout asking for two folders:
+    • Pre input folder
+    • Post input folder
+  The launcher will pass BOTH folders to the module call.
+- For any other module, the GUI shows the classic single input folder.
+- CLI now accepts --input-pre and --input-post for the consistency-check module.
 """
 
 import argparse
@@ -27,7 +36,6 @@ import configparser
 import traceback
 from pathlib import Path
 import inspect
-from tkinter import messagebox
 
 # Import our different Classes
 from src.modules.ConsistencyChecks import ConsistencyChecks
@@ -38,8 +46,8 @@ from src.modules.FinalCleanUp import FinalCleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "RetuningAutomations"
-TOOL_VERSION        = "0.2.6"
-TOOL_DATE           = "2025-11-12"
+TOOL_VERSION        = "0.2.7"
+TOOL_DATE           = "2025-11-13"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
 COPYRIGHT_TEXT      = "(c) 2025 - Jaime Tur (jaime.tur@ericsson.com)"
 TOOL_DESCRIPTION    = textwrap.dedent(f"""
@@ -49,9 +57,10 @@ Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retu
 """)
 
 # ================================ DEFAULTS ================================= #
-# Input Folder
-# INPUT_FOLDER = r"c:\Users\ejaitur\OneDrive - Ericsson\SSB Retuning Project Sharepoint - Scripts\OutputStep0\RetuneAutomations\ToyCells\PA7"
-INPUT_FOLDER = ""  # empty by default if not defined
+# Input Folder(s)
+INPUT_FOLDER = ""  # single-input default if not defined
+INPUT_FOLDER_PRE = ""   # default Pre folder for dual-input GUI (empty by default)
+INPUT_FOLDER_POST = ""  # default Post folder for dual-input GUI (empty by default)
 
 # Frequencies (single Pre/Post used by ConsistencyChecks)
 DEFAULT_FREQ_PRE = "648672"
@@ -81,6 +90,8 @@ CONFIG_DIR  = Path.home() / ".retuning_automations"
 CONFIG_PATH = CONFIG_DIR / "config.cfg"
 CONFIG_SECTION = "general"
 CONFIG_KEY_LAST_INPUT = "last_input_dir"
+CONFIG_KEY_LAST_INPUT_PRE = "last_input_dir_pre"
+CONFIG_KEY_LAST_INPUT_POST = "last_input_dir_post"
 CONFIG_KEY_FREQ_FILTERS = "summary_freq_filters"  # comma-separated persistence for filters
 
 # ============================== LOGGING SYSTEM ============================== #
@@ -116,7 +127,12 @@ except Exception:
 @dataclass
 class GuiResult:
     module: str
+    # Single-input mode
     input_dir: str
+    # Dual-input mode
+    input_pre_dir: str
+    input_post_dir: str
+    # Common
     freq_pre: str
     freq_post: str
     freq_filters_csv: str  # comma-separated list of frequency filters for summary sheets
@@ -131,20 +147,41 @@ def _normalize_csv_list(text: str) -> str:
     return ",".join(items)
 
 
+def _is_consistency_module(selected_text: str) -> bool:
+    """
+    Return True if the selected module is the SECOND item (index 1),
+    regardless of its display name. We check position to stay robust
+    even if the label changes in the future.
+    """
+    try:
+        idx = MODULE_NAMES.index(selected_text)
+        return idx == 1
+    except ValueError:
+        # If not found (custom text?), fallback to comparing lowercased forms
+        lowered = selected_text.strip().lower()
+        return lowered.startswith("2.") or "consistency" in lowered
+
+
 def gui_config_dialog(
     default_input: str = "",
     default_pre: str = DEFAULT_FREQ_PRE,
     default_post: str = DEFAULT_FREQ_POST,
     default_filters_csv: str = "",
+    default_input_pre: str = "",
+    default_input_post: str = "",
 ) -> Optional[GuiResult]:
     """
     Opens a single modal window with:
       - Combobox (module)
-      - Input folder (entry + Browse)
+      - Either:
+         • Single input folder (entry + Browse), or
+         • Dual input folders (Pre + Post, each with Browse)
+        The layout auto-switches when the SECOND module is selected.
       - Freq Pre (entry)
       - Freq Post (entry)
       - Multi-select list for Summary Frequency Filters (persisted)
       - Run / Cancel
+
     Returns GuiResult or None if cancelled/unavailable.
     """
     if tk is None or ttk is None or filedialog is None:
@@ -157,7 +194,7 @@ def gui_config_dialog(
     # Center window
     try:
         root.update_idletasks()
-        w, h = 770, 430
+        w, h = 680, 460
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         x = (sw // 2) - (w // 2)
@@ -169,6 +206,8 @@ def gui_config_dialog(
     # --- Vars
     module_var = tk.StringVar(value=MODULE_NAMES[0])
     input_var = tk.StringVar(value=default_input or "")
+    input_pre_var = tk.StringVar(value=default_input_pre or "")
+    input_post_var = tk.StringVar(value=default_input_post or "")
     pre_var = tk.StringVar(value=default_pre or "")
     post_var = tk.StringVar(value=default_post or "")
     selected_csv_var = tk.StringVar(value=_normalize_csv_list(default_filters_csv))
@@ -182,20 +221,59 @@ def gui_config_dialog(
 
     # Row 0: Module
     ttk.Label(frm, text="Module to run:").grid(row=0, column=0, sticky="w", **pad)
-    cmb = ttk.Combobox(frm, textvariable=module_var, values=MODULE_NAMES, state="readonly", width=42)
+    cmb = ttk.Combobox(frm, textvariable=module_var, values=MODULE_NAMES, state="readonly", width=50)
     cmb.grid(row=0, column=1, columnspan=2, sticky="ew", **pad)
 
-    # Row 1: Input folder
-    ttk.Label(frm, text="Input folder:").grid(row=1, column=0, sticky="w", **pad)
-    ent_input = ttk.Entry(frm, textvariable=input_var, width=48)
-    ent_input.grid(row=1, column=1, sticky="ew", **pad)
+    # --- Single-input frame (shown for modules other than #2)
+    single_frame = ttk.Frame(frm)
+    ttk.Label(single_frame, text="Input folder:").grid(row=0, column=0, sticky="w", **pad)
+    ent_input = ttk.Entry(single_frame, textvariable=input_var, width=58)
+    ent_input.grid(row=0, column=1, sticky="ew", **pad)
 
-    def browse():
+    def browse_single():
         path = filedialog.askdirectory(title="Select input folder", initialdir=input_var.get() or os.getcwd())
         if path:
             input_var.set(path)
 
-    ttk.Button(frm, text="Browse…", command=browse).grid(row=1, column=2, sticky="ew", **pad)
+    ttk.Button(single_frame, text="Browse…", command=browse_single).grid(row=0, column=2, sticky="ew", **pad)
+
+    # --- Dual-input frame (shown only for module #2)
+    dual_frame = ttk.Frame(frm)
+
+    ttk.Label(dual_frame, text="Pre input folder:").grid(row=0, column=0, sticky="w", **pad)
+    ent_pre = ttk.Entry(dual_frame, textvariable=input_pre_var, width=58)
+    ent_pre.grid(row=0, column=1, sticky="ew", **pad)
+
+    def browse_pre():
+        path = filedialog.askdirectory(title="Select PRE input folder", initialdir=input_pre_var.get() or os.getcwd())
+        if path:
+            input_pre_var.set(path)
+
+    ttk.Button(dual_frame, text="Browse…", command=browse_pre).grid(row=0, column=2, sticky="ew", **pad)
+
+    ttk.Label(dual_frame, text="Post input folder:").grid(row=1, column=0, sticky="w", **pad)
+    ent_post = ttk.Entry(dual_frame, textvariable=input_post_var, width=58)
+    ent_post.grid(row=1, column=1, sticky="ew", **pad)
+
+    def browse_post():
+        path = filedialog.askdirectory(title="Select POST input folder", initialdir=input_post_var.get() or os.getcwd())
+        if path:
+            input_post_var.set(path)
+
+    ttk.Button(dual_frame, text="Browse…", command=browse_post).grid(row=1, column=2, sticky="ew", **pad)
+
+    # Initially show single or dual depending on default selection
+    def _refresh_input_mode(*_e):
+        # Hide both, then show the appropriate one
+        single_frame.grid_forget()
+        dual_frame.grid_forget()
+        if _is_consistency_module(module_var.get()):
+            dual_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
+        else:
+            single_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
+
+    cmb.bind("<<ComboboxSelected>>", _refresh_input_mode)
+    _refresh_input_mode()
 
     # Row 2-3: Pre/Post single frequencies (ConsistencyChecks)
     ttk.Label(frm, text="Frequency (Pre):").grid(row=2, column=0, sticky="w", **pad)
@@ -209,7 +287,6 @@ def gui_config_dialog(
 
     # Left: multi-select list of NETWORK_FREQUENCIES with vertical scrollbar
     list_frame = ttk.Frame(frm)
-    # list_frame.grid(row=6, column=0, columnspan=1, sticky="nsw", **pad)
     list_frame.grid(row=6, column=0, columnspan=1, sticky="nsw", **pad_tight)
     ttk.Label(list_frame, text="Available frequencies:").pack(anchor="w")
 
@@ -233,19 +310,17 @@ def gui_config_dialog(
     for freq in NETWORK_FREQUENCIES:
         lb.insert("end", freq)
     lb.pack(side="left", fill="both", expand=True)
-
     scrollbar.config(command=lb.yview)
 
+    # Middle: buttons for selection management
     btns_frame = ttk.Frame(frm)
-    # btns_frame.grid(row=6, column=1, sticky="n", **pad)
     btns_frame.grid(row=6, column=1, sticky="n", **pad_tight)
 
     # Right: entry showing selected (comma-separated)
     right_frame = ttk.Frame(frm)
-    # right_frame.grid(row=6, column=2, sticky="nsew", **pad)
     right_frame.grid(row=6, column=2, sticky="nsew", **pad_tight)
     ttk.Label(right_frame, text="Frequencies Filter (Empty = No Filter):").grid(row=0, column=0, sticky="w")
-    ent_selected = ttk.Entry(right_frame, textvariable=selected_csv_var, width=36)
+    ent_selected = ttk.Entry(right_frame, textvariable=selected_csv_var, width=40)
     ent_selected.grid(row=1, column=0, sticky="ew")
 
     def _current_selected_set() -> List[str]:
@@ -286,17 +361,37 @@ def gui_config_dialog(
     def on_run():
         nonlocal result
         sel_module = module_var.get().strip()
-        sel_input = input_var.get().strip()
-        if not sel_input:
-            messagebox.showerror("Missing input", "Please select an input folder.")
-            return
-        result = GuiResult(
-            module=sel_module,
-            input_dir=sel_input,
-            freq_pre=pre_var.get().strip(),
-            freq_post=post_var.get().strip(),
-            freq_filters_csv=_normalize_csv_list(selected_csv_var.get()),
-        )
+
+        # Validate inputs depending on the selected module
+        if _is_consistency_module(sel_module):
+            sel_input_pre = input_pre_var.get().strip()
+            sel_input_post = input_post_var.get().strip()
+            if not sel_input_pre or not sel_input_post:
+                messagebox.showerror("Missing input", "Please select both Pre and Post input folders.")
+                return
+            result = GuiResult(
+                module=sel_module,
+                input_dir="",  # not used in dual-input mode
+                input_pre_dir=sel_input_pre,
+                input_post_dir=sel_input_post,
+                freq_pre=pre_var.get().strip(),
+                freq_post=post_var.get().strip(),
+                freq_filters_csv=_normalize_csv_list(selected_csv_var.get()),
+            )
+        else:
+            sel_input = input_var.get().strip()
+            if not sel_input:
+                messagebox.showerror("Missing input", "Please select an input folder.")
+                return
+            result = GuiResult(
+                module=sel_module,
+                input_dir=sel_input,
+                input_pre_dir="",
+                input_post_dir="",
+                freq_pre=pre_var.get().strip(),
+                freq_post=post_var.get().strip(),
+                freq_filters_csv=_normalize_csv_list(selected_csv_var.get()),
+            )
         root.destroy()
 
     def on_cancel():
@@ -321,7 +416,12 @@ def parse_args() -> argparse.Namespace:
         choices=["configuration-audit", "consistency-check", "initial-cleanup", "final-cleanup"],
         help="Module to run: configuration-audit|consistency-check|initial-cleanup|final-cleanup. If omitted, GUI appears (unless --no-gui)."
     )
-    parser.add_argument("-i", "--input", help="Input folder to process")
+    # Single-input (most modules)
+    parser.add_argument("-i", "--input", help="Input folder to process (single-input modules)")
+    # Dual-input (consistency-check)
+    parser.add_argument("--input-pre", help="PRE input folder (only for consistency-check)")
+    parser.add_argument("--input-post", help="POST input folder (only for consistency-check)")
+
     parser.add_argument("--freq-pre", help="Frequency before refarming (Pre)")
     parser.add_argument("--freq-post", help="Frequency after refarming (Post)")
     parser.add_argument(
@@ -365,53 +465,95 @@ def run_configuration_audit(input_dir: str, freq_filters_csv: str = "") -> None:
         print(f"{module_name}  No logs found or nothing written.")
 
 
-def run_consistency_checks(input_dir: str, freq_pre: Optional[str], freq_post: Optional[str]) -> None:
+def run_consistency_checks(input_pre_dir: Optional[str], input_post_dir: Optional[str],
+                           freq_pre: Optional[str], freq_post: Optional[str]) -> None:
+    """
+    Updated runner to support DUAL INPUT mode.
+    - If both input_pre_dir and input_post_dir are provided, attempt to load Pre/Post from separate folders.
+    - If not, preserve legacy behavior (single parent folder expected with 'Pre' and 'Post' children).
+    """
     module_name = "[Consistency Checks (Pre/Post Comparison)]"
     print(f"{module_name} Running…")
-    print(f"{module_name} Input folder: '{input_dir}'")
-
-    # --- Detect presence of Pre/Post folders early and exit if missing ---
-    pre_found, post_found = False, False
-    try:
-        for entry in os.scandir(input_dir):
-            if not entry.is_dir():
-                continue
-            tag = ConsistencyChecks._detect_prepost(entry.name)
-            if tag == "Pre":
-                pre_found = True
-            elif tag == "Post":
-                post_found = True
-    except FileNotFoundError:
-        # Si el input_dir no existe, conserva tu comportamiento actual más abajo
-        pass
-
-    if not (pre_found and post_found):
-        missing = []
-        if not pre_found:
-            missing.append("Pre")
-        if not post_found:
-            missing.append("Post")
-        msg = (
-            f"Missing required folder(s): {', '.join(missing)}\n\n"
-            "No processing will be performed. Please select a folder that contains both Pre and Post folders."
-        )
-        try:
-            messagebox.showwarning("Missing Pre/Post folders", msg)
-        except Exception:
-            print(f"{module_name} [WARNING] {msg}")
-        return
-    # -------------------------------------------------------------------------------
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
-    output_dir = os.path.join(input_dir, f"CellRelationConsistencyChecks_{versioned_suffix}")
 
     app = ConsistencyChecks()
-    app.loadPrePost(input_dir)
+
+    # Dual-input new path
+    if input_pre_dir and input_post_dir:
+        print(f"{module_name} PRE folder:  '{input_pre_dir}'")
+        print(f"{module_name} POST folder: '{input_post_dir}'")
+
+        # Try a modern signature first: loadPrePost(pre_dir, post_dir)
+        loaded = False
+        try:
+            # If the class supports two-args loader, this will work
+            app.loadPrePost(input_pre_dir, input_post_dir)  # NEW signature support
+            loaded = True
+        except TypeError:
+            # Fall back to custom method name if available
+            try:
+                app.loadPrePostFromFolders(input_pre_dir, input_post_dir)  # Alternate name
+                loaded = True
+            except Exception:
+                loaded = False
+
+        if not loaded:
+            # Do not try legacy common-parent fallback anymore; we explicitly require dual-input support
+            print(f"{module_name} [ERROR] ConsistencyChecks class does not support dual folders (Pre/Post).")
+            print(f"{module_name}         Please update ConsistencyChecks.loadPrePost(pre_dir, post_dir) to enable dual-input mode.")
+            return
+
+        # Output base is ALWAYS the POST folder in dual-input mode
+        output_dir = os.path.join(input_post_dir, f"CellRelationConsistencyChecks_{versioned_suffix}")
+
+    else:
+        # Legacy single-input behavior preserved: expect a parent with Pre/Post inside
+        input_dir = input_pre_dir or ""  # using first param slot as "single"
+        print(f"{module_name} Input folder: '{input_dir}'")
+
+        # Early presence check (legacy)
+        pre_found, post_found = False, False
+        try:
+            for entry in os.scandir(input_dir):
+                if not entry.is_dir():
+                    continue
+                tag = ConsistencyChecks._detect_prepost(entry.name)
+                if tag == "Pre":
+                    pre_found = True
+                elif tag == "Post":
+                    post_found = True
+        except FileNotFoundError:
+            pass
+
+        if not (pre_found and post_found):
+            missing = []
+            if not pre_found:
+                missing.append("Pre")
+            if not post_found:
+                missing.append("Post")
+            msg = (
+                f"Missing required folder(s): {', '.join(missing)}\n\n"
+                "No processing will be performed. Please select a folder that contains both Pre and Post folders."
+            )
+            try:
+                messagebox.showwarning("Missing Pre/Post folders", msg)
+            except Exception:
+                print(f"{module_name} [WARNING] {msg}")
+            return
+
+        app.loadPrePost(input_dir)
+        output_dir = os.path.join(input_dir, f"CellRelationConsistencyChecks_{versioned_suffix}")
 
     results = None
     if freq_pre and freq_post:
-        results = app.comparePrePost(freq_pre, freq_post, module_name)
+        try:
+            # Modern comparison that may accept dual context transparently
+            results = app.comparePrePost(freq_pre, freq_post, module_name)
+        except TypeError:
+            # If the signature differs in your class, adapt here as needed
+            results = app.comparePrePost(freq_pre, freq_post)
     else:
         print(f"{module_name} [INFO] Frequencies not provided. Comparison will be skipped; only tables will be saved.")
 
@@ -438,7 +580,6 @@ def run_initial_cleanup(input_dir: str, *_args) -> None:
     if out:
         print(f"{module_name} Done → '{out}'")
     else:
-        # print(f"{module_name} No logs found or nothing written.")
         print(f"{module_name} Module logic not yet implemented (under development). Exiting...")
 
 
@@ -456,7 +597,6 @@ def run_final_cleanup(input_dir: str, *_args) -> None:
     if out:
         print(f"{module_name} Done → '{out}'")
     else:
-        # print(f"{module_name} No logs found or nothing written.")
         print(f"{module_name} Module logic not yet implemented (under development). Exiting...")
 
 
@@ -473,63 +613,89 @@ def resolve_module_callable(name: str):
     return None
 
 
+# =============================== PERSISTENCE ================================ #
+
+def _read_cfg() -> configparser.ConfigParser:
+    parser = configparser.ConfigParser()
+    if CONFIG_PATH.exists():
+        parser.read(CONFIG_PATH, encoding="utf-8")
+    return parser
+
 def load_last_input_dir_from_config() -> str:
-    """Load last used input directory from config file. Returns empty string if missing."""
+    """Load last used input directory for single-input modules."""
     try:
         if not CONFIG_PATH.exists():
             return ""
-        parser = configparser.ConfigParser()
-        parser.read(CONFIG_PATH, encoding="utf-8")
+        parser = _read_cfg()
         return parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT, fallback="").strip()
     except Exception:
-        # Fail-safe: do not block the tool if config is corrupt
         return ""
 
+def load_last_dual_from_config() -> tuple[str, str]:
+    """Load last used PRE/POST input directories for dual-input module."""
+    try:
+        if not CONFIG_PATH.exists():
+            return ("", "")
+        parser = _read_cfg()
+        pre = parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT_PRE, fallback="").strip()
+        post = parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT_POST, fallback="").strip()
+        return (pre, post)
+    except Exception:
+        return ("", "")
 
 def load_last_filters_from_config() -> str:
     """Load last used frequency filters (CSV) from config file. Returns empty string if missing."""
     try:
         if not CONFIG_PATH.exists():
             return ""
-        parser = configparser.ConfigParser()
-        parser.read(CONFIG_PATH, encoding="utf-8")
+        parser = _read_cfg()
         return parser.get(CONFIG_SECTION, CONFIG_KEY_FREQ_FILTERS, fallback="").strip()
     except Exception:
         return ""
 
+def _ensure_cfg_section(parser: configparser.ConfigParser) -> None:
+    if CONFIG_SECTION not in parser:
+        parser[CONFIG_SECTION] = {}
 
 def save_last_input_dir_to_config(input_dir: str) -> None:
-    """Persist last used input directory to config file (create/update as needed)."""
+    """Persist last used input directory to config file (single-input)."""
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = configparser.ConfigParser()
-        if CONFIG_PATH.exists():
-            parser.read(CONFIG_PATH, encoding="utf-8")
-        if CONFIG_SECTION not in parser:
-            parser[CONFIG_SECTION] = {}
+        parser = _read_cfg()
+        _ensure_cfg_section(parser)
         parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT] = input_dir or ""
         with CONFIG_PATH.open("w", encoding="utf-8") as f:
             parser.write(f)
     except Exception:
-        # Silent fail on write; we do not want to break main flow due to IO
         pass
 
+def save_last_dual_to_config(pre_dir: str, post_dir: str) -> None:
+    """Persist last used PRE/POST input directories (dual-input)."""
+    try:
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        parser = _read_cfg()
+        _ensure_cfg_section(parser)
+        parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT_PRE] = pre_dir or ""
+        parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT_POST] = post_dir or ""
+        with CONFIG_PATH.open("w", encoding="utf-8") as f:
+            parser.write(f)
+    except Exception:
+        pass
 
 def save_last_filters_to_config(filters_csv: str) -> None:
     """Persist last used frequency filters (CSV) to config file."""
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = configparser.ConfigParser()
-        if CONFIG_PATH.exists():
-            parser.read(CONFIG_PATH, encoding="utf-8")
-        if CONFIG_SECTION not in parser:
-            parser[CONFIG_SECTION] = {}
+        parser = _read_cfg()
+        _ensure_cfg_section(parser)
         parser[CONFIG_SECTION][CONFIG_KEY_FREQ_FILTERS] = _normalize_csv_list(filters_csv)
         with CONFIG_PATH.open("w", encoding="utf-8") as f:
             parser.write(f)
     except Exception:
         pass
 
+
+# =============================== EXECUTION CORE ============================= #
 
 def _format_duration_hms(seconds: float) -> str:
     """Return duration as H:MM:SS.mmm (milliseconds precision)."""
@@ -540,17 +706,30 @@ def _format_duration_hms(seconds: float) -> str:
     return f"{hours}:{minutes:02d}:{secs:02d}.{ms:03d}"
 
 
-def execute_module(module_fn, input_dir: str, freq_pre: str, freq_post: str, freq_filters_csv: str = "") -> None:
-    """Execute the selected module with the proper signature (timed)."""
-    # Timing starts here
+def execute_module(module_fn,
+                   input_dir: str,
+                   freq_pre: str,
+                   freq_post: str,
+                   freq_filters_csv: str = "",
+                   input_pre_dir: str = "",
+                   input_post_dir: str = "") -> None:
+    """
+    Execute the selected module with the proper signature (timed).
+    - For run_consistency_checks: prefer dual-input if both input_pre_dir/post_dir are provided.
+    - For run_configuration_audit: single input + optional filters.
+    - For cleanup modules: single input.
+    """
     start_ts = time.perf_counter()
-    # Friendly label for logs: use function name if no better label
     label = getattr(module_fn, "__name__", "module")
 
     try:
-        # Normalize signatures here so caller code stays simple.
         if module_fn is run_consistency_checks:
-            module_fn(input_dir, freq_pre, freq_post)
+            # Dual-input preferred if provided
+            if input_pre_dir and input_post_dir:
+                module_fn(input_pre_dir, input_post_dir, freq_pre, freq_post)
+            else:
+                # Backwards compatibility: use single input_dir (legacy layout)
+                module_fn(input_dir, None, freq_pre, freq_post)
         elif module_fn is run_configuration_audit:
             module_fn(input_dir, freq_filters_csv=freq_filters_csv)
         elif module_fn is run_initial_cleanup:
@@ -558,15 +737,17 @@ def execute_module(module_fn, input_dir: str, freq_pre: str, freq_post: str, fre
         elif module_fn is run_final_cleanup:
             module_fn(input_dir, freq_pre, freq_post)
         else:
-            # Fallback for custom callables keeping compatibility
-            # Try to pass filters if function supports it
+            # Generic fallback for custom callables
             sig = inspect.signature(module_fn)
-            if "freq_filters_csv" in sig.parameters:
+            params = sig.parameters
+            if "input_pre_dir" in params and "input_post_dir" in params:
+                module_fn(input_pre_dir=input_pre_dir, input_post_dir=input_post_dir,
+                          freq_pre=freq_pre, freq_post=freq_post, freq_filters_csv=freq_filters_csv)
+            elif "freq_filters_csv" in params:
                 module_fn(input_dir, freq_pre, freq_post, freq_filters_csv=freq_filters_csv)
             else:
                 module_fn(input_dir, freq_pre, freq_post)
     finally:
-        # Always print elapsed time even if the module raised an exception
         elapsed = time.perf_counter() - start_ts
         print(f"[Timer] {label} finished in {_format_duration_hms(elapsed)}")
 
@@ -575,7 +756,6 @@ def ask_reopen_launcher() -> bool:
     """Ask the user if the launcher should reopen after a module finishes.
     Returns True to reopen, False to exit.
     """
-    # If Tk is not available (or disabled), default to not reopening.
     if messagebox is None:
         return False
     try:
@@ -584,7 +764,6 @@ def ask_reopen_launcher() -> bool:
             "The selected task has finished.\nDo you want to open the launcher again?"
         )
     except Exception:
-        # In case of headless/console-only contexts, do not loop.
         return False
 
 
@@ -598,7 +777,6 @@ def log_module_exception(module_label: str, exc: BaseException) -> None:
     print("Traceback (most recent call last):")
     print(traceback.format_exc().rstrip())
     print("=" * 80 + "\n")
-    # Optional GUI popup (short message) if Tk is available
     if messagebox is not None:
         try:
             messagebox.showerror(
@@ -607,6 +785,7 @@ def log_module_exception(module_label: str, exc: BaseException) -> None:
             )
         except Exception:
             pass
+
 
 # ================================== MAIN =================================== #
 
@@ -625,18 +804,15 @@ def main():
 
     logs_dir = os.path.join(base_dir, "Logs")
     os.makedirs(logs_dir, exist_ok=True)
-
     log_path = os.path.join(logs_dir, log_filename)
 
     # Replace stdout/stderr and with our dual logger
     sys.stdout = LoggerDual(log_path)
-    sys.stderr = sys.stdout  # <- add this
-    print(f"[Logger] Output will also be written to: {log_path}")
-    print("")
+    sys.stderr = sys.stdout
+    print(f"[Logger] Output will also be written to: {log_path}\n")
 
     # Load Tool while splash image is shown (only for Windows)
-    print("")
-    print("Loading Tool...")
+    print("\nLoading Tool...")
     # Remove Splash image from Pyinstaller
     if '_PYI_SPLASH_IPC' in os.environ and importlib.util.find_spec("pyi_splash"):
         import pyi_splash
@@ -652,20 +828,22 @@ def main():
         )
         with open(splash_filename, "wb") as f:
             f.write(b"READY")
-
         if os.path.exists(splash_filename):
             os.unlink(splash_filename)
     print("Tool loaded!")
     print(TOOL_DESCRIPTION)
-    print("")
-    print(f"[Config] Using config file: {CONFIG_PATH}")
-    print("")
+    print(f"\n[Config] Using config file: {CONFIG_PATH}\n")
 
     args = parse_args()
 
-    # Determine default input folder and default filters (persist across runs)
-    persisted_last = load_last_input_dir_from_config()
-    default_input = args.input or persisted_last or INPUT_FOLDER or ""
+    # Determine default input(s) and filters (persist across runs)
+    persisted_last_single = load_last_input_dir_from_config()
+    persisted_pre, persisted_post = load_last_dual_from_config()
+
+    default_input = args.input or persisted_last_single or INPUT_FOLDER or ""
+    default_input_pre = args.input_pre or persisted_pre or INPUT_FOLDER_PRE or ""
+    default_input_post = args.input_post or persisted_post or INPUT_FOLDER_POST or ""
+
     persisted_filters = load_last_filters_from_config()
     default_filters_csv = _normalize_csv_list(args.freq_filters or persisted_filters)
 
@@ -678,56 +856,116 @@ def main():
         if module_fn is None:
             raise SystemExit(f"Unknown module: {args.module}")
 
-        input_dir = args.input or ""
-        freq_pre = args.freq_pre or DEFAULT_FREQ_PRE
-        freq_post = args.freq_post or DEFAULT_FREQ_POST
-        freq_filters_csv = default_filters_csv  # already normalized from args/config
+        # Consistency-check can use dual-input from CLI
+        if module_fn is run_consistency_checks:
+            input_pre_dir = args.input_pre or default_input_pre
+            input_post_dir = args.input_post or default_input_post
 
-        # If input is missing and GUI is allowed, show GUI, execute, and optionally loop
+            # If missing and GUI allowed, show GUI with dual layout
+            if (not input_pre_dir or not input_post_dir) and not args.no_gui and tk is not None:
+                while True:
+                    sel = gui_config_dialog(
+                        default_input="",  # single not used here
+                        default_pre=default_pre,
+                        default_post=default_post,
+                        default_filters_csv=default_filters_csv,
+                        default_input_pre=input_pre_dir,
+                        default_input_post=input_post_dir,
+                    )
+                    if sel is None:
+                        raise SystemExit("Cancelled.")
+                    input_pre_dir = sel.input_pre_dir
+                    input_post_dir = sel.input_post_dir
+                    freq_pre = sel.freq_pre
+                    freq_post = sel.freq_post
+                    freq_filters_csv = sel.freq_filters_csv
+
+                    # Persist last used inputs/filters
+                    save_last_dual_to_config(input_pre_dir, input_post_dir)
+                    save_last_filters_to_config(freq_filters_csv)
+
+                    try:
+                        execute_module(module_fn,
+                                       input_dir="",  # unused in dual mode
+                                       freq_pre=freq_pre,
+                                       freq_post=freq_post,
+                                       freq_filters_csv=freq_filters_csv,
+                                       input_pre_dir=input_pre_dir,
+                                       input_post_dir=input_post_dir)
+                    except Exception as e:
+                        log_module_exception(sel.module, e)
+
+                    if not ask_reopen_launcher():
+                        break
+                return
+
+            # Pure headless CLI (dual-input required)
+            if not (input_pre_dir and input_post_dir):
+                raise SystemExit("Both --input-pre and --input-post must be provided for consistency-check in headless mode.")
+            save_last_dual_to_config(input_pre_dir, input_post_dir)
+            save_last_filters_to_config(default_filters_csv)
+            execute_module(module_fn,
+                           input_dir="",  # unused in dual mode
+                           freq_pre=default_pre,
+                           freq_post=default_post,
+                           freq_filters_csv=default_filters_csv,
+                           input_pre_dir=input_pre_dir,
+                           input_post_dir=input_post_dir)
+            return
+
+        # Other modules (single-input)
+        input_dir = args.input or default_input
+        freq_pre = default_pre
+        freq_post = default_post
+        freq_filters_csv = default_filters_csv
+
         if not input_dir and not args.no_gui and tk is not None:
             while True:
-                sel = gui_config_dialog(default_input="", default_pre=freq_pre, default_post=freq_post, default_filters_csv=freq_filters_csv)
+                sel = gui_config_dialog(
+                    default_input=default_input,
+                    default_pre=freq_pre,
+                    default_post=freq_post,
+                    default_filters_csv=freq_filters_csv,
+                )
                 if sel is None:
                     raise SystemExit("Cancelled.")
-                input_dir = sel.input_dir
-                freq_pre = sel.freq_pre
-                freq_post = sel.freq_post
-                freq_filters_csv = sel.freq_filters_csv
-
-                # Persist last used input dir and filters
-                save_last_input_dir_to_config(input_dir)
-                save_last_filters_to_config(freq_filters_csv)
+                # Persist last used inputs/filters
+                save_last_input_dir_to_config(sel.input_dir)
+                save_last_filters_to_config(sel.freq_filters_csv)
+                default_input = sel.input_dir
+                default_filters_csv = sel.freq_filters_csv
 
                 try:
-                    execute_module(module_fn, input_dir, freq_pre, freq_post, freq_filters_csv=freq_filters_csv)
+                    execute_module(module_fn,
+                                   input_dir=sel.input_dir,
+                                   freq_pre=sel.freq_pre,
+                                   freq_post=sel.freq_post,
+                                   freq_filters_csv=sel.freq_filters_csv)
                 except Exception as e:
                     log_module_exception(sel.module, e)
 
-                # Ask if user wants to reopen the launcher; if not, exit loop
                 if not ask_reopen_launcher():
                     break
-                # Reset input_dir to force showing the GUI again on next iteration
-                input_dir = ""
             return
 
-        # Pure headless CLI execution (no GUI fallback or input provided)
+        # Headless single-input path
         if not input_dir:
             raise SystemExit("Input folder not provided.")
-        # Persist last used input dir and filters (headless CLI)
         save_last_input_dir_to_config(input_dir)
         save_last_filters_to_config(freq_filters_csv)
-        execute_module(module_fn, input_dir, freq_pre, freq_post, freq_filters_csv=freq_filters_csv)
+        execute_module(module_fn, input_dir=input_dir, freq_pre=freq_pre, freq_post=freq_post, freq_filters_csv=freq_filters_csv)
         return
 
     # CASE B: No module specified -> GUI (if available)
     if not args.no_gui and tk is not None:
-        # Loop to keep reopening the launcher after each module finishes
         while True:
             sel = gui_config_dialog(
                 default_input=default_input,
                 default_pre=default_pre,
                 default_post=default_post,
-                default_filters_csv=default_filters_csv
+                default_filters_csv=default_filters_csv,
+                default_input_pre=default_input_pre,
+                default_input_post=default_input_post,
             )
             if sel is None:
                 raise SystemExit("Cancelled.")
@@ -736,40 +974,37 @@ def main():
             if module_fn is None:
                 raise SystemExit(f"Unknown module selected: {sel.module}")
 
-            # Persist last used input dir and filters
-            save_last_input_dir_to_config(sel.input_dir)
+            # Persist inputs appropriately
+            if _is_consistency_module(sel.module):
+                save_last_dual_to_config(sel.input_pre_dir, sel.input_post_dir)
+                input_dir = ""  # unused in dual mode
+            else:
+                save_last_input_dir_to_config(sel.input_dir)
+                input_dir = sel.input_dir
+
             save_last_filters_to_config(sel.freq_filters_csv)
 
             try:
-                execute_module(module_fn, sel.input_dir, sel.freq_pre, sel.freq_post, freq_filters_csv=sel.freq_filters_csv)
+                execute_module(module_fn,
+                               input_dir=input_dir,
+                               freq_pre=sel.freq_pre,
+                               freq_post=sel.freq_post,
+                               freq_filters_csv=sel.freq_filters_csv,
+                               input_pre_dir=sel.input_pre_dir,
+                               input_post_dir=sel.input_post_dir)
             except Exception as e:
-                # Log nicely and keep the app alive
                 log_module_exception(sel.module, e)
 
-            # Ask if user wants to reopen the launcher; if not, exit loop
             if not ask_reopen_launcher():
                 break
         return
 
     # CASE C: Headless (no GUI)
-    if not args.input:
-        raise SystemExit("Input folder not provided and GUI disabled/unavailable. Use -i/--input.")
-    # Persist last used input dir and filters (headless no-GUI path)
-    save_last_input_dir_to_config(args.input)
-    save_last_filters_to_config(default_filters_csv)
-    try:
-        # Default to Consistency Checks in headless path (same behavior as before)
-        run_consistency_checks(args.input, args.freq_pre or DEFAULT_FREQ_PRE, args.freq_post or DEFAULT_FREQ_POST)
-    except Exception as e:
-        log_module_exception("consistency-check", e)
-        return
+    # Default to Consistency Checks or require single-input depending on args
+    raise SystemExit("Headless start without --module is not supported. Please provide --module and input(s).")
 
-    # Log closing
-    print("\n[Logger] Execution finished.")
-    # Restore stdout and close log file
-    if isinstance(sys.stdout, LoggerDual):
-        sys.stdout.log.close()
-        sys.stdout = sys.stdout.terminal
+    # (No code beyond this point)
+    # Log closing and restoration would happen at the natural process exit.
 
 
 if __name__ == "__main__":

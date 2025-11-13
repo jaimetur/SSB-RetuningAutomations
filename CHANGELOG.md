@@ -4,6 +4,28 @@
 
 ---
 
+## Release: v0.2.7
+- ### Release Date: 2025-11-13
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - If Consistency Check module is selected, then use two input folders, one for Pre and one for Post (#25)
+
+  - #### 🚀 Enhancements:
+    - Align Summary headers to left (#23)
+    - Include input log folder in Summary sheets of Consistency Check (#24)
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+  
+---
+
 ## Release: v0.2.6
 - ### Release Date: 2025-11-12
 
@@ -14,9 +36,14 @@
   - #### 🌟 New Features:
 
   - #### 🚀 Enhancements:
+    - Improvements on Date detection method to do an smart detection of any date included in the input folder.
+    - Changed date format to YYYY-MM-DD for a better visualization.
+    - Changed color of Summary Sheets in output Excel to green for a better visualization. 
+    - Changed macos-x64 runer on GitHub workflow.
     
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
+    - Added `Summary NRFrequency` table to `Configuration Audit` module.
     
   - #### 📚 Documentation: 
     - Updated documentation with latest changes
