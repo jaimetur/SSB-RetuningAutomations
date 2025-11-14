@@ -22,13 +22,44 @@ from src.modules.CommonMethods import (
 class ConfigurationAudit:
     """
     Generates an Excel in input_dir with one sheet per *.log / *.logs / *.txt file.
-    (Funcionalidad intacta.)
+    (Functionality kept, extended with SummaryAudit sheet and PPT summary.)
+
+    ARFCN-related parameters (N77, etc.) are now configurable via __init__:
+      - new_arfcn            → main "new" NR / LTE ARFCN (e.g. 648672)
+      - old_arfcn            → main "old" NR / LTE ARFCN (e.g. 647328)
+      - allowed_ssb_n77      → allowed SSB values for N77 (e.g. {648672, 653952})
+      - allowed_n77b_arfcn   → allowed ARFCN values for N77B sectors
     """
 
     SUMMARY_RE = SUMMARY_RE  # keep class reference
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        new_arfcn: int,
+        old_arfcn: int,
+        allowed_ssb_n77: Optional[List[int]] = None,
+        allowed_n77b_arfcn: Optional[List[int]] = None,
+    ):
+        """
+        Initialize ConfigurationAudit with ARFCN-related parameters.
+
+        All values are converted to integers/sets of integers internally to make checks robust.
+        """
+        # Core ARFCN values
+        self.NEW_ARFCN: int = int(new_arfcn)
+        self.OLD_ARFCN: int = int(old_arfcn)
+
+        # Allowed SSB values for N77 cells (e.g. {648672, 653952})
+        if allowed_ssb_n77 is None:
+            self.ALLOWED_SSB_N77 = set()
+        else:
+            self.ALLOWED_SSB_N77 = {int(v) for v in allowed_ssb_n77}
+
+        # Allowed ARFCN values for N77B sectors (e.g. {654652, 655324, 655984, 656656})
+        if allowed_n77b_arfcn is None:
+            self.ALLOWED_N77B_ARFCN = set()
+        else:
+            self.ALLOWED_N77B_ARFCN = {int(v) for v in allowed_n77b_arfcn}
 
     # =====================================================================
     #                            PUBLIC API
@@ -39,7 +70,7 @@ class ConfigurationAudit:
         module_name: Optional[str] = "",
         versioned_suffix: Optional[str] = None,
         tables_order: Optional[List[str]] = None,      # optional sheet ordering
-        filter_frequencies: Optional[List[str]] = None # NEW: substrings to filter pivot columns
+        filter_frequencies: Optional[List[str]] = None # substrings to filter pivot columns
     ) -> str:
         """
         Main entry point: creates an Excel file with one sheet per detected table.
@@ -49,6 +80,10 @@ class ConfigurationAudit:
         If 'filter_frequencies' is provided, the three added summary sheets will keep only
         those pivot *columns* whose header contains any of the provided substrings
         (case-insensitive). 'NodeId' and 'Total' are always kept.
+
+        In addition, a 'SummaryAudit' sheet is created with high-level checks
+        across the parsed tables, and a PowerPoint (.pptx) summary is generated
+        with a textual bullet-style overview per category.
         """
         # --- Normalize filters ---
         freq_filters = [str(f).strip() for f in (filter_frequencies or []) if str(f).strip()]
@@ -72,7 +107,7 @@ class ConfigurationAudit:
             mo_rank = {name: i for i, name in enumerate(tables_order)}
 
         # --- Prepare Excel output path ---
-        excel_path = os.path.join(input_dir, f"LogsCombined_{versioned_suffix}.xlsx")
+        excel_path = os.path.join(input_dir, f"ConfigurationAudit{versioned_suffix}.xlsx")
         table_entries: List[Dict[str, object]] = []
 
         # --- Keep a per-file index to preserve order of multiple tables inside same file ---
@@ -202,9 +237,12 @@ class ConfigurationAudit:
         # Collect dataframes for the specific MOs we need
         mo_collectors: Dict[str, List[pd.DataFrame]] = {
             "GUtranSyncSignalFrequency": [],
+            "GUtranFreqRelation": [],      # for LTE freq relation checks
             "NRCellDU": [],
             "NRFrequency": [],
             "NRFreqRelation": [],
+            "NRSectorCarrier": [],        # for N77B ARFCN checks
+            "EndcDistrProfile": [],       # for gUtranFreqRef checks
         }
         for entry in table_entries:
             mo_name = str(entry.get("sheet_candidate", "")).strip()
@@ -261,6 +299,24 @@ class ConfigurationAudit:
         )
         pivot_gu_sync_signal_freq = self._apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
 
+        # Extra tables for audit
+        df_gu_freq_rel = self._concat_or_empty(mo_collectors["GUtranFreqRelation"])
+        df_nr_sector_carrier = self._concat_or_empty(mo_collectors["NRSectorCarrier"])
+        df_endc_distr_profile = self._concat_or_empty(mo_collectors["EndcDistrProfile"])
+
+        # =====================================================================
+        #                PHASE 4.2: Build SummaryAudit
+        # =====================================================================
+        summary_audit_df = self._build_summary_audit(
+            df_nr_cell_du=df_nr_cell_du,
+            df_nr_freq=df_nr_freq,
+            df_nr_freq_rel=df_nr_freq_rel,
+            df_gu_sync_signal_freq=df_gu_sync_signal_freq,
+            df_gu_freq_rel=df_gu_freq_rel,
+            df_nr_sector_carrier=df_nr_sector_carrier,
+            df_endc_distr_profile=df_endc_distr_profile,
+        )
+
         # =====================================================================
         #                PHASE 5: Write the Excel file
         # =====================================================================
@@ -274,17 +330,32 @@ class ConfigurationAudit:
             pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
             pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
 
+            # SummaryAudit with high-level checks
+            summary_audit_df.to_excel(writer, sheet_name="SummaryAudit", index=False)
+
             # Then write each table in the final determined order
             for entry in table_entries:
                 entry["df"].to_excel(writer, sheet_name=entry["final_sheet"], index=False)
 
-            # <<< NEW: color the 'Summary*' tabs in green >>>
+            # Color the 'Summary*' tabs in green
             color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
 
-            # <<< NEW: enable filters (and freeze header row) on all sheets >>>
+            # Enable filters (and freeze header row) on all sheets
             enable_header_filters(writer, freeze_header=True)
 
         print(f"{module_name} Wrote Excel with {len(table_entries)} sheet(s) in: '{excel_path}'")
+
+        # =====================================================================
+        #                PHASE 6: Generate PPT textual summary
+        # =====================================================================
+        try:
+            ppt_path = self._generate_ppt_summary(summary_audit_df, excel_path, module_name)
+            if ppt_path:
+                print(f"{module_name} PPT summary generated in: '{ppt_path}'")
+        except Exception as ex:
+            # Never fail the whole module just for PPT creation
+            print(f"{module_name} [WARN] PPT summary generation failed: {ex}")
+
         return excel_path
 
     # =====================================================================
@@ -419,6 +490,58 @@ class ConfigurationAudit:
             dfs_aligned = [d[list(common_cols)].copy() for d in dfs]
             return pd.concat(dfs_aligned, ignore_index=True)
 
+    @staticmethod
+    def _resolve_column_case_insensitive(df: pd.DataFrame, candidates: List[str]) -> Optional[str]:
+        """
+        Resolve a column name by trying several candidates, case-insensitive and ignoring underscores/spaces.
+        """
+        if df is None or df.empty:
+            return None
+
+        def _canon(s: str) -> str:
+            return re.sub(r"[\s_]+", "", str(s).strip().lower())
+
+        cols = list(df.columns)
+        canon_map = {_canon(c): c for c in cols}
+        for cand in candidates:
+            key = _canon(cand)
+            if key in canon_map:
+                return canon_map[key]
+        # Fallback: startswith-based match
+        for cand in candidates:
+            key = _canon(cand)
+            for c in cols:
+                if _canon(c).startswith(key):
+                    return c
+        return None
+
+    @staticmethod
+    def _parse_int_frequency(value: object) -> Optional[int]:
+        """
+        Try to parse a frequency/ARFCN value as integer, ignoring extra spaces or text.
+        """
+        if value is None:
+            return None
+        s = str(value).strip()
+        if not s:
+            return None
+        token = s.split()[0]
+        try:
+            return int(token)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _is_n77_from_string(value: object) -> bool:
+        """
+        Determine if a cell can be considered N77 based on ARFCN/SSB string:
+        NOTE: here we approximate N77 as frequencies whose textual representation starts with '6'.
+        """
+        if value is None:
+            return False
+        s = str(value).strip()
+        return bool(s) and s[0] == "6"
+
     def _safe_pivot_count(
             self,
             df: pd.DataFrame,
@@ -430,26 +553,17 @@ class ConfigurationAudit:
     ) -> pd.DataFrame:
         """
         Robust pivot builder that prevents 'Grouper for ... not 1-dimensional' errors.
-
-        Fixes cases where:
-          - multiple 'NodeId' columns exist (with spaces or suffixes)
-          - index name collides with column name
-          - MultiIndex columns appear (e.g., from 2-line headers)
         """
-
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             return pd.DataFrame({"Info": ["Table not found or empty"]})
 
-        # --- 1) Always flatten MultiIndex (columns and index) ---
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = ["_".join([str(c).strip() for c in tup if str(c).strip()]) for tup in df.columns]
         if isinstance(df.index, pd.MultiIndex):
             df = df.reset_index()
 
-        # --- 2) Reset index to avoid index/column name collisions ---
         work = df.reset_index(drop=True).copy()
 
-        # --- 3) Normalize and deduplicate columns case-insensitively ---
         work.columns = pd.Index([str(c).strip() for c in work.columns])
         seen_lower = set()
         unique_cols = []
@@ -461,7 +575,6 @@ class ConfigurationAudit:
             unique_cols.append(c)
         work = work[unique_cols]
 
-        # --- 4) Case-insensitive resolver (accepts suffixes like NodeId_1) ---
         def _resolve(name: str) -> Optional[str]:
             nl = name.lower()
             for c in work.columns:
@@ -480,7 +593,6 @@ class ConfigurationAudit:
                 "PresentColumns": [", ".join(work.columns.tolist())],
             })
 
-        # --- 5) Sanitize data ---
         for col in {idx_col, col_col, val_col}:
             work[col] = work[col].astype(str).str.strip()
 
@@ -496,7 +608,6 @@ class ConfigurationAudit:
                 margins_name=margins_name,
             ).reset_index()
 
-            # Flatten again in case margins cause MultiIndex
             if isinstance(piv.columns, pd.MultiIndex):
                 piv.columns = [" ".join([str(x) for x in tup if str(x)]).strip() for tup in piv.columns]
 
@@ -518,11 +629,9 @@ class ConfigurationAudit:
     ) -> pd.DataFrame:
         """
         Build a frequency table with pd.crosstab (no 'values' needed).
-        This avoids the 'not 1-dimensional' grouper error when index==values or
-        when subtle duplicate headers exist.
         """
         import unicodedata
-        import re
+        import re as re_local
 
         if df is None or not isinstance(df, pd.DataFrame) or df.empty:
             return pd.DataFrame({"Info": ["Table not found or empty"]})
@@ -537,7 +646,7 @@ class ConfigurationAudit:
         def _norm_header(s: str) -> str:
             s = "" if s is None else str(s)
             s = unicodedata.normalize("NFKC", s).replace("\ufeff", "").replace("\u200b", "").replace("\xa0", " ")
-            s = re.sub(r"\s+", " ", s.strip())
+            s = re_local.sub(r"\s+", " ", s.strip())
             return s
 
         work.columns = pd.Index([_norm_header(c) for c in work.columns])
@@ -546,7 +655,6 @@ class ConfigurationAudit:
             s = s.lower().replace(" ", "").replace("_", "").replace("-", "")
             return s
 
-        # Deduplicate columns by canonical key
         seen = set()
         keep = []
         for c in work.columns:
@@ -557,7 +665,6 @@ class ConfigurationAudit:
             keep.append(c)
         work = work[keep]
 
-        # Resolver by canonical key
         def _resolve(name: str) -> Optional[str]:
             target = _canon(_norm_header(name))
             for c in work.columns:
@@ -577,7 +684,6 @@ class ConfigurationAudit:
                 "PresentColumns": [", ".join(work.columns.tolist())],
             })
 
-        # Clean data
         work[idx_col] = work[idx_col].astype(str).map(_norm_header)
         work[col_col] = work[col_col].astype(str).map(_norm_header)
 
@@ -588,7 +694,6 @@ class ConfigurationAudit:
                 dropna=False,
             ).reset_index()
 
-            # Add margins (row totals and overall total)
             if add_margins:
                 ct["Total"] = ct.drop(columns=[idx_col]).sum(axis=1)
                 total_row = {idx_col: "Total"}
@@ -609,20 +714,16 @@ class ConfigurationAudit:
         """
         Keep only the first (index) column, 'Total' (if present), and columns whose
         header contains any of the provided substrings (case-insensitive).
-        If filters is empty/None, returns the pivot unchanged.
         """
         if not isinstance(piv, pd.DataFrame) or piv.empty or not filters:
             return piv
 
-        # Normalize column names
         cols = [str(c) for c in piv.columns.tolist()]
         keep = []
 
-        # First column (index after reset_index, e.g., 'NodeId')
         if cols:
             keep.append(cols[0])
 
-        # Case-insensitive filtering
         fl = [f.lower() for f in filters if f]
         for c in cols[1:]:
             lc = c.lower()
@@ -632,15 +733,536 @@ class ConfigurationAudit:
             if any(f in lc for f in fl):
                 keep.append(c)
 
-        # Ensure 'Total' is preserved if nothing else matched
         if len(keep) <= 1 and "Total" in cols and "Total" not in keep:
             keep.append("Total")
 
         try:
             return piv.loc[:, keep]
         except Exception:
-            # Fallback: do not filter if selection fails for any reason
             return piv
+
+    # =====================================================================
+    #                     PRIVATE HELPERS (SummaryAudit)
+    # =====================================================================
+    def _build_summary_audit(
+        self,
+        df_nr_cell_du: pd.DataFrame,
+        df_nr_freq: pd.DataFrame,
+        df_nr_freq_rel: pd.DataFrame,
+        df_gu_sync_signal_freq: pd.DataFrame,
+        df_gu_freq_rel: pd.DataFrame,
+        df_nr_sector_carrier: pd.DataFrame,
+        df_endc_distr_profile: pd.DataFrame,
+    ) -> pd.DataFrame:
+        """
+        Build a synthetic 'SummaryAudit' table with high-level checks:
+
+        - Count/list nodes with N77 cells (NRCellDU / NRSectorCarrier)
+        - Count NR/LTE nodes where specific ARFCNs (NEW_ARFCN / OLD_ARFCN) are defined
+        - Check for references to new SSB/ARFCNs in Frequency/FreqRelation tables
+        - Check cardinality limits per cell and per node
+        - Check EndcDistrProfile gUtranFreqRef values
+
+        NOTE:
+        - N77 cells are approximated as those with ARFCN/SSB text starting with '6'.
+        - This function is best-effort and will not raise exceptions; any error is
+          represented as a row in the resulting dataframe.
+        """
+        rows: List[Dict[str, object]] = []
+
+        def add_row(category: str, metric: str, value: object, extra: str = "") -> None:
+            rows.append({
+                "Category": category,
+                "Metric": metric,
+                "Value": value,
+                "ExtraInfo": extra,
+            })
+
+        # ----------------------------- N77 CELLS (NRCellDU / NRSectorCarrier) -----------------------------
+        try:
+            # NRCellDU: N77 cells by SSB
+            if df_nr_cell_du is not None and not df_nr_cell_du.empty:
+                node_col_nr = self._resolve_column_case_insensitive(df_nr_cell_du, ["NodeId"])
+                ssb_col = self._resolve_column_case_insensitive(df_nr_cell_du, ["ssbFrequency", "ssb", "arfcnSsb", "arfcn"])
+                if node_col_nr and ssb_col:
+                    work = df_nr_cell_du[[node_col_nr, ssb_col]].copy()
+                    work[node_col_nr] = work[node_col_nr].astype(str)
+                    work[ssb_col] = work[ssb_col].astype(str)
+
+                    mask_n77 = work[ssb_col].map(self._is_n77_from_string)
+                    n77_nodes = sorted(set(work.loc[mask_n77, node_col_nr]))
+                    add_row(
+                        "N77Cells",
+                        "NR nodes with N77 cells (NRCellDU SSB starting with '6')",
+                        len(n77_nodes),
+                        ", ".join(n77_nodes),
+                    )
+
+                    # Cells with N77 SSB but not in allowed list (if provided)
+                    if self.ALLOWED_SSB_N77:
+                        def _is_allowed_ssb(v: object) -> bool:
+                            freq = self._parse_int_frequency(v)
+                            return freq in self.ALLOWED_SSB_N77 if freq is not None else False
+
+                        invalid_mask = mask_n77 & ~work[ssb_col].map(_is_allowed_ssb)
+                        invalid_rows = work.loc[invalid_mask, [node_col_nr, ssb_col]]
+                        if not invalid_rows.empty:
+                            add_row(
+                                "N77Cells",
+                                "N77 cells with SSB not in allowed list",
+                                len(invalid_rows),
+                                "; ".join(
+                                    f"{r[node_col_nr]}: {r[ssb_col]}"
+                                    for _, r in invalid_rows.head(50).iterrows()
+                                ) + (" (truncated)" if len(invalid_rows) > 50 else ""),
+                            )
+                else:
+                    add_row("N77Cells", "NRCellDU table present but required columns missing", "N/A")
+            else:
+                add_row("N77Cells", "NRCellDU table", "Table not found or empty")
+        except Exception as ex:
+            add_row("N77Cells", "Error while checking NRCellDU", f"ERROR: {ex}")
+
+        try:
+            # NRSectorCarrier: N77B sectors by ARFCN
+            if df_nr_sector_carrier is not None and not df_nr_sector_carrier.empty:
+                node_col_sec = self._resolve_column_case_insensitive(df_nr_sector_carrier, ["NodeId"])
+                arfcn_col_sec = self._resolve_column_case_insensitive(df_nr_sector_carrier, ["arfcnDL", "arfcn", "arfcnValueNRDl"])
+                if node_col_sec and arfcn_col_sec:
+                    work = df_nr_sector_carrier[[node_col_sec, arfcn_col_sec]].copy()
+                    work[node_col_sec] = work[node_col_sec].astype(str)
+                    work[arfcn_col_sec] = work[arfcn_col_sec].astype(str)
+
+                    mask_n77b = work[arfcn_col_sec].map(self._is_n77_from_string)
+                    n77b_nodes = sorted(set(work.loc[mask_n77b, node_col_sec]))
+                    add_row(
+                        "N77Cells",
+                        "NR nodes with N77B sectors (NRSectorCarrier ARFCN starting with '6')",
+                        len(n77b_nodes),
+                        ", ".join(n77b_nodes),
+                    )
+
+                    if self.ALLOWED_N77B_ARFCN:
+                        def _is_allowed_n77b(v: object) -> bool:
+                            freq = self._parse_int_frequency(v)
+                            return freq in self.ALLOWED_N77B_ARFCN if freq is not None else False
+
+                        invalid_mask = mask_n77b & ~work[arfcn_col_sec].map(_is_allowed_n77b)
+                        invalid_rows = work.loc[invalid_mask, [node_col_sec, arfcn_col_sec]]
+                        if not invalid_rows.empty:
+                            add_row(
+                                "N77Cells",
+                                "N77B sectors with ARFCN not in allowed list",
+                                len(invalid_rows),
+                                "; ".join(
+                                    f"{r[node_col_sec]}: {r[arfcn_col_sec]}"
+                                    for _, r in invalid_rows.head(50).iterrows()
+                                ) + (" (truncated)" if len(invalid_rows) > 50 else ""),
+                            )
+                else:
+                    add_row("N77Cells", "NRSectorCarrier table present but required columns missing", "N/A")
+            else:
+                add_row("N77Cells", "NRSectorCarrier table", "Table not found or empty")
+        except Exception as ex:
+            add_row("N77Cells", "Error while checking NRSectorCarrier", f"ERROR: {ex}")
+
+        # ----------------------------- NR FREQUENCY / FREQRELATION (NEW/OLD ARFCN) -----------------------------
+        try:
+            if df_nr_freq is not None and not df_nr_freq.empty:
+                node_col = self._resolve_column_case_insensitive(df_nr_freq, ["NodeId"])
+                arfcn_col = self._resolve_column_case_insensitive(df_nr_freq, ["arfcnValueNRDl", "arfcn", "arfcnDL"])
+                if node_col and arfcn_col:
+                    work = df_nr_freq[[node_col, arfcn_col]].copy()
+                    work[node_col] = work[node_col].astype(str)
+
+                    def _is_new(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.NEW_ARFCN
+
+                    def _is_old(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.OLD_ARFCN
+
+                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(_is_new), node_col]))
+                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(_is_old), node_col]))
+
+                    add_row(
+                        "NRFrequency",
+                        f"NR nodes with ARFCN {self.NEW_ARFCN} in NRFrequency",
+                        len(new_nodes),
+                        ", ".join(new_nodes),
+                    )
+                    add_row(
+                        "NRFrequency",
+                        f"NR nodes still with ARFCN {self.OLD_ARFCN} in NRFrequency",
+                        len(old_nodes),
+                        ", ".join(old_nodes),
+                    )
+                else:
+                    add_row("NRFrequency", "NRFrequency table present but required columns missing", "N/A")
+            else:
+                add_row("NRFrequency", "NRFrequency table", "Table not found or empty")
+        except Exception as ex:
+            add_row("NRFrequency", "Error while checking NRFrequency", f"ERROR: {ex}")
+
+        try:
+            if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
+                node_col_rel = self._resolve_column_case_insensitive(df_nr_freq_rel, ["NodeId"])
+                arfcn_col_rel = self._resolve_column_case_insensitive(df_nr_freq_rel, ["arfcnValueNRDl", "arfcn", "arfcnDL"])
+                if node_col_rel and arfcn_col_rel:
+                    work = df_nr_freq_rel[[node_col_rel, arfcn_col_rel]].copy()
+                    work[node_col_rel] = work[node_col_rel].astype(str)
+
+                    def _is_new(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.NEW_ARFCN
+
+                    def _is_old(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.OLD_ARFCN
+
+                    new_nodes_rel = sorted(set(work.loc[work[arfcn_col_rel].map(_is_new), node_col_rel]))
+                    old_nodes_rel = sorted(set(work.loc[work[arfcn_col_rel].map(_is_old), node_col_rel]))
+
+                    add_row(
+                        "NRFreqRelation",
+                        f"NR nodes with ARFCN {self.NEW_ARFCN} in NRFreqRelation",
+                        len(new_nodes_rel),
+                        ", ".join(new_nodes_rel),
+                    )
+                    add_row(
+                        "NRFreqRelation",
+                        f"NR nodes still with ARFCN {self.OLD_ARFCN} in NRFreqRelation",
+                        len(old_nodes_rel),
+                        ", ".join(old_nodes_rel),
+                    )
+                else:
+                    add_row("NRFreqRelation", "NRFreqRelation table present but ARFCN column missing", "N/A")
+            else:
+                add_row("NRFreqRelation", "NRFreqRelation table", "Table not found or empty")
+        except Exception as ex:
+            add_row("NRFreqRelation", "Error while checking NRFreqRelation", f"ERROR: {ex}")
+
+        # ----------------------------- LTE GUtranSyncSignalFrequency / GUtranFreqRelation -----------------------------
+        try:
+            if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
+                node_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
+                arfcn_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["arfcn", "arfcnDL"])
+                if node_col_gu and arfcn_col_gu:
+                    work = df_gu_sync_signal_freq[[node_col_gu, arfcn_col_gu]].copy()
+                    work[node_col_gu] = work[node_col_gu].astype(str)
+
+                    def _is_new(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.NEW_ARFCN
+
+                    def _is_old(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.OLD_ARFCN
+
+                    new_nodes_gu = sorted(set(work.loc[work[arfcn_col_gu].map(_is_new), node_col_gu]))
+                    old_nodes_gu = sorted(set(work.loc[work[arfcn_col_gu].map(_is_old), node_col_gu]))
+
+                    add_row(
+                        "GUtranSyncSignalFrequency",
+                        f"LTE nodes with GUtranSyncSignalFrequency {self.NEW_ARFCN}",
+                        len(new_nodes_gu),
+                        ", ".join(new_nodes_gu),
+                    )
+                    add_row(
+                        "GUtranSyncSignalFrequency",
+                        f"LTE nodes still with GUtranSyncSignalFrequency {self.OLD_ARFCN}",
+                        len(old_nodes_gu),
+                        ", ".join(old_nodes_gu),
+                    )
+                else:
+                    add_row("GUtranSyncSignalFrequency", "GUtranSyncSignalFrequency table present but required columns missing", "N/A")
+            else:
+                add_row("GUtranSyncSignalFrequency", "GUtranSyncSignalFrequency table", "Table not found or empty")
+        except Exception as ex:
+            add_row("GUtranSyncSignalFrequency", "Error while checking GUtranSyncSignalFrequency", f"ERROR: {ex}")
+
+        try:
+            if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
+                node_col_gfr = self._resolve_column_case_insensitive(df_gu_freq_rel, ["NodeId"])
+                arfcn_col_gfr = self._resolve_column_case_insensitive(df_gu_freq_rel, ["arfcn", "arfcnDL"])
+                if node_col_gfr and arfcn_col_gfr:
+                    work = df_gu_freq_rel[[node_col_gfr, arfcn_col_gfr]].copy()
+                    work[node_col_gfr] = work[node_col_gfr].astype(str)
+
+                    def _is_new(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.NEW_ARFCN
+
+                    def _is_old(v: object) -> bool:
+                        freq = self._parse_int_frequency(v)
+                        return freq == self.OLD_ARFCN
+
+                    new_nodes_gfr = sorted(set(work.loc[work[arfcn_col_gfr].map(_is_new), node_col_gfr]))
+                    old_nodes_gfr = sorted(set(work.loc[work[arfcn_col_gfr].map(_is_old), node_col_gfr]))
+
+                    add_row(
+                        "GUtranFreqRelation",
+                        f"LTE nodes with GUtranFreqRelation {self.NEW_ARFCN}",
+                        len(new_nodes_gfr),
+                        ", ".join(new_nodes_gfr),
+                    )
+                    add_row(
+                        "GUtranFreqRelation",
+                        f"LTE nodes still with GUtranFreqRelation {self.OLD_ARFCN}",
+                        len(old_nodes_gfr),
+                        ", ".join(old_nodes_gfr),
+                    )
+                else:
+                    add_row("GUtranFreqRelation", "GUtranFreqRelation table present but ARFCN/NodeId missing", "N/A")
+            else:
+                add_row("GUtranFreqRelation", "GUtranFreqRelation table", "Table not found or empty")
+        except Exception as ex:
+            add_row("GUtranFreqRelation", "Error while checking GUtranFreqRelation", f"ERROR: {ex}")
+
+        # ----------------------------- CARDINALITY LIMITS -----------------------------
+        # Max 16 NRFreqRelation and 16 GUtranFreqRelation per cell
+        try:
+            if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
+                cell_col = self._resolve_column_case_insensitive(df_nr_freq_rel, ["NRCellCUId", "NRCellId", "CellId"])
+                if cell_col:
+                    counts = df_nr_freq_rel[cell_col].value_counts(dropna=False)
+                    max_count = int(counts.max()) if not counts.empty else 0
+                    over_limit = counts[counts >= 16]
+                    add_row(
+                        "Cardinality",
+                        "Max NRFreqRelation per NR cell (limit 16)",
+                        max_count,
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
+                        + (" (truncated)" if len(over_limit) > 50 else ""),
+                    )
+                else:
+                    add_row("Cardinality", "NRFreqRelation per cell (required cell column missing)", "N/A")
+            else:
+                add_row("Cardinality", "NRFreqRelation per cell", "Table not found or empty")
+        except Exception as ex:
+            add_row("Cardinality", "Error while checking NRFreqRelation cardinality", f"ERROR: {ex}")
+
+        try:
+            if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
+                cell_col_gu = self._resolve_column_case_insensitive(df_gu_freq_rel, ["EUtranCellFDDId", "EUtranCellId", "CellId", "GUCellId"])
+                if cell_col_gu:
+                    counts = df_gu_freq_rel[cell_col_gu].value_counts(dropna=False)
+                    max_count = int(counts.max()) if not counts.empty else 0
+                    over_limit = counts[counts >= 16]
+                    add_row(
+                        "Cardinality",
+                        "Max GUtranFreqRelation per LTE cell (limit 16)",
+                        max_count,
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
+                        + (" (truncated)" if len(over_limit) > 50 else ""),
+                    )
+                else:
+                    add_row("Cardinality", "GUtranFreqRelation per LTE cell (required cell column missing)", "N/A")
+            else:
+                add_row("Cardinality", "GUtranFreqRelation per LTE cell", "Table not found or empty")
+        except Exception as ex:
+            add_row("Cardinality", "Error while checking GUtranFreqRelation cardinality", f"ERROR: {ex}")
+
+        # Max 24 GUtranSyncSignalFrequency per node
+        try:
+            if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
+                node_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
+                if node_col_gu:
+                    counts = df_gu_sync_signal_freq[node_col_gu].astype(str).value_counts(dropna=False)
+                    max_count = int(counts.max()) if not counts.empty else 0
+                    over_limit_nodes = counts[counts >= 24]
+                    add_row(
+                        "Cardinality",
+                        "Max GUtranSyncSignalFrequency definitions per node (limit 24)",
+                        max_count,
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit_nodes.head(50).items())
+                        + (" (truncated)" if len(over_limit_nodes) > 50 else ""),
+                    )
+                else:
+                    add_row("Cardinality", "GUtranSyncSignalFrequency per node (NodeId missing)", "N/A")
+            else:
+                add_row("Cardinality", "GUtranSyncSignalFrequency per node", "Table not found or empty")
+        except Exception as ex:
+            add_row("Cardinality", "Error while checking GUtranSyncSignalFrequency cardinality", f"ERROR: {ex}")
+
+        # Max 64 NRFrequency per node
+        try:
+            if df_nr_freq is not None and not df_nr_freq.empty:
+                node_col = self._resolve_column_case_insensitive(df_nr_freq, ["NodeId"])
+                if node_col:
+                    counts = df_nr_freq[node_col].astype(str).value_counts(dropna=False)
+                    max_count = int(counts.max()) if not counts.empty else 0
+                    over_limit_nodes = counts[counts >= 64]
+                    add_row(
+                        "Cardinality",
+                        "Max NRFrequency definitions per node (limit 64)",
+                        max_count,
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit_nodes.head(50).items())
+                        + (" (truncated)" if len(over_limit_nodes) > 50 else ""),
+                    )
+                else:
+                    add_row("Cardinality", "NRFrequency per node (NodeId missing)", "N/A")
+            else:
+                add_row("Cardinality", "NRFrequency per node", "Table not found or empty")
+        except Exception as ex:
+            add_row("Cardinality", "Error while checking NRFrequency cardinality", f"ERROR: {ex}")
+
+        # ----------------------------- EndcDistrProfile gUtranFreqRef -----------------------------
+        try:
+            if df_endc_distr_profile is not None and not df_endc_distr_profile.empty:
+                node_col_edp = self._resolve_column_case_insensitive(df_endc_distr_profile, ["NodeId"])
+                ref_col = self._resolve_column_case_insensitive(df_endc_distr_profile, ["gUtranFreqRef"])
+                if node_col_edp and ref_col:
+                    work = df_endc_distr_profile[[node_col_edp, ref_col]].copy()
+                    work[node_col_edp] = work[node_col_edp].astype(str)
+                    work[ref_col] = work[ref_col].astype(str)
+
+                    def _normalize_ref(s: str) -> str:
+                        return str(s).replace(" ", "").strip()
+
+                    # Expected pattern is always NEW&other (or equivalent with comma/dash)
+                    # We only check that the normalized string contains the numeric NEW_ARFCN at least once.
+                    expected_str = str(self.NEW_ARFCN)
+
+                    bad_mask = ~work[ref_col].map(lambda v: expected_str in _normalize_ref(v))
+                    bad_rows = work.loc[bad_mask, [node_col_edp, ref_col]]
+
+                    add_row(
+                        "EndcDistrProfile",
+                        f"EndcDistrProfile rows with gUtranFreqRef not containing {self.NEW_ARFCN}",
+                        len(bad_rows),
+                        "; ".join(
+                            f"{r[node_col_edp]}: {r[ref_col]}"
+                            for _, r in bad_rows.head(50).iterrows()
+                        ) + (" (truncated)" if len(bad_rows) > 50 else ""),
+                    )
+                else:
+                    add_row("EndcDistrProfile", "EndcDistrProfile table present but NodeId/gUtranFreqRef missing", "N/A")
+            else:
+                add_row("EndcDistrProfile", "EndcDistrProfile table", "Table not found or empty")
+        except Exception as ex:
+            add_row("EndcDistrProfile", "Error while checking EndcDistrProfile gUtranFreqRef", f"ERROR: {ex}")
+
+        # If nothing was added, return at least an informational row
+        if not rows:
+            rows.append({
+                "Category": "Info",
+                "Metric": "SummaryAudit",
+                "Value": "No data available",
+                "ExtraInfo": "",
+            })
+
+        return pd.DataFrame(rows)
+
+    # =====================================================================
+    #                     PRIVATE HELPERS (Summary → PPT)
+    # =====================================================================
+    @staticmethod
+    def _build_text_summary_structure(summary_audit_df: pd.DataFrame) -> Dict[str, List[str]]:
+        """
+        Transform SummaryAudit rows into a dict structure suitable for PPT generation.
+
+        Returns:
+          {
+            "Category1": [
+                "Metric1: value | extra",
+                "Metric2: value | extra",
+                ...
+            ],
+            "Category2": [
+                ...
+            ],
+          }
+        """
+        sections: Dict[str, List[str]] = {}
+
+        if summary_audit_df is None or summary_audit_df.empty:
+            sections["Info"] = ["No audit data available to build textual summary"]
+            return sections
+
+        for _, row in summary_audit_df.iterrows():
+            category = str(row.get("Category", "") or "Info")
+            metric = str(row.get("Metric", "") or "")
+            value = row.get("Value", "")
+            extra = str(row.get("ExtraInfo", "") or "")
+
+            base_line = f"{metric}: {value}"
+            if extra:
+                base_line = f"{base_line} | {extra}"
+
+            sections.setdefault(category, []).append(base_line)
+
+        return sections
+
+    def _generate_ppt_summary(
+        self,
+        summary_audit_df: pd.DataFrame,
+        excel_path: str,
+        module_name: str = "",
+    ) -> Optional[str]:
+        """
+        Generate a PPTX file next to the Excel with a slide per Category from SummaryAudit.
+
+        - First slide: global title.
+        - One slide per Category:
+            • Slide title = Category
+            • Body = bullets with "Metric: Value | ExtraInfo"
+        """
+        # Late import to avoid hard dependency if pptx is not installed
+        try:
+            from pptx import Presentation
+        except ImportError:
+            print(f"{module_name} [INFO] python-pptx is not installed. Skipping PPT summary.")
+            return None
+
+        sections = self._build_text_summary_structure(summary_audit_df)
+
+        # Derive PPT path from Excel path
+        base, _ = os.path.splitext(excel_path)
+        ppt_path = base + "_Summary.pptx"
+
+        prs = Presentation()
+
+        # --- Title slide ---
+        title_slide_layout = prs.slide_layouts[0]  # usually "Title" layout
+        slide = prs.slides.add_slide(title_slide_layout)
+        title = slide.shapes.title
+        subtitle = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+        title.text = "Configuration Audit Summary"
+        if subtitle is not None:
+            subtitle.text = os.path.basename(excel_path)
+
+        # --- Category slides ---
+        content_layout = prs.slide_layouts[1]  # "Title and Content"
+        for category, lines in sections.items():
+            slide = prs.slides.add_slide(content_layout)
+            title_shape = slide.shapes.title
+            body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+            title_shape.text = category
+
+            if body is None:
+                continue
+
+            tf = body.text_frame
+            tf.clear()
+
+            if not lines:
+                tf.text = "No data available for this category."
+                continue
+
+            # First bullet
+            tf.text = lines[0]
+            # Remaining bullets
+            for line in lines[1:]:
+                p = tf.add_paragraph()
+                p.text = line
+                p.level = 0  # top-level bullet
+
+        prs.save(ppt_path)
+        return ppt_path
 
 
 # --------- kept local to preserve current behavior (module-level helper) ----
