@@ -214,7 +214,7 @@ def gui_config_dialog(
     # Center window
     try:
         root.update_idletasks()
-        w, h = 720, 540
+        w, h = 620, 580
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
         x = (sw // 2) - (w // 2)
