@@ -29,16 +29,16 @@ class ConfigurationAudit:
     ARFCN-related parameters (N77, etc.) are now configurable via __init__:
       - new_arfcn            → main "new" NR / LTE ARFCN (e.g. 648672)
       - old_arfcn            → main "old" NR / LTE ARFCN (e.g. 647328)
-      - allowed_ssb_n77      → allowed SSB values for N77 (e.g. {648672, 653952})
-      - allowed_n77b_arfcn   → allowed ARFCN values for N77B sectors
+      - allowed_n77_ssb      → allowed SSB values for N77 (e.g. {648672, 653952})
+      - allowed_n77_arfcn    → allowed ARFCN values for N77 sectors
     """
 
     SUMMARY_RE = SUMMARY_RE  # keep class reference
 
     def __init__(
         self,
-        new_arfcn: int,
         old_arfcn: int,
+        new_arfcn: int,
         allowed_n77_ssb: Optional[List[int]] = None,
         allowed_n77_arfcn: Optional[List[int]] = None,
     ):
@@ -48,20 +48,20 @@ class ConfigurationAudit:
         All values are converted to integers/sets of integers internally to make checks robust.
         """
         # Core ARFCN values
-        self.NEW_ARFCN: int = int(new_arfcn)
         self.OLD_ARFCN: int = int(old_arfcn)
+        self.NEW_ARFCN: int = int(new_arfcn)
 
         # Allowed SSB values for N77 cells (e.g. {648672, 653952})
         if allowed_n77_ssb is None:
-            self.ALLOWED_SSB_N77 = set()
+            self.ALLOWED_N77_SSB = set()
         else:
-            self.ALLOWED_SSB_N77 = {int(v) for v in allowed_n77_ssb}
+            self.ALLOWED_N77_SSB = {int(v) for v in allowed_n77_ssb}
 
         # Allowed ARFCN values for N77B sectors (e.g. {654652, 655324, 655984, 656656})
         if allowed_n77_arfcn is None:
-            self.ALLOWED_N77B_ARFCN = set()
+            self.ALLOWED_N77_ARFCN = set()
         else:
-            self.ALLOWED_N77B_ARFCN = {int(v) for v in allowed_n77_arfcn}
+            self.ALLOWED_N77_ARFCN = {int(v) for v in allowed_n77_arfcn}
 
     # =====================================================================
     #                            PUBLIC API
@@ -520,16 +520,26 @@ class ConfigurationAudit:
     @staticmethod
     def _parse_int_frequency(value: object) -> Optional[int]:
         """
-        Try to parse a frequency/ARFCN value as integer, ignoring extra spaces or text.
+        Try to parse a frequency/ARFCN value as integer from the leading numeric part
+        of the string (before any non-digit chars like '-' or spaces).
+        Examples:
+          - '653952-30-20-0-1' -> 653952
+          - '648672 some text' -> 648672
+          - '  647328'         -> 647328
         """
         if value is None:
             return None
         s = str(value).strip()
         if not s:
             return None
-        token = s.split()[0]
+
+        # Extract leading digits only
+        m = re.match(r"^(\d+)", s)
+        if not m:
+            return None
+
         try:
-            return int(token)
+            return int(m.group(1))
         except Exception:
             return None
 
@@ -746,6 +756,29 @@ class ConfigurationAudit:
     # =====================================================================
     #                     PRIVATE HELPERS (SummaryAudit)
     # =====================================================================
+    def _is_allowed_n77_ssb(self, v: object) -> bool:
+        freq = self._parse_int_frequency(v)
+        return freq in self.ALLOWED_N77_SSB if freq is not None else False
+
+    def _is_allowed_n77_arfcn(self, v: object) -> bool:
+        freq = self._parse_int_frequency(v)
+        return freq in self.ALLOWED_N77_ARFCN if freq is not None else False
+
+    def _is_not_old_not_new(self, v: object) -> bool:
+        freq = self._parse_int_frequency(v)
+        return freq not in (self.OLD_ARFCN, self.NEW_ARFCN)
+
+    def _only_not_old_not_new(self, series):
+        return all(self._is_not_old_not_new(v) for v in series)
+
+    def _is_new(self, v: object) -> bool:
+        freq = self._parse_int_frequency(v)
+        return freq == self.NEW_ARFCN
+
+    def _is_old(self, v: object) -> bool:
+        freq = self._parse_int_frequency(v)
+        return freq == self.OLD_ARFCN
+
     def _build_summary_audit(
         self,
         df_nr_cell_du: pd.DataFrame,
@@ -794,24 +827,20 @@ class ConfigurationAudit:
                     mask_n77 = work[ssb_col].map(self._is_n77_from_string)
                     n77_nodes = sorted(set(work.loc[mask_n77, node_col_nr]))
                     add_row(
-                        "N77Cells",
-                        "NR nodes with N77 cells (NRCellDU SSB starting with '6')",
+                        "NRCellDU",
+                        "N77 nodes (NRCellDU SSB starting with '6')",
                         len(n77_nodes),
                         ", ".join(n77_nodes),
                     )
 
                     # Cells with N77 SSB but not in allowed list (if provided)
-                    if self.ALLOWED_SSB_N77:
-                        def _is_allowed_ssb(v: object) -> bool:
-                            freq = self._parse_int_frequency(v)
-                            return freq in self.ALLOWED_SSB_N77 if freq is not None else False
-
-                        invalid_mask = mask_n77 & ~work[ssb_col].map(_is_allowed_ssb)
+                    if self.ALLOWED_N77_SSB:
+                        invalid_mask = mask_n77 & ~work[ssb_col].map(self._is_allowed_n77_ssb)
                         invalid_rows = work.loc[invalid_mask, [node_col_nr, ssb_col]]
                         if not invalid_rows.empty:
                             add_row(
-                                "N77Cells",
-                                "N77 cells with SSB not in allowed list",
+                                "NRCellDU",
+                                "N77 nodes with SSB not in allowed list",
                                 len(invalid_rows),
                                 "; ".join(
                                     f"{r[node_col_nr]}: {r[ssb_col]}"
@@ -819,14 +848,14 @@ class ConfigurationAudit:
                                 ) + (" (truncated)" if len(invalid_rows) > 50 else ""),
                             )
                 else:
-                    add_row("N77Cells", "NRCellDU table present but required columns missing", "N/A")
+                    add_row("NRCellDU", "NRCellDU table present but required columns missing", "N/A")
             else:
-                add_row("N77Cells", "NRCellDU table", "Table not found or empty")
+                add_row("NRCellDU", "NRCellDU table", "Table not found or empty")
         except Exception as ex:
-            add_row("N77Cells", "Error while checking NRCellDU", f"ERROR: {ex}")
+            add_row("NRCellDU", "Error while checking NRCellDU", f"ERROR: {ex}")
 
         try:
-            # NRSectorCarrier: N77B sectors by ARFCN
+            # NRSectorCarrier: N77 sectors by ARFCN
             if df_nr_sector_carrier is not None and not df_nr_sector_carrier.empty:
                 node_col_sec = self._resolve_column_case_insensitive(df_nr_sector_carrier, ["NodeId"])
                 arfcn_col_sec = self._resolve_column_case_insensitive(df_nr_sector_carrier, ["arfcnDL", "arfcn", "arfcnValueNRDl"])
@@ -838,23 +867,19 @@ class ConfigurationAudit:
                     mask_n77b = work[arfcn_col_sec].map(self._is_n77_from_string)
                     n77b_nodes = sorted(set(work.loc[mask_n77b, node_col_sec]))
                     add_row(
-                        "N77Cells",
-                        "NR nodes with N77B sectors (NRSectorCarrier ARFCN starting with '6')",
+                        "NRSectorCarrier",
+                        "N77 nodes with ARFCN starting with '6'",
                         len(n77b_nodes),
                         ", ".join(n77b_nodes),
                     )
 
-                    if self.ALLOWED_N77B_ARFCN:
-                        def _is_allowed_n77b(v: object) -> bool:
-                            freq = self._parse_int_frequency(v)
-                            return freq in self.ALLOWED_N77B_ARFCN if freq is not None else False
-
-                        invalid_mask = mask_n77b & ~work[arfcn_col_sec].map(_is_allowed_n77b)
+                    if self.ALLOWED_N77_ARFCN:
+                        invalid_mask = mask_n77b & ~work[arfcn_col_sec].map(self._is_allowed_n77_arfcn)
                         invalid_rows = work.loc[invalid_mask, [node_col_sec, arfcn_col_sec]]
                         if not invalid_rows.empty:
                             add_row(
-                                "N77Cells",
-                                "N77B sectors with ARFCN not in allowed list",
+                                "NRSectorCarrier",
+                                "N77 nodes with ARFCN not in allowed list",
                                 len(invalid_rows),
                                 "; ".join(
                                     f"{r[node_col_sec]}: {r[arfcn_col_sec]}"
@@ -862,43 +887,44 @@ class ConfigurationAudit:
                                 ) + (" (truncated)" if len(invalid_rows) > 50 else ""),
                             )
                 else:
-                    add_row("N77Cells", "NRSectorCarrier table present but required columns missing", "N/A")
+                    add_row("NRSectorCarrier", "NRSectorCarrier table present but required columns missing", "N/A")
             else:
-                add_row("N77Cells", "NRSectorCarrier table", "Table not found or empty")
+                add_row("NRSectorCarrier", "NRSectorCarrier table", "Table not found or empty")
         except Exception as ex:
-            add_row("N77Cells", "Error while checking NRSectorCarrier", f"ERROR: {ex}")
+            add_row("NRSectorCarrier", "Error while checking NRSectorCarrier", f"ERROR: {ex}")
 
-        # ----------------------------- NR FREQUENCY / FREQRELATION (NEW/OLD ARFCN) -----------------------------
+        # ----------------------------- NR FREQUENCY (OLD/NEW ARFCN) -----------------------------
         try:
             if df_nr_freq is not None and not df_nr_freq.empty:
                 node_col = self._resolve_column_case_insensitive(df_nr_freq, ["NodeId"])
-                arfcn_col = self._resolve_column_case_insensitive(df_nr_freq, ["arfcnValueNRDl", "arfcn", "arfcnDL"])
+                arfcn_col = self._resolve_column_case_insensitive(df_nr_freq, ["arfcnValueNRDl"])
                 if node_col and arfcn_col:
                     work = df_nr_freq[[node_col, arfcn_col]].copy()
                     work[node_col] = work[node_col].astype(str)
 
-                    def _is_new(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.NEW_ARFCN
-
-                    def _is_old(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.OLD_ARFCN
-
-                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(_is_new), node_col]))
-                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(_is_old), node_col]))
+                    grouped = work.groupby(node_col)[arfcn_col]
+                    mask = grouped.apply(self._only_not_old_not_new)
+                    not_old_not_new_nodes = sorted(mask[mask].index.astype(str))
+                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_new), node_col]))
+                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_old), node_col]))
 
                     add_row(
                         "NRFrequency",
-                        f"NR nodes with ARFCN {self.NEW_ARFCN} in NRFrequency",
-                        len(new_nodes),
-                        ", ".join(new_nodes),
+                        f"N77 nodes with the ARFCN not in ({self.OLD_ARFCN}, {self.NEW_ARFCN}) in NRFrequency",
+                        len(not_old_not_new_nodes),
+                        ", ".join(not_old_not_new_nodes),
                     )
                     add_row(
                         "NRFrequency",
-                        f"NR nodes still with ARFCN {self.OLD_ARFCN} in NRFrequency",
+                        f"N77 nodes with the old ARFCN ({self.OLD_ARFCN}) in NRFrequency",
                         len(old_nodes),
                         ", ".join(old_nodes),
+                    )
+                    add_row(
+                        "NRFrequency",
+                        f"N77 nodes with the new ARFCN ({self.NEW_ARFCN}) in NRFrequency",
+                        len(new_nodes),
+                        ", ".join(new_nodes),
                     )
                 else:
                     add_row("NRFrequency", "NRFrequency table present but required columns missing", "N/A")
@@ -907,37 +933,40 @@ class ConfigurationAudit:
         except Exception as ex:
             add_row("NRFrequency", "Error while checking NRFrequency", f"ERROR: {ex}")
 
+        # ----------------------------- NR FREQRELATION (OLD/NEW ARFCN) -----------------------------
         try:
             if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
-                node_col_rel = self._resolve_column_case_insensitive(df_nr_freq_rel, ["NodeId"])
-                arfcn_col_rel = self._resolve_column_case_insensitive(df_nr_freq_rel, ["arfcnValueNRDl", "arfcn", "arfcnDL"])
-                if node_col_rel and arfcn_col_rel:
-                    work = df_nr_freq_rel[[node_col_rel, arfcn_col_rel]].copy()
-                    work[node_col_rel] = work[node_col_rel].astype(str)
+                node_col = self._resolve_column_case_insensitive(df_nr_freq_rel, ["NodeId"])
+                arfcn_col = self._resolve_column_case_insensitive(df_nr_freq_rel, ["NRFreqRelationId"])
+                if node_col and arfcn_col:
+                    work = df_nr_freq_rel[[node_col, arfcn_col]].copy()
+                    work[node_col] = work[node_col].astype(str)
 
-                    def _is_new(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.NEW_ARFCN
-
-                    def _is_old(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.OLD_ARFCN
-
-                    new_nodes_rel = sorted(set(work.loc[work[arfcn_col_rel].map(_is_new), node_col_rel]))
-                    old_nodes_rel = sorted(set(work.loc[work[arfcn_col_rel].map(_is_old), node_col_rel]))
+                    grouped = work.groupby(node_col)[arfcn_col]
+                    mask = grouped.apply(self._only_not_old_not_new)
+                    not_old_not_new_nodes = sorted(mask[mask].index.astype(str))
+                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_new), node_col]))
+                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_old), node_col]))
 
                     add_row(
                         "NRFreqRelation",
-                        f"NR nodes with ARFCN {self.NEW_ARFCN} in NRFreqRelation",
-                        len(new_nodes_rel),
-                        ", ".join(new_nodes_rel),
+                        f"N77 nodes with the ARFCN not in ({self.OLD_ARFCN}, {self.NEW_ARFCN}) in NRFreqRelation",
+                        len(not_old_not_new_nodes),
+                        ", ".join(not_old_not_new_nodes),
                     )
                     add_row(
                         "NRFreqRelation",
-                        f"NR nodes still with ARFCN {self.OLD_ARFCN} in NRFreqRelation",
-                        len(old_nodes_rel),
-                        ", ".join(old_nodes_rel),
+                        f"NR nodes with the old ARFCN ({self.OLD_ARFCN}) in NRFreqRelation",
+                        len(old_nodes),
+                        ", ".join(old_nodes),
                     )
+                    add_row(
+                        "NRFreqRelation",
+                        f"NR nodes with the old ARFCN ({self.NEW_ARFCN}) in NRFreqRelation",
+                        len(new_nodes),
+                        ", ".join(new_nodes),
+                    )
+
                 else:
                     add_row("NRFreqRelation", "NRFreqRelation table present but ARFCN column missing", "N/A")
             else:
@@ -945,37 +974,38 @@ class ConfigurationAudit:
         except Exception as ex:
             add_row("NRFreqRelation", "Error while checking NRFreqRelation", f"ERROR: {ex}")
 
-        # ----------------------------- LTE GUtranSyncSignalFrequency / GUtranFreqRelation -----------------------------
+        # ----------------------------- LTE GUtranSyncSignalFrequency -----------------------------
         try:
             if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
-                node_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
-                arfcn_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["arfcn", "arfcnDL"])
-                if node_col_gu and arfcn_col_gu:
-                    work = df_gu_sync_signal_freq[[node_col_gu, arfcn_col_gu]].copy()
-                    work[node_col_gu] = work[node_col_gu].astype(str)
+                node_col = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
+                arfcn_col = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["arfcn", "arfcnDL"])
+                if node_col and arfcn_col:
+                    work = df_gu_sync_signal_freq[[node_col, arfcn_col]].copy()
+                    work[node_col] = work[node_col].astype(str)
 
-                    def _is_new(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.NEW_ARFCN
-
-                    def _is_old(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.OLD_ARFCN
-
-                    new_nodes_gu = sorted(set(work.loc[work[arfcn_col_gu].map(_is_new), node_col_gu]))
-                    old_nodes_gu = sorted(set(work.loc[work[arfcn_col_gu].map(_is_old), node_col_gu]))
+                    grouped = work.groupby(node_col)[arfcn_col]
+                    mask = grouped.apply(self._only_not_old_not_new)
+                    not_old_not_new_nodes = sorted(mask[mask].index.astype(str))
+                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_new), node_col]))
+                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_old), node_col]))
 
                     add_row(
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with GUtranSyncSignalFrequency {self.NEW_ARFCN}",
-                        len(new_nodes_gu),
-                        ", ".join(new_nodes_gu),
+                        f"LTE nodes with the ARFCN not in ({self.OLD_ARFCN}, {self.NEW_ARFCN}) in GUtranSyncSignalFrequency",
+                        len(not_old_not_new_nodes),
+                        ", ".join(not_old_not_new_nodes),
                     )
                     add_row(
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes still with GUtranSyncSignalFrequency {self.OLD_ARFCN}",
-                        len(old_nodes_gu),
-                        ", ".join(old_nodes_gu),
+                        f"LTE nodes with the old ARFCN ({self.OLD_ARFCN}) in GUtranSyncSignalFrequency",
+                        len(old_nodes),
+                        ", ".join(old_nodes),
+                    )
+                    add_row(
+                        "GUtranSyncSignalFrequency",
+                        f"LTE nodes with the new ARFCN ({self.NEW_ARFCN}) in GUtranSyncSignalFrequency",
+                        len(new_nodes),
+                        ", ".join(new_nodes),
                     )
                 else:
                     add_row("GUtranSyncSignalFrequency", "GUtranSyncSignalFrequency table present but required columns missing", "N/A")
@@ -984,37 +1014,40 @@ class ConfigurationAudit:
         except Exception as ex:
             add_row("GUtranSyncSignalFrequency", "Error while checking GUtranSyncSignalFrequency", f"ERROR: {ex}")
 
+        # ----------------------------- LTE GUtranFreqRelation -----------------------------
         try:
             if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
-                node_col_gfr = self._resolve_column_case_insensitive(df_gu_freq_rel, ["NodeId"])
-                arfcn_col_gfr = self._resolve_column_case_insensitive(df_gu_freq_rel, ["arfcn", "arfcnDL"])
-                if node_col_gfr and arfcn_col_gfr:
-                    work = df_gu_freq_rel[[node_col_gfr, arfcn_col_gfr]].copy()
-                    work[node_col_gfr] = work[node_col_gfr].astype(str)
+                node_col = self._resolve_column_case_insensitive(df_gu_freq_rel, ["NodeId"])
+                arfcn_col = self._resolve_column_case_insensitive(df_gu_freq_rel, ["GUtranFreqRelationId", "gUtranFreqRelationId"])
+                if node_col and arfcn_col:
+                    work = df_gu_freq_rel[[node_col, arfcn_col]].copy()
+                    work[node_col] = work[node_col].astype(str)
 
-                    def _is_new(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.NEW_ARFCN
-
-                    def _is_old(v: object) -> bool:
-                        freq = self._parse_int_frequency(v)
-                        return freq == self.OLD_ARFCN
-
-                    new_nodes_gfr = sorted(set(work.loc[work[arfcn_col_gfr].map(_is_new), node_col_gfr]))
-                    old_nodes_gfr = sorted(set(work.loc[work[arfcn_col_gfr].map(_is_old), node_col_gfr]))
+                    grouped = work.groupby(node_col)[arfcn_col]
+                    mask = grouped.apply(self._only_not_old_not_new)
+                    not_old_not_new_nodes = sorted(mask[mask].index.astype(str))
+                    new_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_new), node_col]))
+                    old_nodes = sorted(set(work.loc[work[arfcn_col].map(self._is_old), node_col]))
 
                     add_row(
                         "GUtranFreqRelation",
-                        f"LTE nodes with GUtranFreqRelation {self.NEW_ARFCN}",
-                        len(new_nodes_gfr),
-                        ", ".join(new_nodes_gfr),
+                        f"LTE nodes with the ARFCN not in ({self.OLD_ARFCN}, {self.NEW_ARFCN}) in GUtranFreqRelation",
+                        len(not_old_not_new_nodes),
+                        ", ".join(not_old_not_new_nodes),
                     )
                     add_row(
                         "GUtranFreqRelation",
-                        f"LTE nodes still with GUtranFreqRelation {self.OLD_ARFCN}",
-                        len(old_nodes_gfr),
-                        ", ".join(old_nodes_gfr),
+                        f"LTE nodes with the old ARFCN ({self.OLD_ARFCN}) in GUtranFreqRelation",
+                        len(old_nodes),
+                        ", ".join(old_nodes),
                     )
+                    add_row(
+                        "GUtranFreqRelation",
+                        f"LTE nodes with the new ARFCN ({self.NEW_ARFCN}) in GUtranFreqRelation",
+                        len(new_nodes),
+                        ", ".join(new_nodes),
+                    )
+
                 else:
                     add_row("GUtranFreqRelation", "GUtranFreqRelation table present but ARFCN/NodeId missing", "N/A")
             else:
@@ -1069,9 +1102,9 @@ class ConfigurationAudit:
         # Max 24 GUtranSyncSignalFrequency per node
         try:
             if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
-                node_col_gu = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
-                if node_col_gu:
-                    counts = df_gu_sync_signal_freq[node_col_gu].astype(str).value_counts(dropna=False)
+                node_col = self._resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
+                if node_col:
+                    counts = df_gu_sync_signal_freq[node_col].astype(str).value_counts(dropna=False)
                     max_count = int(counts.max()) if not counts.empty else 0
                     over_limit_nodes = counts[counts >= 24]
                     add_row(

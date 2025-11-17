@@ -542,14 +542,14 @@ def run_configuration_audit(
     # Determine ARFCN-related parameters for ConfigurationAudit using GUI/CLI frequencies
     # This allows the user to change new/old ARFCN values without touching the class internals.
     try:
-        new_arfcn = int(freq_pre) if freq_pre else int(DEFAULT_FREQ_PRE)
+        old_arfcn = int(freq_pre) if freq_pre else int(DEFAULT_FREQ_PRE)
     except ValueError:
-        new_arfcn = int(DEFAULT_FREQ_PRE)
+        old_arfcn = int(DEFAULT_FREQ_PRE)
 
     try:
-        old_arfcn = int(freq_post) if freq_post else int(DEFAULT_FREQ_POST)
+        new_arfcn = int(freq_post) if freq_post else int(DEFAULT_FREQ_POST)
     except ValueError:
-        old_arfcn = int(DEFAULT_FREQ_POST)
+        new_arfcn = int(DEFAULT_FREQ_POST)
 
     # Build allowed sets from CSV (or fall back to defaults that include new_arfcn).
     # Default behavior:
@@ -569,7 +569,7 @@ def run_configuration_audit(
         label="Allowed N77 ARFCN",
     )
 
-    print(f"{module_name} Using new ARFCN = {new_arfcn}, old ARFCN = {old_arfcn}")
+    print(f"{module_name} Using old ARFCN = {old_arfcn} --> new ARFCN = {new_arfcn}")
     print(f"{module_name} Allowed N77 SSB set = {sorted(allowed_n77_ssb)}")
     print(f"{module_name} Allowed N77 ARFCN set = {sorted(allowed_n77_arfcn)}")
 
@@ -578,8 +578,8 @@ def run_configuration_audit(
 
     # Create ConfigurationAudit instance with ARFCN parameters coming from launcher
     app = ConfigurationAudit(
-        new_arfcn=new_arfcn,
         old_arfcn=old_arfcn,
+        new_arfcn=new_arfcn,
         allowed_n77_ssb=allowed_n77_ssb,
         allowed_n77_arfcn=allowed_n77_arfcn,
     )
