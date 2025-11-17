@@ -1,4 +1,4 @@
-import os
+import os, sys
 import platform
 import zipfile
 from pathlib import Path
@@ -116,3 +116,28 @@ def zip_folder(temp_dir, output_file):
                 if not os.listdir(dir_path):
                     zipf.write(dir_path, dir_path.relative_to(temp_dir))
     print(f"File successfully packed: {output_file}")
+
+def get_resource_path(relative_path: str) -> str:
+    """
+    Return absolute path to resource, working for:
+    - Source execution (normal Python)
+    - PyInstaller / Nuitka executables
+
+    When running from source:
+        this file is src/utils/Utils.py
+        project 'src' folder   = parent of this file's directory
+        resources are addressed relative to 'src'.
+
+    When frozen:
+        base path is the temp extraction folder (PyInstaller onefile)
+        or the executable folder (Nuitka / PyInstaller onefolder).
+    """
+    if getattr(sys, 'frozen', False):
+        # Frozen: PyInstaller / Nuitka
+        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+    else:
+        # Source: go one level up from src/utils -> src
+        utils_dir = os.path.dirname(os.path.abspath(__file__))    # .../src/utils
+        base_path = os.path.dirname(utils_dir)                    # .../src
+
+    return os.path.join(base_path, relative_path)

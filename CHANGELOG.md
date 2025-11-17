@@ -4,6 +4,27 @@
 
 ---
 
+## Release: v0.2.8
+- ### Release Date: 2025-11-17
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+
+  - #### 🚀 Enhancements:
+    - Added PPT Template
+    - Modified PPT to split nodes in chunks of 50 nodes per slide (2 columns of 50 nodes)
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
 ## Release: v0.2.7
 - ### Release Date: 2025-11-14
 

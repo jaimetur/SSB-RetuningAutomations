@@ -5,6 +5,8 @@ import re
 from typing import List, Tuple, Optional, Dict
 import pandas as pd
 
+from src.utils.Utils import get_resource_path
+
 from src.modules.CommonMethods import (
     read_text_with_encoding,
     find_all_subnetwork_headers,
@@ -1202,20 +1204,25 @@ class ConfigurationAudit:
             module_name: str = "",
     ) -> Optional[str]:
         """
-        Generate a PPTX file next to the Excel with a slide per Category from SummaryAudit.
+        Generate a PPTX file next to the Excel with slides per Category from SummaryAudit.
 
         - First slide: global title.
-        - One slide per Category:
+        - Then, for each Category:
+            • One or more slides.
             • Slide title = Category
-            • Body = bullets with:
+            • Body:
                 - Main bullet (font size 14 pt): "Metric: Value"
                 - Secondary bullets (font size 10 pt): one per cell/node/sector
-                  that appears after the '|' separator in the text structure.
+                  that appears after the '|' separator.
+                - Secondary bullets are arranged in two columns:
+                    · Max 25 items per column (50 per slide).
+                    · If there are more than 50 items, a new slide is created
+                      for the remaining items (repeating the same main bullet).
         """
         # Late import to avoid hard dependency if pptx is not installed
         try:
             from pptx import Presentation
-            from pptx.util import Pt
+            from pptx.util import Pt, Inches
         except ImportError:
             print(f"{module_name} [INFO] python-pptx is not installed. Skipping PPT summary.")
             return None
@@ -1230,10 +1237,35 @@ class ConfigurationAudit:
         base, _ = os.path.splitext(excel_path)
         ppt_path = base + "_Summary.pptx"
 
-        prs = Presentation()
+        # Helper: set font size for all runs in a paragraph
+        def _set_paragraph_font_size(paragraph, size: Pt) -> None:
+            for run in paragraph.runs:
+                run.font.size = size
+
+        # Helper: chunk a list into pieces of maximum 'size' elements
+        def _chunk_list(items: List[str], size: int) -> List[List[str]]:
+            return [items[i:i + size] for i in range(0, len(items), size)]
+
+        # Load user template instead of default blank PPT
+        template_path = get_resource_path("ppt_templates/ConfigurationAuditTemplate.pptx")
+        try:
+            prs = Presentation(template_path)
+            print(f"{module_name} Using PPT template: {template_path}")
+        except Exception as e:
+            print(f"{module_name} [WARN] Could not load PPT template, using default. ({e})")
+            prs = Presentation()
+
+        # Find appropriate layouts inside the template
+        # You may adjust indices depending on your template
+        try:
+            title_slide_layout = prs.slide_layouts[0]  # Title layout of your template
+            content_layout = prs.slide_layouts[2]  # Title + content layout of your template
+        except:
+            # Fallback to default mapping
+            title_slide_layout = prs.slide_layouts[0]
+            content_layout = prs.slide_layouts[1]
 
         # --- Title slide ---
-        title_slide_layout = prs.slide_layouts[0]  # usually "Title" layout
         slide = prs.slides.add_slide(title_slide_layout)
         title = slide.shapes.title
         subtitle = slide.placeholders[1] if len(slide.placeholders) > 1 else None
@@ -1243,44 +1275,32 @@ class ConfigurationAudit:
             subtitle.text = os.path.basename(excel_path)
 
         # --- Category slides ---
-        content_layout = prs.slide_layouts[1]  # "Title and Content"
         for category, lines in sections.items():
-            slide = prs.slides.add_slide(content_layout)
-            title_shape = slide.shapes.title
-            body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
-
-            title_shape.text = category
-
-            if body is None:
-                continue
-
-            tf = body.text_frame
-            tf.clear()
-
+            # If there are no lines for this category, create a single simple slide
             if not lines:
-                tf.text = "No data available for this category."
-                # Make sure this text uses main bullet size
+                slide = prs.slides.add_slide(content_layout)
+                title_shape = slide.shapes.title
+                body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+                title_shape.text = category
+
+                if body is None:
+                    continue
+
+                tf = body.text_frame
+                tf.clear()
                 p = tf.paragraphs[0]
-                for run in p.runs:
-                    run.font.size = MAIN_BULLET_SIZE
+                p.text = "No data available for this category."
+                p.level = 0
+                _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
                 continue
 
-            # Helper to apply font size to all runs in a paragraph
-            def _set_paragraph_font_size(paragraph, size):
-                for run in paragraph.runs:
-                    run.font.size = size
-
-            # Process each logical line:
-            #   "Metric: Value | Node1, Node2, Node3"
-            # becomes:
-            #   - "Metric: Value" (level 0, size 14)
-            #   - "Node1" (level 1, size 10)
-            #   - "Node2" (level 1, size 10)
-            #   - "Node3" (level 1, size 10)
-            first_main = True
+            # For each logical line: "Metric: Value | Node1, Node2, Node3, ..."
+            # we may create multiple slides if there are many nodes.
             for line in lines:
                 raw_text = line or ""
-                # Split main text and list of nodes/cells after '|'
+
+                # Split main text and node list by '|'
                 if "|" in raw_text:
                     main_text, extra_text = raw_text.split("|", 1)
                     main_text = main_text.strip()
@@ -1289,30 +1309,134 @@ class ConfigurationAudit:
                     main_text = raw_text.strip()
                     extra_text = ""
 
-                # Create / reuse paragraph for main bullet
-                if first_main:
-                    # After tf.clear(), there is a single empty paragraph we can reuse
+                # If there is no extra_text, just one simple slide with a main bullet
+                if not extra_text:
+                    slide = prs.slides.add_slide(content_layout)
+                    title_shape = slide.shapes.title
+                    body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+                    title_shape.text = category
+
+                    if body is None:
+                        continue
+
+                    tf = body.text_frame
+                    tf.clear()
                     p_main = tf.paragraphs[0]
-                    p_main.text = main_text
+                    p_main.text = main_text if main_text else "No data available for this category."
                     p_main.level = 0
-                    first_main = False
-                else:
-                    p_main = tf.add_paragraph()
-                    p_main.text = main_text
+                    _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
+                    continue
+
+                # There is extra_text: build the list of secondary items (nodes/cells/sectors)
+                cleaned_extra = extra_text.replace(";", ",")
+                items = [t.strip() for t in cleaned_extra.split(",") if t.strip()]
+
+                if not items:
+                    # Fallback: treat as no extra_text
+                    slide = prs.slides.add_slide(content_layout)
+                    title_shape = slide.shapes.title
+                    body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+                    title_shape.text = category
+
+                    if body is None:
+                        continue
+
+                    tf = body.text_frame
+                    tf.clear()
+                    p_main = tf.paragraphs[0]
+                    p_main.text = main_text if main_text else "No data available for this category."
                     p_main.level = 0
+                    _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
+                    continue
 
-                _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
+                # Now we have a non-empty list of secondary items.
+                # We will:
+                #   - Split items into chunks of 50 (max per slide).
+                #   - For each chunk:
+                #       · Use main placeholder for the main bullet.
+                #       · Create two columns of up to 25 items each (secondary bullets).
+                chunks_of_50 = _chunk_list(items, 50)
 
-                # Create secondary bullets for each element after '|'
-                if extra_text:
-                    # Replace semicolons with commas to be more robust
-                    cleaned = extra_text.replace(";", ",")
-                    items = [t.strip() for t in cleaned.split(",") if t.strip()]
-                    for item in items:
-                        p_sub = tf.add_paragraph()
-                        p_sub.text = item
-                        p_sub.level = 1  # secondary bullet
-                        _set_paragraph_font_size(p_sub, SUB_BULLET_SIZE)
+                for chunk_index, chunk_items in enumerate(chunks_of_50):
+                    slide = prs.slides.add_slide(content_layout)
+                    title_shape = slide.shapes.title
+                    body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+                    title_shape.text = category
+
+                    if body is None:
+                        continue
+
+                    # Main bullet in placeholder
+                    tf_main = body.text_frame
+                    tf_main.clear()
+                    p_main = tf_main.paragraphs[0]
+                    p_main.text = main_text if main_text else "No data available for this category."
+                    p_main.level = 0
+                    _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
+
+                    # Split secondary items into two columns: 25 max each
+                    col1_items = chunk_items[:25]
+                    col2_items = chunk_items[25:]
+
+                    # Coordinates for the two columns
+                    left_margin = Inches(0.8)
+                    top = Inches(2.0)
+                    col_width = Inches(4.0)
+                    col_height = Inches(4.0)
+                    gap_between_cols = Inches(0.3)
+
+                    # Left column
+                    if col1_items:
+                        tx_box1 = slide.shapes.add_textbox(
+                            left_margin,
+                            top,
+                            col_width,
+                            col_height,
+                        )
+                        tf1 = tx_box1.text_frame
+                        tf1.clear()
+
+                        first = True
+                        for item in col1_items:
+                            bullet_text = f"- {item}"
+                            if first:
+                                p = tf1.paragraphs[0]
+                                p.text = bullet_text
+                                first = False
+                            else:
+                                p = tf1.add_paragraph()
+                                p.text = bullet_text
+
+                            p.level = 1  # secondary bullet
+                            _set_paragraph_font_size(p, SUB_BULLET_SIZE)
+
+                    # Right column
+                    if col2_items:
+                        tx_box2 = slide.shapes.add_textbox(
+                            left_margin + col_width + gap_between_cols,
+                            top,
+                            col_width,
+                            col_height,
+                        )
+                        tf2 = tx_box2.text_frame
+                        tf2.clear()
+
+                        first = True
+                        for item in col2_items:
+                            bullet_text = f"- {item}"
+                            if first:
+                                p = tf2.paragraphs[0]
+                                p.text = bullet_text
+                                first = False
+                            else:
+                                p = tf2.add_paragraph()
+                                p.text = bullet_text
+
+                            p.level = 1  # secondary bullet
+                            _set_paragraph_font_size(p, SUB_BULLET_SIZE)
 
         prs.save(ppt_path)
         return ppt_path
