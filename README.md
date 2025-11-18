@@ -31,7 +31,7 @@ Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 arc
 **RetuningAutomations** streamlines routine tasks during SSB retuning projects.  
 It ships a single launcher that can run in **GUI** mode (no arguments) or **CLI** mode (with arguments) to execute one of several modules:
 
-1. **Configuration Audit (Logs Parser)** — parses raw log folders and builds a curated Excel workbook (module scaffold ready).  
+1. **Configuration Audit** — parses raw log folders and builds a curated Excel workbook (module scaffold ready).  
 2. **Consistency Check (Pre/Post Comparison)** — loads Pre and Post datasets, compares relations across frequencies, and generates a clean Excel summary (plus detailed tables).  
 3. **Initial Clean-Up (During Maintenance Window)** — helper utilities to tidy intermediate outputs (module scaffold ready).
 4. **Final Clean-Up (During Maintenance Window)** — helper utilities to tidy final outputs (module scaffold ready).
@@ -47,7 +47,7 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ## 🧩 Main Modules
 
-### `1. Configuration Audit (Logs Parser)`
+### `1. Configuration Audit`
 **Purpose:** Scan the log folder and build a consolidated Excel workbook.
 
 **Notes**

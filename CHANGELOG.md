@@ -4,8 +4,83 @@
 
 ---
 
+## Release: v0.3.0
+- ### Release Date: 2025-11-19
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+
+  - #### 🚀 Enhancements:
+    - Refactor main module `RetuningAutomations` to simplify the logic.
+  
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
+## Release: v0.2.9
+- ### Release Date: 2025-11-18
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - Check if all EndcDistrProfile gUtranFreqRef is always set to (old_arfcn or new_arfcn) and & n77b_ssb (653952)
+    - Added N77B SSB fields to GUI and CLI intefaces.
+
+  - #### 🚀 Enhancements:
+    - Refactor module `ConfigurationAudit` and split in different submodules
+    - Network Audit Enhancements (#26) now includes: 
+      - Count/List of Nodes/Cells per category:
+        - Count Nodes with N77 cells. NRCellDU Pivot table to check if all cells with SSB 648672&653952. NRSectorCarrier to check if all N77B sectors with ARFCN 654652, 655324, 655984 or 656656
+        - Count NR nodes with NrFrequency/NrFreqRelation 648672 defined. Pivot tables to detect if 647328 already defined 
+        - Count LTE nodes with GUtranSyncSignalFrequency/GUtranFreqRelation 648672 defined. Pivot table to detect if 647328 already defined
+      - Check if any referece to new SSB in any node: FreqRelation, Frequency. If autocreated might need additional actions
+      - Check if any cell reached max FreqRelation cardinality (max 16 NrFreqRelation and 16 GUtranFreqRelation per Cell)
+      - Check if any nodes reached max 24 GUtranSyncSignalFrequency definitions
+      - Check if any nodes reached max 64 NRFrequency definitions
+      - Check if all EndcDistrProfile gUtranFreqRef always set to 648672&653952
+  
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
+## Release: v0.2.8
+- ### Release Date: 2025-11-17
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+
+  - #### 🚀 Enhancements:
+    - Added PPT Template.
+    - Modified PPT to split nodes in chunks of 50 nodes per slide (2 columns of 50 nodes).
+    - Persist Allowed SSB and ARFCN lists between different executions.
+    - Improvements on Configuration Audit.
+    
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes
+
+---
+
 ## Release: v0.2.7
-- ### Release Date: 2025-11-13
+- ### Release Date: 2025-11-14
 
 - ### Main Changes:
   
@@ -13,10 +88,22 @@
   
   - #### 🌟 New Features:
     - If Consistency Check module is selected, then use two input folders, one for Pre and one for Post (#25)
+    - Network Audit Enhancements:
+      - Count/List of Nodes/Cells per category:
+        - Count Nodes with N77 cells. NRCellDU Pivot table to check if all cells with SSB 648672&653952. NRSectorCarrier to check if all N77B sectors with ARFCN 654652, 655324, 655984 or 656656
+        - Count NR nodes with NrFrequency/NrFreqRelation 648672 defined. Pivot tables to detect if 647328 already defined 
+        - Count LTE nodes with GUtranSyncSignalFrequency/GUtranFreqRelation 648672 defined. Pivot table to detect if 647328 already defined
+      - Check if any referece to new SSB in any node: FreqRelation, Frequency. If autocreated might need additional actions
+      - Check if any cell reached max FreqRelation cardinality (max 16 NrFreqRelation and 16 GUtranFreqRelation per Cell)
+      - Check if any nodes reached max 24 GUtranSyncSignalFrequency definitions
+      - Check if any nodes reached max 64 NRFrequency definitions
+      - Check if all EndcDistrProfile gUtranFreqRef always set to 648672&653952
+    - Configuration Audit now generates a PPT with a Text Summary.
 
   - #### 🚀 Enhancements:
     - Align Summary headers to left (#23)
     - Include input log folder in Summary sheets of Consistency Check (#24)
+    - Modified GUI to accept `ALLOWED_SSB_N77` and `ALLOWED_N77B_ARFCN` lists for Configuration Audit.
     
   - #### 🐛 Bug fixes:
     - Minor bug fixing.

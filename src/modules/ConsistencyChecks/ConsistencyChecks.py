@@ -6,24 +6,8 @@ from typing import Dict, Optional, List
 
 import pandas as pd
 
-from src.modules.CommonMethods import (
-    read_text_lines,
-    find_all_subnetwork_headers,
-    extract_mo_from_subnetwork_line,
-    parse_table_slice_from_subnetwork,
-    normalize_df,
-    select_latest_by_date,
-    make_index_by_keys,
-    extract_gu_freq_base,
-    extract_nr_freq_base,
-    detect_freq_column,
-    detect_key_columns,
-    enforce_gu_columns,
-    enforce_nr_columns,
-    color_summary_tabs,
-    enable_header_filters,
-    extract_date,
-)
+from src.utils.utils_io import read_text_lines
+from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 
 class ConsistencyChecks:
     """

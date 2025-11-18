@@ -6,6 +6,7 @@ pillow>=11.2.1
 colorama>=0.4.6
 pyinstaller>=6.0.0
 nuitka>=2.7.3
+python-pptx
 
 # Optional (recommended for best performance and CLI experience)
 python-dateutil>=2.8.2

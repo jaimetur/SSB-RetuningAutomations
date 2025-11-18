@@ -16,7 +16,7 @@ import glob
 from pathlib import Path
 
 from RetuningAutomations import TOOL_NAME, TOOL_VERSION, COPYRIGHT_TEXT
-from src.utils.Utils import clear_screen, get_os, get_arch, print_arguments_pretty, zip_folder
+from src.utils.utils_infrastructure import clear_screen, get_os, get_arch, print_arguments_pretty, zip_folder
 
 global OPERATING_SYSTEM
 global ARCHITECTURE
@@ -46,6 +46,10 @@ def include_extrafiles_and_zip(input_file, output_file):
         {
             'subdir': 'help',  # Estos ficheros van al subdirectorio 'help'
             'files': ["./help/*.md"]
+        },
+        {
+            'subdir': 'ppt_templates',  # Estos ficheros van al subdirectorio 'help'
+            'files': ["./src/ppt_templates/ConfigurationAuditTemplate.pptx"]
         }
     ]
     if not input_file or not output_file:
