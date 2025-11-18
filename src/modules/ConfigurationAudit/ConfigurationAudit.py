@@ -33,6 +33,7 @@ class ConfigurationAudit:
         new_arfcn: int,
         allowed_n77_ssb: Optional[List[int]] = None,
         allowed_n77_arfcn: Optional[List[int]] = None,
+        n77b_ssb_arfcn: Optional[int] = None
     ):
         """
         Initialize ConfigurationAudit with ARFCN-related parameters.
@@ -42,6 +43,7 @@ class ConfigurationAudit:
         # Core ARFCN values
         self.OLD_ARFCN: int = int(old_arfcn)
         self.NEW_ARFCN: int = int(new_arfcn)
+        self.N77B_SSB: int = int(n77b_ssb_arfcn)
 
         # Allowed SSB values for N77 cells (e.g. {648672, 653952})
         if allowed_n77_ssb is None:
@@ -317,6 +319,7 @@ class ConfigurationAudit:
             df_endc_distr_profile=df_endc_distr_profile,
             old_arfcn=self.OLD_ARFCN,
             new_arfcn=self.NEW_ARFCN,
+            n77b_ssb=self.N77B_SSB,
             allowed_n77_ssb=self.ALLOWED_N77_SSB,
             allowed_n77_arfcn=self.ALLOWED_N77_ARFCN,
         )

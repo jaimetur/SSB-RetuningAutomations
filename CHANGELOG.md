@@ -12,7 +12,8 @@
   - #### 🚨 Breaking Changes:
   
   - #### 🌟 New Features:
-    - Check if all EndcDistrProfile gUtranFreqRef is always set to (old_arfcn or new_arfcn) and &653952
+    - Check if all EndcDistrProfile gUtranFreqRef is always set to (old_arfcn or new_arfcn) and & n77b_ssb (653952)
+    - Added N77B SSB fields to GUI and CLI intefaces.
 
   - #### 🚀 Enhancements:
     - Refactor module `ConfigurationAudit` and split in different submodules

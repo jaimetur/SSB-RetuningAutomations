@@ -25,6 +25,7 @@ def build_summary_audit(
     df_endc_distr_profile: pd.DataFrame,
     old_arfcn: int,
     new_arfcn: int,
+    n77b_ssb: int,
     allowed_n77_ssb,
     allowed_n77_arfcn,
 ) -> pd.DataFrame:
@@ -43,8 +44,9 @@ def build_summary_audit(
         represented as a row in the resulting dataframe.
     """
 
-    old_arfcn = int(old_arfcn)
-    new_arfcn = int(new_arfcn)
+    # old_arfcn = int(old_arfcn)
+    # new_arfcn = int(new_arfcn)
+    # n77b_ssb = int(n77b_ssb)
 
     allowed_n77_ssb_set = {int(v) for v in (allowed_n77_ssb or [])}
     allowed_n77_arfcn_set = {int(v) for v in (allowed_n77_arfcn or [])}
@@ -512,15 +514,17 @@ def build_summary_audit(
                     work[node_col_edp] = work[node_col_edp].astype(str)
                     work[ref_col] = work[ref_col].astype(str)
 
-                    expected_old = str(old_arfcn)
-                    expected_new = str(new_arfcn)
-                    expected_pair_freq = "653952"
-
+                    # extract_sync_frequencies returns a set of strings (e.g. {"648672", "653952"})
                     freq_sets = work[ref_col].map(extract_sync_frequencies)
 
-                    # Nodes with GUtranSyncSignalFrequency containing old_arfcn and 653952
+                    # Make sure we compare strings with strings
+                    expected_old = str(old_arfcn)
+                    expected_new = str(new_arfcn)
+                    expected_n77b = str(n77b_ssb)
+
+                    # Nodes with GUtranSyncSignalFrequency containing old_arfcn and n77b_ssb
                     mask_old_pair = freq_sets.map(
-                        lambda s: (expected_old in s) and (expected_pair_freq in s)
+                        lambda s: (expected_old in s) and (expected_n77b in s)
                     )
                     old_nodes = sorted(
                         work.loc[mask_old_pair, node_col_edp].astype(str).unique()
@@ -529,14 +533,14 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Audit",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency containing {expected_old} and {expected_pair_freq}",
+                        f"Nodes with GUtranSyncSignalFrequency containing {old_arfcn} and {n77b_ssb}",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
 
-                    # Nodes with GUtranSyncSignalFrequency containing new_arfcn and 653952
+                    # Nodes with GUtranSyncSignalFrequency containing new_arfcn and n77b_ssb
                     mask_new_pair = freq_sets.map(
-                        lambda s: (expected_new in s) and (expected_pair_freq in s)
+                        lambda s: (expected_new in s) and (expected_n77b in s)
                     )
                     new_nodes = sorted(
                         work.loc[mask_new_pair, node_col_edp].astype(str).unique()
@@ -545,7 +549,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Audit",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency containing {expected_new} and {expected_pair_freq}",
+                        f"Nodes with GUtranSyncSignalFrequency containing {new_arfcn} and {n77b_ssb}",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -553,9 +557,9 @@ def build_summary_audit(
                     # Inconsistencies:
                     # - rows where neither old_arfcn nor new_arfcn is present
                     #   OR
-                    # - rows where 653952 is not present
+                    # - rows where n77b_ssb is not present
                     mask_inconsistent = freq_sets.map(
-                        lambda s: ((expected_old not in s and expected_new not in s) or (expected_pair_freq not in s))
+                        lambda s: ((expected_old not in s and expected_new not in s) or (expected_n77b not in s))
                     )
                     bad_nodes = sorted(
                         work.loc[mask_inconsistent, node_col_edp].astype(str).unique()
@@ -564,7 +568,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Inconsistencies",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency not containing ({expected_old} or {expected_new}) together with {expected_pair_freq}",
+                        f"Nodes with GUtranSyncSignalFrequency not containing ({old_arfcn} or {new_arfcn}) together with {n77b_ssb}",
                         len(bad_nodes),
                         ", ".join(bad_nodes),
                     )
@@ -850,9 +854,9 @@ def build_summary_audit(
                 ("GUtran Frequency Inconsistences", "GUtranFreqRelation", f"LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) in GUtranFreqRelation"),
 
                 # EndcDistrProfile Audit
-                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {expected_old} and {expected_pair_freq}"),
-                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {expected_new} and {expected_pair_freq}"),
-                ("EndcDistrProfile Inconsistencies", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency not containing ({expected_old} or {expected_new}) together with {expected_pair_freq}"),
+                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {old_arfcn} and {n77b_ssb}"),
+                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {new_arfcn} and {n77b_ssb}"),
+                ("EndcDistrProfile Inconsistencies", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency not containing ({old_arfcn} or {new_arfcn}) together with {n77b_ssb}"),
 
                 # Cardinality Audit
                 ("Cardinality Audit", "Cardinality", "Max NRFreqRelation per NR cell (limit 16)"),
