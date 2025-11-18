@@ -70,7 +70,7 @@ def print_arguments_pretty(arguments, title="Arguments", step_name="", use_custo
     i = 0
 
     if use_custom_print:
-        from utils_general.StandaloneUtils import custom_print
+        from utils_infrastructure.StandaloneUtils import custom_print
         custom_print(f"{title}:")
         while i < len(arguments):
             arg = arguments[i]
@@ -124,7 +124,7 @@ def get_resource_path(relative_path: str) -> str:
     - PyInstaller / Nuitka executables
 
     When running from source:
-        this file is src/utils/utils_general.py
+        this file is src/utils/utils_infrastructure.py
         project 'src' folder   = parent of this file's directory
         resources are addressed relative to 'src'.
 

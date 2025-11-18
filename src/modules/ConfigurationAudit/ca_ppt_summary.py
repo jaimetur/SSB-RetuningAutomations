@@ -4,7 +4,7 @@ import os
 from typing import Dict, List, Optional
 import pandas as pd
 
-from src.utils.utils_general import get_resource_path
+from src.utils.utils_infrastructure import get_resource_path
 
 
 def build_text_summary_structure(
