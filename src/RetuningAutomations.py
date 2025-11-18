@@ -24,16 +24,16 @@ from dataclasses import dataclass
 from typing import Optional, List
 import textwrap
 import importlib
-import configparser
-import traceback
 from pathlib import Path
-import inspect
 
 # Import our different Classes
 from src.modules.ConsistencyChecks.ConsistencyChecks import ConsistencyChecks
 from src.modules.ConfigurationAudit import ConfigurationAudit
 from src.modules.CleanUp.InitialCleanUp import InitialCleanUp
 from src.modules.CleanUp.FinalCleanUp import FinalCleanUp
+from src.utils.utils_datetime import format_duration_hms
+from src.utils.utils_infrastructure import LoggerDual
+from src.utils.utils_io import normalize_csv_list, parse_arfcn_csv_to_set, load_cfg_values, save_cfg_values, log_module_exception
 
 # ================================ VERSIONING ================================ #
 
@@ -50,24 +50,22 @@ Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retu
 
 # ================================ DEFAULTS ================================= #
 # Input Folder(s)
-INPUT_FOLDER = ""  # single-input default if not defined
-INPUT_FOLDER_PRE = ""   # default Pre folder for dual-input GUI (empty by default)
-INPUT_FOLDER_POST = ""  # default Post folder for dual-input GUI (empty by default)
+INPUT_FOLDER = ""        # single-input default if not defined
+INPUT_FOLDER_PRE = ""    # default Pre folder for dual-input GUI
+INPUT_FOLDER_POST = ""   # default Post folder for dual-input GUI
 
 # Frequencies (single Pre/Post used by ConsistencyChecks)
 DEFAULT_FREQ_PRE = "648672"
 DEFAULT_FREQ_POST = "647328"
 
-# NEW: Default N77B SSB frequency
+# Default N77B SSB frequency
 DEFAULT_N77B_SSB = "653952"
 
 # Default ARFCN lists (CSV) for ConfigurationAudit
-# NOTE: These are used if the user does not provide custom lists via CLI/GUI.
 DEFAULT_ALLOWED_N77_SSB_CSV = "648672,653952"
 DEFAULT_ALLOWED_N77_ARFCN_CSV = "654652,655324,655984,656656"
 
 # Global selectable list for filtering summary columns in ConfigurationAudit
-# NOTE: User can edit/extend this list. It supports multi-selection in GUI.
 NETWORK_FREQUENCIES: List[str] = [
     "174970","176410","176430","176910","177150","392410","393410","394500","394590","432970",
     "647328","648672","650004","650006","653952",
@@ -75,10 +73,9 @@ NETWORK_FREQUENCIES: List[str] = [
 ]
 
 # TABLES_ORDER defines the desired priority of table sheet ordering.
-# Sheets whose MO name is not listed here will be placed after the listed ones.
-TABLES_ORDER = []
+TABLES_ORDER: List[str] = []
 
-# Module names
+# Module names (GUI labels)
 MODULE_NAMES = [
     "1. Configuration Audit (Logs Parser)",
     "2. Consistency Check (Pre/Post Comparison)",
@@ -87,38 +84,32 @@ MODULE_NAMES = [
 ]
 
 # ============================== PERSISTENT CONFIG =========================== #
-# We store config under user's home to avoid write-permission issues with PyInstaller/Nuitka.
 CONFIG_DIR  = Path.home() / ".retuning_automations"
 CONFIG_PATH = CONFIG_DIR / "config.cfg"
 CONFIG_SECTION = "general"
-CONFIG_KEY_LAST_INPUT = "last_input_dir"
-CONFIG_KEY_LAST_INPUT_PRE = "last_input_dir_pre"
-CONFIG_KEY_LAST_INPUT_POST = "last_input_dir_post"
-CONFIG_KEY_FREQ_PRE = "freq_pre"
-CONFIG_KEY_FREQ_POST = "freq_post"
-CONFIG_KEY_N77B_SSB = "n77b_ssb_freq"  # persist N77B SSB frequency
-CONFIG_KEY_FREQ_FILTERS = "summary_freq_filters"  # comma-separated persistence for filters
-CONFIG_KEY_ALLOWED_N77_SSB = "allowed_n77_ssb_csv"
+
+CONFIG_KEY_LAST_INPUT       = "last_input_dir"
+CONFIG_KEY_LAST_INPUT_PRE   = "last_input_dir_pre"
+CONFIG_KEY_LAST_INPUT_POST  = "last_input_dir_post"
+CONFIG_KEY_FREQ_PRE         = "freq_pre"
+CONFIG_KEY_FREQ_POST        = "freq_post"
+CONFIG_KEY_N77B_SSB         = "n77b_ssb_freq"
+CONFIG_KEY_FREQ_FILTERS     = "summary_freq_filters"
+CONFIG_KEY_ALLOWED_N77_SSB  = "allowed_n77_ssb_csv"
 CONFIG_KEY_ALLOWED_N77_ARFCN = "allowed_n77_arfcn_csv"
 
-# ============================== LOGGING SYSTEM ============================== #
-class LoggerDual:
-    """
-    Simple dual logger that mirrors stdout prints to both console and a log file.
-    Replaces sys.stdout so every print() goes to both outputs automatically.
-    """
-    def __init__(self, log_file_path: str):
-        self.terminal = sys.stdout
-        self.log = open(log_file_path, "a", encoding="utf-8")
-
-    def write(self, message: str):
-        self.terminal.write(message)
-        self.log.write(message)
-
-    def flush(self):
-        """Required for compatibility with Python's stdout flush behavior."""
-        self.terminal.flush()
-        self.log.flush()
+# Logic Map -> Key in config
+CFG_FIELD_MAP = {
+    "last_input":        CONFIG_KEY_LAST_INPUT,
+    "last_input_pre":    CONFIG_KEY_LAST_INPUT_PRE,
+    "last_input_post":   CONFIG_KEY_LAST_INPUT_POST,
+    "freq_pre":          CONFIG_KEY_FREQ_PRE,
+    "freq_post":         CONFIG_KEY_FREQ_POST,
+    "n77b_ssb":          CONFIG_KEY_N77B_SSB,
+    "freq_filters":      CONFIG_KEY_FREQ_FILTERS,
+    "allowed_n77_ssb":   CONFIG_KEY_ALLOWED_N77_SSB,
+    "allowed_n77_arfcn": CONFIG_KEY_ALLOWED_N77_ARFCN,
+}
 
 # ============================ OPTIONAL TKINTER UI =========================== #
 try:
@@ -142,30 +133,17 @@ class GuiResult:
     # Common frequencies
     freq_pre: str
     freq_post: str
-    # NEW: N77B SSB frequency
+    # N77B SSB frequency
     n77b_ssb_freq: str
     # Summary filters for ConfigurationAudit
-    freq_filters_csv: str  # comma-separated list of frequency filters for summary sheets
-    # NEW: SSB/ARFCN lists for ConfigurationAudit
+    freq_filters_csv: str
+    # SSB/ARFCN lists for ConfigurationAudit
     allowed_n77_ssb_csv: str
     allowed_n77_arfcn_csv: str
 
 
-def _normalize_csv_list(text: str) -> str:
-    """Normalize a comma-separated text into 'a,b,c' without extra spaces/empties."""
-    if not text:
-        return ""
-    items = [t.strip() for t in text.split(",")]
-    items = [t for t in items if t]  # drop empties
-    return ",".join(items)
-
-
-def _is_consistency_module(selected_text: str) -> bool:
-    """
-    Return True if the selected module is the SECOND item (index 1),
-    regardless of its display name. We check position to stay robust
-    even if the label changes in the future.
-    """
+def is_consistency_module(selected_text: str) -> bool:
+    """True if selected module is the second (Consistency Check)."""
     try:
         idx = MODULE_NAMES.index(selected_text)
         return idx == 1
@@ -186,20 +164,12 @@ def gui_config_dialog(
     default_n77b_ssb: str = DEFAULT_N77B_SSB,
 ) -> Optional[GuiResult]:
     """
-    Opens a single modal window with:
-      - Combobox (module)
-      - Either:
-         • Single input folder (entry + Browse), or
-         • Dual input folders (Pre + Post, each with Browse)
-      - N77 SSB Frequency (Pre/Post)
-      - N77B SSB Frequency
-      - Multi-select list for Summary Frequency Filters (persisted)
-      - CSV fields for:
-         • Allowed N77 SSB list
-         • Allowed N77 ARFCN list
-      - Run / Cancel
-
-    Returns GuiResult or None if cancelled/unavailable.
+    Ventana única con:
+      - Combobox de módulo
+      - Input único o dual (Pre/Post)
+      - Frecuencias N77 Pre/Post + N77B
+      - Filtros de Summary (multi-select)
+      - Listas Allowed N77 SSB / N77 ARFCN
     """
     if tk is None or ttk is None or filedialog is None:
         return None
@@ -220,7 +190,7 @@ def gui_config_dialog(
     except Exception:
         pass
 
-    # --- Vars
+    # Vars
     module_var = tk.StringVar(value=MODULE_NAMES[0])
     input_var = tk.StringVar(value=default_input or "")
     input_pre_var = tk.StringVar(value=default_input_pre or "")
@@ -228,27 +198,25 @@ def gui_config_dialog(
     pre_var = tk.StringVar(value=default_pre or "")
     post_var = tk.StringVar(value=default_post or "")
     n77b_ssb_var = tk.StringVar(value=default_n77b_ssb or "")
-    selected_csv_var = tk.StringVar(value=_normalize_csv_list(default_filters_csv))
-    allowed_n77_ssb_var = tk.StringVar(value=_normalize_csv_list(default_allowed_n77_ssb_csv))
-    allowed_n77_arfcn_var = tk.StringVar(value=_normalize_csv_list(default_allowed_n77_arfcn_csv))
+    selected_csv_var = tk.StringVar(value=normalize_csv_list(default_filters_csv))
+    allowed_n77_ssb_var = tk.StringVar(value=normalize_csv_list(default_allowed_n77_ssb_csv))
+    allowed_n77_arfcn_var = tk.StringVar(value=normalize_csv_list(default_allowed_n77_arfcn_csv))
     result: Optional[GuiResult] = None
 
-    # --- Layout
     pad = {'padx': 10, 'pady': 6}
     pad_tight = {'padx': 4, 'pady': 2}
     frm = ttk.Frame(root, padding=12)
     frm.pack(fill="both", expand=True)
 
-    # Row 0: Module
+    # Row 0: module
     ttk.Label(frm, text="Module to run:").grid(row=0, column=0, sticky="w", **pad)
     cmb = ttk.Combobox(frm, textvariable=module_var, values=MODULE_NAMES, state="readonly", width=50)
     cmb.grid(row=0, column=1, columnspan=2, sticky="ew", **pad)
 
-    # --- Single-input frame (shown for modules other than #2)
+    # Single-input frame
     single_frame = ttk.Frame(frm)
     ttk.Label(single_frame, text="Input folder:").grid(row=0, column=0, sticky="w", **pad)
-    ent_input = ttk.Entry(single_frame, textvariable=input_var, width=58)
-    ent_input.grid(row=0, column=1, sticky="ew", **pad)
+    ttk.Entry(single_frame, textvariable=input_var, width=58).grid(row=0, column=1, sticky="ew", **pad)
 
     def browse_single():
         path = filedialog.askdirectory(title="Select input folder", initialdir=input_var.get() or os.getcwd())
@@ -257,12 +225,10 @@ def gui_config_dialog(
 
     ttk.Button(single_frame, text="Browse…", command=browse_single).grid(row=0, column=2, sticky="ew", **pad)
 
-    # --- Dual-input frame (shown only for module #2)
+    # Dual-input frame
     dual_frame = ttk.Frame(frm)
-
     ttk.Label(dual_frame, text="Pre input folder:").grid(row=0, column=0, sticky="w", **pad)
-    ent_pre = ttk.Entry(dual_frame, textvariable=input_pre_var, width=58)
-    ent_pre.grid(row=0, column=1, sticky="ew", **pad)
+    ttk.Entry(dual_frame, textvariable=input_pre_var, width=58).grid(row=0, column=1, sticky="ew", **pad)
 
     def browse_pre():
         path = filedialog.askdirectory(title="Select PRE input folder", initialdir=input_pre_var.get() or os.getcwd())
@@ -272,8 +238,7 @@ def gui_config_dialog(
     ttk.Button(dual_frame, text="Browse…", command=browse_pre).grid(row=0, column=2, sticky="ew", **pad)
 
     ttk.Label(dual_frame, text="Post input folder:").grid(row=1, column=0, sticky="w", **pad)
-    ent_post = ttk.Entry(dual_frame, textvariable=input_post_var, width=58)
-    ent_post.grid(row=1, column=1, sticky="ew", **pad)
+    ttk.Entry(dual_frame, textvariable=input_post_var, width=58).grid(row=1, column=1, sticky="ew", **pad)
 
     def browse_post():
         path = filedialog.askdirectory(title="Select POST input folder", initialdir=input_post_var.get() or os.getcwd())
@@ -282,19 +247,18 @@ def gui_config_dialog(
 
     ttk.Button(dual_frame, text="Browse…", command=browse_post).grid(row=1, column=2, sticky="ew", **pad)
 
-    # Initially show single or dual depending on default selection
-    def _refresh_input_mode(*_e):
+    def refresh_input_mode(*_e):
         single_frame.grid_forget()
         dual_frame.grid_forget()
-        if _is_consistency_module(module_var.get()):
+        if is_consistency_module(module_var.get()):
             dual_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
         else:
             single_frame.grid(row=1, column=0, columnspan=3, sticky="ew")
 
-    cmb.bind("<<ComboboxSelected>>", _refresh_input_mode)
-    _refresh_input_mode()
+    cmb.bind("<<ComboboxSelected>>", refresh_input_mode)
+    refresh_input_mode()
 
-    # Row 2-4: Pre/Post N77 SSB frequencies + N77B SSB
+    # Frecuencias
     ttk.Label(frm, text="N77 SSB Frequency (Pre):").grid(row=2, column=0, sticky="w", **pad)
     ttk.Entry(frm, textvariable=pre_var, width=22).grid(row=2, column=1, sticky="w", **pad)
 
@@ -304,13 +268,12 @@ def gui_config_dialog(
     ttk.Label(frm, text="N77B SSB Frequency:").grid(row=4, column=0, sticky="w", **pad)
     ttk.Entry(frm, textvariable=n77b_ssb_var, width=22).grid(row=4, column=1, sticky="w", **pad)
 
-    # Row 5+: Multi-select for Summary Filters (ConfigurationAudit)
+    # Filtros Summary
     ttk.Separator(frm).grid(row=5, column=0, columnspan=3, sticky="ew", **pad)
     ttk.Label(frm, text="Summary Filters (for pivot columns in Configuration Audit):").grid(
         row=6, column=0, columnspan=3, sticky="w", **pad
     )
 
-    # Left: multi-select list of NETWORK_FREQUENCIES with vertical scrollbar
     list_frame = ttk.Frame(frm)
     list_frame.grid(row=7, column=0, columnspan=1, sticky="nsw", **pad_tight)
     ttk.Label(list_frame, text="Available frequencies:").pack(anchor="w")
@@ -334,30 +297,26 @@ def gui_config_dialog(
     lb.pack(side="left", fill="both", expand=True)
     scrollbar.config(command=lb.yview)
 
-    # Middle: buttons for selection management
     btns_frame = ttk.Frame(frm)
     btns_frame.grid(row=7, column=1, sticky="n", **pad_tight)
 
-    # Right: entry showing selected (comma-separated)
     right_frame = ttk.Frame(frm)
     right_frame.grid(row=7, column=2, sticky="nsew", **pad_tight)
     ttk.Label(right_frame, text="Frequencies Filter (Empty = No Filter):").grid(row=0, column=0, sticky="w")
-    ent_selected = ttk.Entry(right_frame, textvariable=selected_csv_var, width=40)
-    ent_selected.grid(row=1, column=0, sticky="ew")
+    ttk.Entry(right_frame, textvariable=selected_csv_var, width=40).grid(row=1, column=0, sticky="ew")
 
-    def _current_selected_set() -> List[str]:
-        return [s.strip() for s in _normalize_csv_list(selected_csv_var.get()).split(",") if s.strip()]
+    def current_selected_set() -> List[str]:
+        return [s.strip() for s in normalize_csv_list(selected_csv_var.get()).split(",") if s.strip()]
 
     def add_selected():
         chosen = [lb.get(i) for i in lb.curselection()]
-        pool = set(_current_selected_set())
-        for c in chosen:
-            pool.add(c)
+        pool = set(current_selected_set())
+        pool.update(chosen)
         selected_csv_var.set(",".join(sorted(pool)))
 
     def remove_selected():
-        chosen = set([lb.get(i) for i in lb.curselection()])
-        pool = [x for x in _current_selected_set() if x not in chosen]
+        chosen = set(lb.get(i) for i in lb.curselection())
+        pool = [x for x in current_selected_set() if x not in chosen]
         selected_csv_var.set(",".join(pool))
 
     def select_all():
@@ -365,7 +324,6 @@ def gui_config_dialog(
         add_selected()
 
     def clear_filters():
-        """Clear only the summary frequency filters (no input dir / pre/post)."""
         lb.selection_clear(0, "end")
         selected_csv_var.set("")
 
@@ -374,7 +332,7 @@ def gui_config_dialog(
     ttk.Button(btns_frame, text="Select all", command=select_all).pack(pady=4, fill="x")
     ttk.Button(btns_frame, text="Clear Filter", command=clear_filters).pack(pady=4, fill="x")
 
-    # NEW: ARFCN lists for ConfigurationAudit
+    # ARFCN lists
     ttk.Separator(frm).grid(row=8, column=0, columnspan=3, sticky="ew", **pad)
     ttk.Label(frm, text="Allowed ARFCN sets for Configuration Audit (CSV):").grid(
         row=9, column=0, columnspan=3, sticky="w", **pad
@@ -390,7 +348,6 @@ def gui_config_dialog(
         row=11, column=1, columnspan=2, sticky="ew", **pad
     )
 
-    # Buttons
     btns = ttk.Frame(frm)
     btns.grid(row=12, column=0, columnspan=3, sticky="e", **pad)
 
@@ -398,11 +355,10 @@ def gui_config_dialog(
         nonlocal result
         sel_module = module_var.get().strip()
 
-        # Normalize ARFCN CSV inputs
-        normalized_allowed_n77_ssb = _normalize_csv_list(allowed_n77_ssb_var.get())
-        normalized_allowed_n77_arfcn = _normalize_csv_list(allowed_n77_arfcn_var.get())
+        normalized_allowed_n77_ssb = normalize_csv_list(allowed_n77_ssb_var.get())
+        normalized_allowed_n77_arfcn = normalize_csv_list(allowed_n77_arfcn_var.get())
 
-        if _is_consistency_module(sel_module):
+        if is_consistency_module(sel_module):
             sel_input_pre = input_pre_var.get().strip()
             sel_input_post = input_post_var.get().strip()
             if not sel_input_pre or not sel_input_post:
@@ -416,7 +372,7 @@ def gui_config_dialog(
                 freq_pre=pre_var.get().strip(),
                 freq_post=post_var.get().strip(),
                 n77b_ssb_freq=n77b_ssb_var.get().strip(),
-                freq_filters_csv=_normalize_csv_list(selected_csv_var.get()),
+                freq_filters_csv=normalize_csv_list(selected_csv_var.get()),
                 allowed_n77_ssb_csv=normalized_allowed_n77_ssb,
                 allowed_n77_arfcn_csv=normalized_allowed_n77_arfcn,
             )
@@ -433,7 +389,7 @@ def gui_config_dialog(
                 freq_pre=pre_var.get().strip(),
                 freq_post=post_var.get().strip(),
                 n77b_ssb_freq=n77b_ssb_var.get().strip(),
-                freq_filters_csv=_normalize_csv_list(selected_csv_var.get()),
+                freq_filters_csv=normalize_csv_list(selected_csv_var.get()),
                 allowed_n77_ssb_csv=normalized_allowed_n77_ssb,
                 allowed_n77_arfcn_csv=normalized_allowed_n77_arfcn,
             )
@@ -453,7 +409,6 @@ def gui_config_dialog(
 
 
 # ================================ CLI PARSER ================================ #
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launcher Retuning Automations Tool with GUI fallback.")
     parser.add_argument(
@@ -471,60 +426,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--freq-pre", help="Frequency before refarming (Pre)")
     parser.add_argument("--freq-post", help="Frequency after refarming (Post)")
     parser.add_argument("--freq-n77b-ssb", help="N77B SSB frequency (ARFCN).")
-    parser.add_argument(
-        "--freq-filters",
-        help="Comma-separated list of frequencies to filter pivot columns in Configuration Audit "
-             "(substring match per column header)."
-    )
+    parser.add_argument("--freq-filters", help="Comma-separated list of frequencies to filter pivot columns in Configuration Audit (substring match per column header).")
 
     # ARFCN list options for ConfigurationAudit
-    parser.add_argument(
-        "--allowed-n77-ssb",
-        help="Comma-separated ARFCN list for N77 SSB allowed values (Configuration Audit)."
-    )
-    parser.add_argument(
-        "--allowed-n77-arfcn",
-        help="Comma-separated ARFCN list for N77 ARFCN allowed values (Configuration Audit)."
-    )
+    parser.add_argument("--allowed-n77-ssb", help="Comma-separated ARFCN list for N77 SSB allowed values (Configuration Audit).")
+    parser.add_argument("--allowed-n77-arfcn", help="Comma-separated ARFCN list for N77 ARFCN allowed values (Configuration Audit).")
 
     parser.add_argument("--no-gui", action="store_true", help="Disable GUI usage (only CLI).")
 
     args = parser.parse_args()
-    # Attach parser so we can print help from main()
     setattr(args, "_parser", parser)
     return args
 
 
 # ============================== RUNNERS (TASKS) ============================= #
-
-def _parse_arfcn_csv_to_set(
-    csv_text: Optional[str],
-    default_values: List[int],
-    label: str,
-) -> set:
-    """
-    Helper to parse a CSV string into a set of integers.
-
-    - If csv_text is empty or all values are invalid, fall back to default_values.
-    - Logs warnings for invalid tokens.
-    """
-    values: List[int] = []
-    if csv_text:
-        for token in csv_text.split(","):
-            tok = token.strip()
-            if not tok:
-                continue
-            try:
-                values.append(int(tok))
-            except ValueError:
-                print(f"[Configuration Audit] [WARN] Ignoring invalid ARFCN '{tok}' in {label} list.")
-
-    if not values:
-        return set(default_values)
-
-    return set(values)
-
-
 def run_configuration_audit(
     input_dir: str,
     freq_filters_csv: str = "",
@@ -541,7 +456,7 @@ def run_configuration_audit(
     if freq_filters_csv:
         print(f"{module_name} Summary column filters: {freq_filters_csv}")
 
-    # Determine ARFCN-related parameters for ConfigurationAudit using GUI/CLI frequencies
+    # ARFCN principales
     try:
         old_arfcn = int(freq_pre) if freq_pre else int(DEFAULT_FREQ_PRE)
     except ValueError:
@@ -552,7 +467,7 @@ def run_configuration_audit(
     except ValueError:
         new_arfcn = int(DEFAULT_FREQ_POST)
 
-    # Parse optional N77B SSB frequency
+    # N77B SSB
     n77b_ssb_arfcn = None
     if n77b_ssb_freq:
         try:
@@ -561,16 +476,16 @@ def run_configuration_audit(
             print(f"{module_name} [WARN] Invalid N77B SSB frequency '{n77b_ssb_freq}'. Ignoring.")
             n77b_ssb_arfcn = None
 
-    # Build allowed sets from CSV (or fall back to defaults that include new_arfcn).
+    # Allowed sets
     default_n77_ssb_list = [new_arfcn, 653952]
     default_n77_list = [654652, 655324, 655984, 656656]
 
-    allowed_n77_ssb = _parse_arfcn_csv_to_set(
+    allowed_n77_ssb = parse_arfcn_csv_to_set(
         csv_text=allowed_n77_ssb_csv,
         default_values=default_n77_ssb_list,
         label="Allowed N77 SSB",
     )
-    allowed_n77_arfcn = _parse_arfcn_csv_to_set(
+    allowed_n77_arfcn = parse_arfcn_csv_to_set(
         csv_text=allowed_n77_arfcn_csv,
         default_values=default_n77_list,
         label="Allowed N77 ARFCN",
@@ -588,7 +503,6 @@ def run_configuration_audit(
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
 
-    # Create ConfigurationAudit instance with ARFCN parameters coming from launcher
     try:
         app = ConfigurationAudit(
             old_arfcn=old_arfcn,
@@ -759,209 +673,28 @@ def resolve_module_callable(name: str):
     return None
 
 
-# =============================== PERSISTENCE ================================ #
-
-def _read_cfg() -> configparser.ConfigParser:
-    parser = configparser.ConfigParser()
-    if CONFIG_PATH.exists():
-        parser.read(CONFIG_PATH, encoding="utf-8")
-    return parser
-
-
-def load_last_input_dir_from_config() -> str:
-    """Load last used input directory for single-input modules."""
-    try:
-        if not CONFIG_PATH.exists():
-            return ""
-        parser = _read_cfg()
-        return parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT, fallback="").strip()
-    except Exception:
-        return ""
-
-
-def save_last_input_dir_to_config(input_dir: str) -> None:
-    """Persist last used input directory to config file (single-input)."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT] = input_dir or ""
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def load_last_dual_from_config() -> tuple[str, str]:
-    """Load last used PRE/POST input directories for dual-input module."""
-    try:
-        if not CONFIG_PATH.exists():
-            return ("", "")
-        parser = _read_cfg()
-        pre = parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT_PRE, fallback="").strip()
-        post = parser.get(CONFIG_SECTION, CONFIG_KEY_LAST_INPUT_POST, fallback="").strip()
-        return (pre, post)
-    except Exception:
-        return ("", "")
-
-
-def save_last_dual_to_config(pre_dir: str, post_dir: str) -> None:
-    """Persist last used PRE/POST input directories (dual-input)."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT_PRE] = pre_dir or ""
-        parser[CONFIG_SECTION][CONFIG_KEY_LAST_INPUT_POST] = post_dir or ""
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def load_last_freqs_from_config() -> tuple[str, str]:
-    """Load last used Pre/Post main frequencies from config file."""
-    try:
-        if not CONFIG_PATH.exists():
-            return ("", "")
-        parser = _read_cfg()
-        freq_pre = parser.get(CONFIG_SECTION, CONFIG_KEY_FREQ_PRE, fallback="").strip()
-        freq_post = parser.get(CONFIG_SECTION, CONFIG_KEY_FREQ_POST, fallback="").strip()
-        return (freq_pre, freq_post)
-    except Exception:
-        return ("", "")
-
-
-def save_last_freqs_to_config(freq_pre: str, freq_post: str) -> None:
-    """Persist last used Pre/Post main frequencies to config file."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_FREQ_PRE] = (freq_pre or "").strip()
-        parser[CONFIG_SECTION][CONFIG_KEY_FREQ_POST] = (freq_post or "").strip()
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def load_last_n77b_ssb_from_config() -> str:
-    """Load last used N77B SSB frequency from config file."""
-    try:
-        if not CONFIG_PATH.exists():
-            return ""
-        parser = _read_cfg()
-        return parser.get(CONFIG_SECTION, CONFIG_KEY_N77B_SSB, fallback="").strip()
-    except Exception:
-        return ""
-
-
-def save_last_n77b_ssb_to_config(n77b_ssb_freq: str) -> None:
-    """Persist last used N77B SSB frequency to config file."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_N77B_SSB] = (n77b_ssb_freq or "").strip()
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def load_last_filters_from_config() -> str:
-    """Load last used frequency filters (CSV) from config file."""
-    try:
-        if not CONFIG_PATH.exists():
-            return ""
-        parser = _read_cfg()
-        return parser.get(CONFIG_SECTION, CONFIG_KEY_FREQ_FILTERS, fallback="").strip()
-    except Exception:
-        return ""
-
-
-def save_last_filters_to_config(filters_csv: str) -> None:
-    """Persist last used frequency filters (CSV) to config file."""
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_FREQ_FILTERS] = _normalize_csv_list(filters_csv)
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def load_last_allowed_lists_from_config() -> tuple[str, str]:
-    """
-    Load last used Allowed N77 SSB and Allowed N77 ARFCN CSV lists from config file.
-    """
-    try:
-        if not CONFIG_PATH.exists():
-            return ("", "")
-        parser = _read_cfg()
-        allowed_n77_ssb = parser.get(CONFIG_SECTION, CONFIG_KEY_ALLOWED_N77_SSB, fallback="").strip()
-        allowed_n77_arfcn = parser.get(CONFIG_SECTION, CONFIG_KEY_ALLOWED_N77_ARFCN, fallback="").strip()
-        return (allowed_n77_ssb, allowed_n77_arfcn)
-    except Exception:
-        return ("", "")
-
-
-def save_last_allowed_lists_to_config(allowed_n77_ssb_csv: str, allowed_n77_arfcn_csv: str) -> None:
-    """
-    Persist last used Allowed N77 SSB and Allowed N77 ARFCN CSV lists to config file.
-    """
-    try:
-        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-        parser = _read_cfg()
-        _ensure_cfg_section(parser)
-        parser[CONFIG_SECTION][CONFIG_KEY_ALLOWED_N77_SSB] = _normalize_csv_list(allowed_n77_ssb_csv)
-        parser[CONFIG_SECTION][CONFIG_KEY_ALLOWED_N77_ARFCN] = _normalize_csv_list(allowed_n77_arfcn_csv)
-        with CONFIG_PATH.open("w", encoding="utf-8") as f:
-            parser.write(f)
-    except Exception:
-        pass
-
-
-def _ensure_cfg_section(parser: configparser.ConfigParser) -> None:
-    if CONFIG_SECTION not in parser:
-        parser[CONFIG_SECTION] = {}
-
-
 # =============================== EXECUTION CORE ============================= #
-
-def _format_duration_hms(seconds: float) -> str:
-    """Return duration as H:MM:SS.mmm (milliseconds precision)."""
-    ms = int((seconds - int(seconds)) * 1000)
-    total_seconds = int(seconds)
-    hours, rem = divmod(total_seconds, 3600)
-    minutes, secs = divmod(rem, 60)
-    return f"{hours}:{minutes:02d}:{secs:02d}.{ms:03d}"
-
-
-def execute_module(module_fn,
-                   input_dir: str,
-                   freq_pre: str,
-                   freq_post: str,
-                   freq_filters_csv: str = "",
-                   input_pre_dir: str = "",
-                   input_post_dir: str = "",
-                   allowed_n77_ssb_csv: str = "",
-                   allowed_n77_arfcn_csv: str = "",
-                   n77b_ssb_freq: str = "") -> None:
+def execute_module(
+    module_fn,
+    input_dir: str,
+    freq_pre: str,
+    freq_post: str,
+    freq_filters_csv: str = "",
+    input_pre_dir: str = "",
+    input_post_dir: str = "",
+    allowed_n77_ssb_csv: str = "",
+    allowed_n77_arfcn_csv: str = "",
+    n77b_ssb_freq: str = "",
+) -> None:
     """
-    Execute the selected module with the proper signature (timed).
-    - For run_consistency_checks: prefer dual-input if both input_pre_dir/post_dir are provided.
-    - For run_configuration_audit: single input + optional filters and ARFCN config.
-    - For cleanup modules: single input.
+    Launch selected module with the proper signature (and measure execution time)
     """
     start_ts = time.perf_counter()
     label = getattr(module_fn, "__name__", "module")
 
     try:
         if module_fn is run_consistency_checks:
+            # dual-input preferido
             if input_pre_dir and input_post_dir:
                 module_fn(input_pre_dir, input_post_dir, freq_pre, freq_post)
             else:
@@ -981,37 +714,11 @@ def execute_module(module_fn,
         elif module_fn is run_final_cleanup:
             module_fn(input_dir, freq_pre, freq_post)
         else:
-            sig = inspect.signature(module_fn)
-            params = sig.parameters
-            if "input_pre_dir" in params and "input_post_dir" in params:
-                kwargs = {}
-                if "freq_pre" in params:
-                    kwargs["freq_pre"] = freq_pre
-                if "freq_post" in params:
-                    kwargs["freq_post"] = freq_post
-                if "freq_filters_csv" in params:
-                    kwargs["freq_filters_csv"] = freq_filters_csv
-                if "allowed_n77_ssb_csv" in params:
-                    kwargs["allowed_n77_ssb_csv"] = allowed_n77_ssb_csv
-                if "allowed_n77_arfcn_csv" in params:
-                    kwargs["allowed_n77_arfcn_csv"] = allowed_n77_arfcn_csv
-                module_fn(input_pre_dir=input_pre_dir, input_post_dir=input_post_dir, **kwargs)
-            elif "freq_filters_csv" in params or "allowed_n77_ssb_csv" in params or "allowed_n77_arfcn_csv" in params:
-                kwargs = {}
-                if "freq_filters_csv" in params:
-                    kwargs["freq_filters_csv"] = freq_filters_csv
-                if "allowed_n77_ssb_csv" in params:
-                    kwargs["allowed_n77_ssb_csv"] = allowed_n77_ssb_csv
-                if "allowed_n77_arfcn_csv" in params:
-                    kwargs["allowed_n77_arfcn_csv"] = allowed_n77_arfcn_csv
-                if "n77b_ssb_freq" in params:
-                    kwargs["n77b_ssb_freq"] = n77b_ssb_freq
-                module_fn(input_dir, freq_pre, freq_post, **kwargs)
-            else:
-                module_fn(input_dir, freq_pre, freq_post)
+            # Fallback simple para futuros módulos
+            module_fn(input_dir, freq_pre, freq_post)
     finally:
         elapsed = time.perf_counter() - start_ts
-        print(f"[Timer] {label} finished in {_format_duration_hms(elapsed)}")
+        print(f"[Timer] {label} finished in {format_duration_hms(elapsed)}")
 
 
 def ask_reopen_launcher() -> bool:
@@ -1027,28 +734,7 @@ def ask_reopen_launcher() -> bool:
         return False
 
 
-def log_module_exception(module_label: str, exc: BaseException) -> None:
-    """Pretty-print a module exception to stdout (and therefore to the log)."""
-    print("\n" + "=" * 80)
-    print(f"[ERROR] An exception occurred while executing {module_label}:")
-    print("-" * 80)
-    print(str(exc))
-    print("-" * 80)
-    print("Traceback (most recent call last):")
-    print(traceback.format_exc().rstrip())
-    print("=" * 80 + "\n")
-    if messagebox is not None:
-        try:
-            messagebox.showerror(
-                "Execution error",
-                f"An exception occurred while executing {module_label}.\n\n{exc}"
-            )
-        except Exception:
-            pass
-
-
 # ================================== MAIN =================================== #
-
 def main():
     os.system('cls' if os.name == 'nt' else 'clear')
 
@@ -1097,33 +783,46 @@ def main():
     # Parse CLI
     args = parse_args()
     parser = getattr(args, "_parser")
-
     no_args = (len(sys.argv) == 1)
 
-    # Load persisted config
-    persisted_last_single = load_last_input_dir_from_config()
-    persisted_pre_dir, persisted_post_dir = load_last_dual_from_config()
-    persisted_freq_pre, persisted_freq_post = load_last_freqs_from_config()
-    persisted_n77b_ssb = load_last_n77b_ssb_from_config()
-    persisted_allowed_n77_ssb, persisted_allowed_n77_arfcn = load_last_allowed_lists_from_config()
+    # Load persisted config (all de golpe)
+    cfg = load_cfg_values(
+        "last_input",
+        "last_input_pre",
+        "last_input_post",
+        "freq_pre",
+        "freq_post",
+        "n77b_ssb",
+        "freq_filters",
+        "allowed_n77_ssb",
+        "allowed_n77_arfcn",
+    )
 
-    # Defaults (CLI overrides persisted, which override hardcoded defaults)
+    persisted_last_single   = cfg["last_input"]
+    persisted_pre_dir       = cfg["last_input_pre"]
+    persisted_post_dir      = cfg["last_input_post"]
+    persisted_freq_pre      = cfg["freq_pre"]
+    persisted_freq_post     = cfg["freq_post"]
+    persisted_n77b_ssb      = cfg["n77b_ssb"]
+    persisted_filters       = cfg["freq_filters"]
+    persisted_allowed_ssb   = cfg["allowed_n77_ssb"]
+    persisted_allowed_arfcn = cfg["allowed_n77_arfcn"]
+
+    # Defaults (CLI > persisted > hardcode)
     default_input = args.input or persisted_last_single or INPUT_FOLDER or ""
     default_input_pre = args.input_pre or persisted_pre_dir or INPUT_FOLDER_PRE or ""
     default_input_post = args.input_post or persisted_post_dir or INPUT_FOLDER_POST or ""
 
-    persisted_filters = load_last_filters_from_config()
-    default_filters_csv = _normalize_csv_list(args.freq_filters or persisted_filters)
-
+    default_filters_csv = normalize_csv_list(args.freq_filters or persisted_filters)
     default_pre = args.freq_pre or persisted_freq_pre or DEFAULT_FREQ_PRE
     default_post = args.freq_post or persisted_freq_post or DEFAULT_FREQ_POST
     default_n77b_ssb = args.freq_n77b_ssb or persisted_n77b_ssb or DEFAULT_N77B_SSB
 
-    default_allowed_n77_ssb_csv = _normalize_csv_list(
-        args.allowed_n77_ssb or persisted_allowed_n77_ssb or DEFAULT_ALLOWED_N77_SSB_CSV
+    default_allowed_n77_ssb_csv = normalize_csv_list(
+        args.allowed_n77_ssb or persisted_allowed_ssb or DEFAULT_ALLOWED_N77_SSB_CSV
     )
-    default_allowed_n77_arfcn_csv = _normalize_csv_list(
-        args.allowed_n77_arfcn or persisted_allowed_n77_arfcn or DEFAULT_ALLOWED_N77_ARFCN_CSV
+    default_allowed_n77_arfcn_csv = normalize_csv_list(
+        args.allowed_n77_arfcn or persisted_allowed_arfcn or DEFAULT_ALLOWED_N77_ARFCN_CSV
     )
 
     # ====================== MODE 1: GUI (NO ARGS) ===========================
@@ -1134,7 +833,6 @@ def main():
             parser.print_help()
             return
 
-        # GUI loop
         while True:
             sel = gui_config_dialog(
                 default_input=default_input,
@@ -1154,24 +852,28 @@ def main():
             if module_fn is None:
                 raise SystemExit(f"Unknown module selected: {sel.module}")
 
-            # Persist inputs appropriately
-            if _is_consistency_module(sel.module):
-                save_last_dual_to_config(sel.input_pre_dir, sel.input_post_dir)
+            if is_consistency_module(sel.module):
                 input_dir = ""
                 default_input_pre = sel.input_pre_dir
                 default_input_post = sel.input_post_dir
             else:
-                save_last_input_dir_to_config(sel.input_dir)
                 input_dir = sel.input_dir
                 default_input = sel.input_dir
 
-            # Persist all numeric / list config
-            save_last_freqs_to_config(sel.freq_pre, sel.freq_post)
-            save_last_n77b_ssb_to_config(sel.n77b_ssb_freq)
-            save_last_filters_to_config(sel.freq_filters_csv)
-            save_last_allowed_lists_to_config(sel.allowed_n77_ssb_csv, sel.allowed_n77_arfcn_csv)
+            # Persist all with a single call
+            save_cfg_values(
+                last_input=input_dir,
+                last_input_pre=sel.input_pre_dir,
+                last_input_post=sel.input_post_dir,
+                freq_pre=sel.freq_pre,
+                freq_post=sel.freq_post,
+                n77b_ssb=sel.n77b_ssb_freq,
+                freq_filters=sel.freq_filters_csv,
+                allowed_n77_ssb=sel.allowed_n77_ssb_csv,
+                allowed_n77_arfcn=sel.allowed_n77_arfcn_csv,
+            )
 
-            # Update in-memory defaults
+            # Update defaults in memmory
             default_pre = sel.freq_pre
             default_post = sel.freq_post
             default_n77b_ssb = sel.n77b_ssb_freq
@@ -1200,7 +902,6 @@ def main():
         return
 
     # ====================== MODE 2: PURE CLI (WITH ARGS) ====================
-
     if not args.module:
         print("Error: --module is required when running in CLI mode.\n")
         parser.print_help()
@@ -1212,7 +913,6 @@ def main():
         parser.print_help()
         return
 
-    # Use resolved defaults
     freq_pre = default_pre
     freq_post = default_post
     n77b_ssb_freq = default_n77b_ssb
@@ -1229,12 +929,16 @@ def main():
             parser.print_help()
             return
 
-        # Persist config
-        save_last_dual_to_config(input_pre_dir, input_post_dir)
-        save_last_freqs_to_config(freq_pre, freq_post)
-        save_last_n77b_ssb_to_config(n77b_ssb_freq)
-        save_last_filters_to_config(freq_filters_csv)
-        save_last_allowed_lists_to_config(allowed_n77_ssb_csv, allowed_n77_arfcn_csv)
+        save_cfg_values(
+            last_input_pre=input_pre_dir,
+            last_input_post=input_post_dir,
+            freq_pre=freq_pre,
+            freq_post=freq_post,
+            n77b_ssb=n77b_ssb_freq,
+            freq_filters=freq_filters_csv,
+            allowed_n77_ssb=allowed_n77_ssb_csv,
+            allowed_n77_arfcn=allowed_n77_arfcn_csv,
+        )
 
         execute_module(
             module_fn,
@@ -1250,19 +954,22 @@ def main():
         )
         return
 
-    # Other modules: single-input required
+    # Other modules: single-input
     input_dir = args.input or default_input
     if not input_dir:
         print("Error: --input is required for this module in CLI mode.\n")
         parser.print_help()
         return
 
-    # Persist config
-    save_last_input_dir_to_config(input_dir)
-    save_last_freqs_to_config(freq_pre, freq_post)
-    save_last_n77b_ssb_to_config(n77b_ssb_freq)
-    save_last_filters_to_config(freq_filters_csv)
-    save_last_allowed_lists_to_config(allowed_n77_ssb_csv, allowed_n77_arfcn_csv)
+    save_cfg_values(
+        last_input=input_dir,
+        freq_pre=freq_pre,
+        freq_post=freq_post,
+        n77b_ssb=n77b_ssb_freq,
+        freq_filters=freq_filters_csv,
+        allowed_n77_ssb=allowed_n77_ssb_csv,
+        allowed_n77_arfcn=allowed_n77_arfcn_csv,
+    )
 
     execute_module(
         module_fn,

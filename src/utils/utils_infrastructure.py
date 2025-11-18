@@ -141,3 +141,22 @@ def get_resource_path(relative_path: str) -> str:
         base_path = os.path.dirname(utils_dir)                    # .../src
 
     return os.path.join(base_path, relative_path)
+
+# ============================== LOGGING SYSTEM ============================== #
+class LoggerDual:
+    """
+    Simple dual logger that mirrors stdout prints to both console and a log file.
+    Replaces sys.stdout so every print() goes to both outputs automatically.
+    """
+    def __init__(self, log_file_path: str):
+        self.terminal = sys.stdout
+        self.log = open(log_file_path, "a", encoding="utf-8")
+
+    def write(self, message: str):
+        self.terminal.write(message)
+        self.log.write(message)
+
+    def flush(self):
+        """Required for compatibility with Python's stdout flush behavior."""
+        self.terminal.flush()
+        self.log.flush()

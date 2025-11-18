@@ -182,3 +182,12 @@ def extract_date(folder_name: str) -> Optional[str]:
                 return normalize_output(dt)
 
     return normalize_output(best_dt) if best_dt else None
+
+
+def format_duration_hms(seconds: float) -> str:
+    """Return duration as H:MM:SS.mmm (milliseconds precision)."""
+    ms = int((seconds - int(seconds)) * 1000)
+    total_seconds = int(seconds)
+    hours, rem = divmod(total_seconds, 3600)
+    minutes, secs = divmod(rem, 60)
+    return f"{hours}:{minutes:02d}:{secs:02d}.{ms:03d}"
