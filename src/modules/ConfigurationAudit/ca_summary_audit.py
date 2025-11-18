@@ -337,14 +337,14 @@ def build_summary_audit(
                     add_row(
                         "NR Frequency Audit",
                         "NRFreqRelation",
-                        f"NR nodes with the old ARFCN ({old_arfcn}) in NRFreqRelation",
+                        f"N77 nodes with the old ARFCN ({old_arfcn}) in NRFreqRelation",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
                     add_row(
                         "NR Frequency Audit",
                         "NRFreqRelation",
-                        f"NR nodes with the new ARFCN ({new_arfcn}) in NRFreqRelation",
+                        f"N77 nodes with the new ARFCN ({new_arfcn}) in NRFreqRelation",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -821,9 +821,9 @@ def build_summary_audit(
             ("NR Frequency Audit", "NRFrequency",
              f"N77 nodes with the old ARFCN ({old_arfcn}) in NRFrequency"),
             ("NR Frequency Audit", "NRFreqRelation",
-             f"NR nodes with the new ARFCN ({new_arfcn}) in NRFreqRelation"),
+             f"N77 nodes with the new ARFCN ({new_arfcn}) in NRFreqRelation"),
             ("NR Frequency Audit", "NRFreqRelation",
-             f"NR nodes with the old ARFCN ({old_arfcn}) in NRFreqRelation"),
+             f"N77 nodes with the old ARFCN ({old_arfcn}) in NRFreqRelation"),
 
             # NR Frequency Inconsistencies
             ("NR Frequency Inconsistencies", "NRSectorCarrier",
