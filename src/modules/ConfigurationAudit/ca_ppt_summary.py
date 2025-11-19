@@ -68,12 +68,13 @@ def generate_ppt_summary(
             - Body = one bullet per row: "Metric: Value" (no node list).
 
         • If Category name contains 'inconsist' (case-insensitive):
-            - Single slide per Category.
+            - One or more slides per Category.
             - Title = Category.
-            - Body:
-                · For each row: main bullet "Metric: Value".
-                · Under each row, level-1 bullets with the node list
-                  parsed from ExtraInfo (comma/semicolon separated).
+            - For each row with Value > 0 and a non-empty node list:
+                · Main bullet "Metric: Value".
+                · Level-1 bullets with the node list parsed from ExtraInfo
+                  (comma/semicolon separated), split into blocks of 50 items
+                  per slide (no truncation).
     """
     try:
         from pptx import Presentation
@@ -93,6 +94,18 @@ def generate_ppt_summary(
     def _set_paragraph_font_size(paragraph, size: Pt) -> None:
         for run in paragraph.runs:
             run.font.size = size
+
+    def _value_is_positive(v: object) -> bool:
+        """Return True if the given value represents a numeric value > 0."""
+        try:
+            if isinstance(v, (int, float)):
+                return v > 0
+            s = str(v).strip()
+            if not s or s.upper() == "N/A":
+                return False
+            return float(s) > 0
+        except Exception:
+            return False
 
     template_path = get_resource_path("ppt_templates/ConfigurationAuditTemplate.pptx")
     try:
@@ -118,98 +131,116 @@ def generate_ppt_summary(
     if subtitle is not None:
         subtitle.text = os.path.basename(excel_path)
 
-    # --- One slide per Category ---
+    # --- Category slides ---
     for category, items in sections.items():
-        slide = prs.slides.add_slide(content_layout)
-        title_shape = slide.shapes.title
-        body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
-
-        title_shape.text = category
-
-        if body is None:
-            continue
-
-        tf = body.text_frame
-        tf.clear()
-
-        if not items:
-            p = tf.paragraphs[0]
-            p.text = "No data available for this category."
-            p.level = 0
-            _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
-            continue
-
         cat_lower = category.lower()
         is_audit = "audit" in cat_lower
         is_incons = "inconsist" in cat_lower  # covers 'Inconsistences' typo as well
 
-        if is_audit:
-            # Only "Metric: Value" bullets
-            for idx, item in enumerate(items):
-                metric = item.get("Metric", "")
-                value = item.get("Value", "")
-                text = f"{metric}: {value}"
+        # ---------------------- INCONSISTENCIES: may need multiple slides ----------------------
+        if is_incons:
+            if not items:
+                # No items at all: skip creating slides for this category
+                continue
 
-                if idx == 0:
-                    p = tf.paragraphs[0]
-                else:
-                    p = tf.add_paragraph()
-
-                p.text = text
-                p.level = 0
-                _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
-
-        elif is_incons:
-            # Metric + Value as main bullets; node list as level-1 bullets
-            first = True
             for item in items:
                 metric = item.get("Metric", "")
                 value = item.get("Value", "")
                 extra = item.get("ExtraInfo", "")
 
+                # Skip rows with non-positive value
+                if not _value_is_positive(value):
+                    continue
+
+                # Parse node/cell list from ExtraInfo
+                cleaned_extra = str(extra).replace(";", ",") if extra else ""
+                nodes = [t.strip() for t in cleaned_extra.split(",") if t.strip()]
+
+                # Skip rows with empty node/cell list
+                if not nodes:
+                    continue
+
                 main_text = f"{metric}: {value}"
 
-                if first:
+                # Split the node list into chunks of 50 per slide (no truncation)
+                for chunk_start in range(0, len(nodes), 50):
+                    chunk_nodes = nodes[chunk_start:chunk_start + 50]
+
+                    slide = prs.slides.add_slide(content_layout)
+                    title_shape = slide.shapes.title
+                    body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
+
+                    title_shape.text = category
+                    if body is None:
+                        continue
+
+                    tf = body.text_frame
+                    tf.clear()
+
+                    # Main bullet for this metric
                     p_main = tf.paragraphs[0]
-                    first = False
-                else:
-                    p_main = tf.add_paragraph()
+                    p_main.text = main_text
+                    p_main.level = 0
+                    _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
 
-                p_main.text = main_text
-                p_main.level = 0
-                _set_paragraph_font_size(p_main, MAIN_BULLET_SIZE)
-
-                if extra:
-                    cleaned_extra = str(extra).replace(";", ",")
-                    nodes = [t.strip() for t in cleaned_extra.split(",") if t.strip()]
-
-                    for node in nodes[:50]:
+                    # One level-1 bullet per node/cell in this chunk
+                    for node in chunk_nodes:
                         p_node = tf.add_paragraph()
-                        p_node.text = f"{node}"
+                        p_node.text = node
                         p_node.level = 1
                         _set_paragraph_font_size(p_node, SUB_BULLET_SIZE)
 
-                    if len(nodes) > 50:
-                        p_node = tf.add_paragraph()
-                        p_node.text = "... (truncated)"
-                        p_node.level = 1
-                        _set_paragraph_font_size(p_node, SUB_BULLET_SIZE)
-
+        # ---------------------- AUDIT CATEGORIES: single slide per category ----------------------
         else:
-            # Fallback: behave like audit
-            for idx, item in enumerate(items):
-                metric = item.get("Metric", "")
-                value = item.get("Value", "")
-                text = f"{metric}: {value}"
+            slide = prs.slides.add_slide(content_layout)
+            title_shape = slide.shapes.title
+            body = slide.placeholders[1] if len(slide.placeholders) > 1 else None
 
-                if idx == 0:
-                    p = tf.paragraphs[0]
-                else:
-                    p = tf.add_paragraph()
+            title_shape.text = category
 
-                p.text = text
+            if body is None:
+                continue
+
+            tf = body.text_frame
+            tf.clear()
+
+            if not items:
+                p = tf.paragraphs[0]
+                p.text = "No data available for this category."
                 p.level = 0
                 _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
+                continue
+
+            if is_audit:
+                # Only "Metric: Value" bullets
+                for idx, item in enumerate(items):
+                    metric = item.get("Metric", "")
+                    value = item.get("Value", "")
+                    text = f"{metric}: {value}"
+
+                    if idx == 0:
+                        p = tf.paragraphs[0]
+                    else:
+                        p = tf.add_paragraph()
+
+                    p.text = text
+                    p.level = 0
+                    _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
+            else:
+                # Fallback: behave like audit
+                for idx, item in enumerate(items):
+                    metric = item.get("Metric", "")
+                    value = item.get("Value", "")
+                    text = f"{metric}: {value}"
+
+                    if idx == 0:
+                        p = tf.paragraphs[0]
+                    else:
+                        p = tf.add_paragraph()
+
+                    p.text = text
+                    p.level = 0
+                    _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
 
     prs.save(ppt_path)
     return ppt_path

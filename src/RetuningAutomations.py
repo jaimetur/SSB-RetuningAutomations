@@ -62,8 +62,8 @@ DEFAULT_FREQ_POST = "647328"
 DEFAULT_N77B_SSB = "653952"
 
 # Default ARFCN lists (CSV) for ConfigurationAudit
-DEFAULT_ALLOWED_N77_SSB_CSV = "648672,653952"
-DEFAULT_ALLOWED_N77_ARFCN_CSV = "654652,655324,655984,656656"
+DEFAULT_ALLOWED_N77_SSB_CSV = "647328,648672,653952"
+DEFAULT_ALLOWED_N77_ARFCN_CSV = "650006,654652,655324,655984,656656"
 
 # Global selectable list for filtering summary columns in ConfigurationAudit
 NETWORK_FREQUENCIES: List[str] = [
@@ -77,7 +77,7 @@ TABLES_ORDER: List[str] = []
 
 # Module names (GUI labels)
 MODULE_NAMES = [
-    "1. Configuration Audit (Logs Parser)",
+    "1. Configuration Audit & Logs Parser",
     "2. Consistency Check (Pre/Post Comparison)",
     "3. Initial Clean-Up (During Maintenance Window)",
     "4. Final Clean-Up (After Retune is completed)",
