@@ -15,10 +15,14 @@
 
   - #### 🚀 Enhancements:
     - Refactor main module `RetuningAutomations` to simplify the logic.
+    - Added ARFCN 650006 to default Allowed ARFCN list
     - Added 'LTE nodes with GUtranSyncSignalFrequency defined' to GUtran Frequency Audit
+    - Changed N77 band detection to filter freqs within range 646600-660000
   
   - #### 🐛 Bug fixes:
     - Fix PPT template not found
+    - Fixed some Configuration Audit Metrics
+    - Fixed truncated lists of nodes in Configuration Audit
     - Minor bug fixing.
     
   - #### 📚 Documentation: 

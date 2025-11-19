@@ -134,16 +134,35 @@ def parse_int_frequency(value: object) -> Optional[int]:
         return None
 
 
+# def is_n77_from_string(value: object) -> bool:
+#     """
+#     Determine if a cell can be considered N77 based on ARFCN/SSB string.
+#
+#     Here we approximate N77 as frequencies whose textual representation starts with '6'.
+#     """
+#     if value is None:
+#         return False
+#     s = str(value).strip()
+#     return bool(s) and s[0] == "6"
+
 def is_n77_from_string(value: object) -> bool:
     """
-    Determine if a cell can be considered N77 based on ARFCN/SSB string.
+    Determine if a cell can be considered N77 based on ARFCN/SSB value.
 
-    Here we approximate N77 as frequencies whose textual representation starts with '6'.
+    New rule:
+    - Return True if the integer value (parsed from string) is within the range
+      646600 to 660000 (both inclusive).
     """
     if value is None:
         return False
     s = str(value).strip()
-    return bool(s) and s[0] == "6"
+    if not s:
+        return False
+    try:
+        v = int(s)
+    except ValueError:
+        return False
+    return 646600 <= v <= 660000
 
 
 def extract_sync_frequencies(value: str):

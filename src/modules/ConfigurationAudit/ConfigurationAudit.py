@@ -290,6 +290,18 @@ class ConfigurationAudit:
         )
         pivot_nr_freq_rel = apply_frequency_column_filter(pivot_nr_freq_rel, freq_filters)
 
+        # Pivot NRSectorCarrier
+        df_nr_sector_carrier = concat_or_empty(mo_collectors["NRSectorCarrier"])
+        pivot_nr_sector_carrier = safe_pivot_count(
+            df=df_nr_sector_carrier,
+            index_field="NodeId",
+            columns_field="arfcnDL",
+            values_field="NRSectorCarrierId",
+            add_margins=True,
+            margins_name="Total",
+        )
+        pivot_nr_sector_carrier = apply_frequency_column_filter(pivot_nr_sector_carrier, freq_filters)
+
         # Pivot GUtranSyncSignalFrequency
         df_gu_sync_signal_freq = concat_or_empty(mo_collectors["GUtranSyncSignalFrequency"])
         pivot_gu_sync_signal_freq = safe_crosstab_count(
@@ -303,7 +315,7 @@ class ConfigurationAudit:
 
         # Extra tables for audit logic
         df_gu_freq_rel = concat_or_empty(mo_collectors["GUtranFreqRelation"])
-        df_nr_sector_carrier = concat_or_empty(mo_collectors["NRSectorCarrier"])
+        # df_nr_sector_carrier = concat_or_empty(mo_collectors["NRSectorCarrier"])
         df_endc_distr_profile = concat_or_empty(mo_collectors["EndcDistrProfile"])
 
         # =====================================================================
@@ -313,9 +325,9 @@ class ConfigurationAudit:
             df_nr_cell_du=df_nr_cell_du,
             df_nr_freq=df_nr_freq,
             df_nr_freq_rel=df_nr_freq_rel,
+            df_nr_sector_carrier=df_nr_sector_carrier,
             df_gu_sync_signal_freq=df_gu_sync_signal_freq,
             df_gu_freq_rel=df_gu_freq_rel,
-            df_nr_sector_carrier=df_nr_sector_carrier,
             df_endc_distr_profile=df_endc_distr_profile,
             old_arfcn=self.OLD_ARFCN,
             new_arfcn=self.NEW_ARFCN,
@@ -335,6 +347,7 @@ class ConfigurationAudit:
             pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CellDU", index=False)
             pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
             pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
+            pivot_nr_sector_carrier.to_excel(writer, sheet_name="Summary NR_SectorCarrier", index=False)
             pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
 
             # SummaryAudit with high-level checks

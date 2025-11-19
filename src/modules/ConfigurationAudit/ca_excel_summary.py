@@ -39,14 +39,10 @@ def build_summary_audit(
       - EndcDistrProfile gUtranFreqRef values.
 
     Notes:
-      - N77 cells are approximated as those with ARFCN/SSB text starting with '6'.
+      - N77 cells are those with ARFCN/SSB in range [646600-660000].
       - This function is best-effort and should not raise exceptions; any error is
         represented as a row in the resulting dataframe.
     """
-
-    # old_arfcn = int(old_arfcn)
-    # new_arfcn = int(new_arfcn)
-    # n77b_ssb = int(n77b_ssb)
 
     allowed_n77_ssb_set = {int(v) for v in (allowed_n77_ssb or [])}
     allowed_n77_arfcn_set = {int(v) for v in (allowed_n77_arfcn or [])}
@@ -262,41 +258,38 @@ def build_summary_audit(
             if df_nr_sector_carrier is not None and not df_nr_sector_carrier.empty:
                 node_col = resolve_column_case_insensitive(df_nr_sector_carrier, ["NodeId"])
                 arfcn_col = resolve_column_case_insensitive(df_nr_sector_carrier, ["arfcnDL"])
-                sector_carrier_id_col = resolve_column_case_insensitive(df_nr_sector_carrier, ["NRSectorCarrierId"])
 
                 if node_col and arfcn_col:
-                    # work = df_nr_sector_carrier[[node_col, arfcn_col]].copy()
-                    work = df_nr_sector_carrier[[node_col, arfcn_col, sector_carrier_id_col]].copy()
+                    work = df_nr_sector_carrier[[node_col, arfcn_col]].copy()
 
-                    work[node_col] = work[node_col].astype(str)
+                    work[node_col] = work[node_col].astype(str).str.strip()
 
                     # N77 nodes = those having at least one ARFCN starting with "6"
                     mask_n77 = work[arfcn_col].map(is_n77_from_string)
                     n77_rows = work.loc[mask_n77].copy()
-                    n77_rows["unique_id"] = (n77_rows[node_col].astype(str) + "-" + n77_rows[sector_carrier_id_col].astype(str))
 
-                    # NR Frequency Audit: NR nodes with ARFCN starting with '6' in NRSectorCarrier
-                    # n77_sector_carriers = sorted(set(n77_rows[node_col].astype(str)))
-                    n77_sector_carriers = sorted(set(n77_rows["unique_id"]))
+                    # NR Frequency Audit: NR nodes with ARFCN in N77 band (646600-660000) in NRSectorCarrier
+                    n77_nodes = sorted(n77_rows[node_col].astype(str).unique())
 
                     add_row(
                         "NR Frequency Audit",
                         "NRSectorCarrier",
-                        "NR nodes with ARFCN starting with '6' in NRSectorCarrier",
-                        len(n77_sector_carriers),
-                        ", ".join(n77_sector_carriers),
+                        "NR nodes with ARFCN in N77 band (646600-660000) in NRSectorCarrier",
+                        len(n77_nodes),
+                        ", ".join(n77_nodes),
                     )
 
                     # NR Frequency Inconsistencies: NR ARFCN not in allowed list
                     if allowed_n77_arfcn_set:
                         bad_rows = n77_rows.loc[~n77_rows[arfcn_col].map(is_allowed_n77_arfcn)]
-                        bad_nodes = sorted(set(bad_rows[node_col].astype(str)))
+
+                        bad_nodes = sorted(bad_rows[node_col].astype(str).unique())
+
                         extra = "; ".join(
-                            f"{r[node_col]}: {r[arfcn_col]}-{r[sector_carrier_id_col]}"
-                            for _, r in bad_rows.head(200).iterrows()
+                            f"{r[node_col]}: {r[arfcn_col]}"
+                            for _, r in bad_rows.iterrows()
                         )
-                        if len(bad_rows) > 200:
-                            extra += " (truncated)"
+
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRSectorCarrier",
@@ -337,21 +330,27 @@ def build_summary_audit(
     def process_nr_cell_du():
         try:
             if df_nr_cell_du is not None and not df_nr_cell_du.empty:
-                node_col = resolve_column_case_insensitive(df_nr_cell_du, ["NRCellDUId"])
-                ssb_col = resolve_column_case_insensitive(df_nr_cell_du, ["ssbFrequency", "ssbFreq", "ssb"])
+                node_col = resolve_column_case_insensitive(df_nr_cell_du, ["NodeId"])
+                ssb_col = resolve_column_case_insensitive(df_nr_cell_du, ["ssbFrequency"])
+
                 if node_col and ssb_col:
                     work = df_nr_cell_du[[node_col, ssb_col]].copy()
-                    work[node_col] = work[node_col].astype(str)
 
-                    # NR Frequency Audit: NR nodes with SSB starting with '6' in NRCellDU
+                    # Ensure NodeId is treated consistently
+                    work[node_col] = work[node_col].astype(str).str.strip()
+
+                    # Filter rows where SSB starts with '6' (N77)
                     mask_n77 = work[ssb_col].map(is_n77_from_string)
-                    n77_sector_carriers = sorted(set(work.loc[mask_n77, node_col].astype(str)))
+
+                    # Extract unique NodeId values
+                    unique_nodes = sorted(work.loc[mask_n77, node_col].unique())
+
                     add_row(
                         "NR Frequency Audit",
                         "NRCellDU",
-                        "NR nodes with SSB starting with '6' in NRCellDU",
-                        len(n77_sector_carriers),
-                        ", ".join(n77_sector_carriers),
+                        "NR nodes with SSB in N77 band (646600-660000) in NRCellDU",
+                        len(unique_nodes),
+                        ", ".join(unique_nodes),
                     )
                 else:
                     add_row(
@@ -543,7 +542,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Audit",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency containing {old_arfcn} and {n77b_ssb}",
+                        f"Nodes with gUtranFreqRef containing {old_arfcn} and {n77b_ssb} in EndcDistrProfile",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
@@ -559,7 +558,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Audit",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency containing {new_arfcn} and {n77b_ssb}",
+                        f"Nodes with gUtranFreqRef containing {new_arfcn} and {n77b_ssb} in EndcDistrProfile",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -578,7 +577,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile Inconsistencies",
                         "EndcDistrProfile",
-                        f"Nodes with GUtranSyncSignalFrequency not containing ({old_arfcn} or {new_arfcn}) together with {n77b_ssb}",
+                        f"Nodes with gUtranFreqRef not containing ({old_arfcn} or {new_arfcn}) together with {n77b_ssb} in EndcDistrProfile",
                         len(bad_nodes),
                         ", ".join(bad_nodes),
                     )
@@ -609,30 +608,36 @@ def build_summary_audit(
         # Max 16 NRFreqRelation per NR cell
         try:
             if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
-                cell_col = resolve_column_case_insensitive(df_nr_freq_rel,["NRCellCUId", "NRCellId", "CellId"])
+                cell_col = resolve_column_case_insensitive(df_nr_freq_rel, ["NRCellCUId", "NRCellId", "CellId"])
                 if cell_col:
                     counts = df_nr_freq_rel[cell_col].value_counts(dropna=False)
                     max_count = int(counts.max()) if not counts.empty else 0
+                    limit = 16
 
-                    at_limit_or_above = counts[counts >= 16]
-                    over_limit = counts[counts > 16]
+                    # AUDIT: show the maximum observed value and the worst offenders
+                    at_limit_or_above = counts[counts >= limit]
+                    if at_limit_or_above.empty and max_count > 0:
+                        at_limit_or_above = counts[counts == max_count]
+                    extra_audit = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.items())
 
                     add_row(
                         "Cardinality Audit",
                         "Cardinality",
                         "Max NRFreqRelation per NR cell (limit 16)",
                         max_count,
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
-                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
+                        extra_audit,
                     )
+
+                    # INCONSISTENCIES: cells exactly at the configured limit
+                    at_limit = counts[counts == limit]
+                    extra_incons = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit.items())
 
                     add_row(
                         "Cardinality Inconsistencies",
                         "Cardinality",
-                        "Nodes with #NRFreqRelation per NR cell above limit (16)",
-                        int(over_limit.size),
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
-                        + (" (truncated)" if over_limit.size > 50 else ""),
+                        "NR cells with NRFreqRelation count at limit 16",
+                        int(at_limit.size),
+                        extra_incons,
                     )
                 else:
                     add_row(
@@ -663,26 +668,32 @@ def build_summary_audit(
                 if node_col:
                     counts = df_nr_freq[node_col].astype(str).value_counts(dropna=False)
                     max_count = int(counts.max()) if not counts.empty else 0
+                    limit = 64
 
-                    at_limit_or_above = counts[counts >= 64]
-                    over_limit = counts[counts > 64]
+                    # AUDIT: show the maximum observed value and the worst offenders
+                    at_limit_or_above = counts[counts >= limit]
+                    if at_limit_or_above.empty and max_count > 0:
+                        at_limit_or_above = counts[counts == max_count]
+                    extra_audit = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.items())
 
                     add_row(
                         "Cardinality Audit",
                         "Cardinality",
                         "Max NRFrequency definitions per node (limit 64)",
                         max_count,
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
-                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
+                        extra_audit,
                     )
+
+                    # INCONSISTENCIES: nodes exactly at the configured limit
+                    at_limit = counts[counts == limit]
+                    extra_incons = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit.items())
 
                     add_row(
                         "Cardinality Inconsistencies",
                         "Cardinality",
-                        "Nodes with #NRFrequency definitions per node above limit (64)",
-                        int(over_limit.size),
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
-                        + (" (truncated)" if over_limit.size > 50 else ""),
+                        "NR nodes with NRFrequency definitions at limit 64",
+                        int(at_limit.size),
+                        extra_incons,
                     )
                 else:
                     add_row(
@@ -709,30 +720,36 @@ def build_summary_audit(
         # Max 16 GUtranFreqRelation per LTE cell
         try:
             if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
-                cell_col_gu = resolve_column_case_insensitive(df_gu_freq_rel,["EUtranCellFDDId", "EUtranCellId", "CellId", "GUCellId"])
+                cell_col_gu = resolve_column_case_insensitive(df_gu_freq_rel, ["EUtranCellFDDId", "EUtranCellId", "CellId", "GUCellId"])
                 if cell_col_gu:
                     counts = df_gu_freq_rel[cell_col_gu].value_counts(dropna=False)
                     max_count = int(counts.max()) if not counts.empty else 0
+                    limit = 16
 
-                    at_limit_or_above = counts[counts >= 16]
-                    over_limit = counts[counts > 16]
+                    # AUDIT: show the maximum observed value and the worst offenders
+                    at_limit_or_above = counts[counts >= limit]
+                    if at_limit_or_above.empty and max_count > 0:
+                        at_limit_or_above = counts[counts == max_count]
+                    extra_audit = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.items())
 
                     add_row(
                         "Cardinality Audit",
                         "Cardinality",
                         "Max GUtranFreqRelation per LTE cell (limit 16)",
                         max_count,
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
-                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
+                        extra_audit,
                     )
+
+                    # INCONSISTENCIES: LTE cells exactly at the configured limit
+                    at_limit = counts[counts == limit]
+                    extra_incons = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit.items())
 
                     add_row(
                         "Cardinality Inconsistencies",
                         "Cardinality",
-                        "Nodes with #GUtranFreqRelation per LTE cell above limit (16)",
-                        int(over_limit.size),
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
-                        + (" (truncated)" if over_limit.size > 50 else ""),
+                        "LTE cells with GUtranFreqRelation count at limit 16",
+                        int(at_limit.size),
+                        extra_incons,
                     )
                 else:
                     add_row(
@@ -759,30 +776,36 @@ def build_summary_audit(
         # Max 24 GUtranSyncSignalFrequency per node
         try:
             if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
-                node_col = resolve_column_case_insensitive(df_gu_sync_signal_freq,["NodeId"])
+                node_col = resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
                 if node_col:
                     counts = df_gu_sync_signal_freq[node_col].astype(str).value_counts(dropna=False)
                     max_count = int(counts.max()) if not counts.empty else 0
+                    limit = 24
 
-                    at_limit_or_above = counts[counts >= 24]
-                    over_limit = counts[counts > 24]
+                    # AUDIT: show the maximum observed value and the worst offenders
+                    at_limit_or_above = counts[counts >= limit]
+                    if at_limit_or_above.empty and max_count > 0:
+                        at_limit_or_above = counts[counts == max_count]
+                    extra_audit = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.items())
 
                     add_row(
                         "Cardinality Audit",
                         "Cardinality",
                         "Max GUtranSyncSignalFrequency definitions per node (limit 24)",
                         max_count,
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
-                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
+                        extra_audit,
                     )
+
+                    # INCONSISTENCIES: nodes exactly at the configured limit
+                    at_limit = counts[counts == limit]
+                    extra_incons = "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit.items())
 
                     add_row(
                         "Cardinality Inconsistencies",
                         "Cardinality",
-                        "Nodes with #GUtranSyncSignalFrequency definitions per node above limit (24)",
-                        int(over_limit.size),
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
-                        + (" (truncated)" if over_limit.size > 50 else ""),
+                        "LTE nodes with GUtranSyncSignalFrequency definitions at limit 24",
+                        int(at_limit.size),
+                        extra_incons,
                     )
                 else:
                     add_row(
@@ -805,7 +828,6 @@ def build_summary_audit(
                 "Error while checking GUtranSyncSignalFrequency cardinality",
                 f"ERROR: {ex}",
             )
-
 
     # =======================================================================
     # ============================ MAIN CODE ================================
