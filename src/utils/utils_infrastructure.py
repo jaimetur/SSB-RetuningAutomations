@@ -133,8 +133,14 @@ def get_resource_path(relative_path: str) -> str:
         or the executable folder (Nuitka / PyInstaller onefolder).
     """
     if getattr(sys, 'frozen', False):
-        # Frozen: PyInstaller / Nuitka
-        base_path = getattr(sys, '_MEIPASS', os.path.dirname(sys.executable))
+        # First, try next to the executable (your external ppt_templates folder)
+        exe_dir = os.path.dirname(sys.executable)
+        external_candidate = os.path.join(exe_dir, relative_path)
+        if os.path.exists(external_candidate):
+            return external_candidate
+
+        # If not found there, fall back to internal bundled resources (PyInstaller _MEIPASS)
+        base_path = getattr(sys, '_MEIPASS', exe_dir)
     else:
         # Source: go one level up from src/utils -> src
         utils_dir = os.path.dirname(os.path.abspath(__file__))    # .../src/utils

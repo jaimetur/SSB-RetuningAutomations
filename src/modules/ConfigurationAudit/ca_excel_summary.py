@@ -386,6 +386,16 @@ def build_summary_audit(
                     work = df_gu_sync_signal_freq[[node_col, arfcn_col]].copy()
                     work[node_col] = work[node_col].astype(str)
 
+                    # LTE nodes with any GUtranSyncSignalFrequency defined
+                    all_nodes_with_freq = sorted(work.loc[work[arfcn_col].map(has_value), node_col].astype(str).unique())
+                    add_row(
+                        "GUtran Frequency Audit",
+                        "GUtranSyncSignalFrequency",
+                        "LTE nodes with GUtranSyncSignalFrequency defined:",
+                        len(all_nodes_with_freq),
+                        ", ".join(all_nodes_with_freq),
+                    )
+
                     grouped = work.groupby(node_col)[arfcn_col]
 
                     # GUtran Frequency Audit: LTE nodes with the old ARFCN in GUtranSyncSignalFrequency
@@ -646,6 +656,56 @@ def build_summary_audit(
                 f"ERROR: {ex}",
             )
 
+        # Max 64 NRFrequency per node
+        try:
+            if df_nr_freq is not None and not df_nr_freq.empty:
+                node_col = resolve_column_case_insensitive(df_nr_freq, ["NodeId"])
+                if node_col:
+                    counts = df_nr_freq[node_col].astype(str).value_counts(dropna=False)
+                    max_count = int(counts.max()) if not counts.empty else 0
+
+                    at_limit_or_above = counts[counts >= 64]
+                    over_limit = counts[counts > 64]
+
+                    add_row(
+                        "Cardinality Audit",
+                        "Cardinality",
+                        "Max NRFrequency definitions per node (limit 64)",
+                        max_count,
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
+                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
+                    )
+
+                    add_row(
+                        "Cardinality Inconsistencies",
+                        "Cardinality",
+                        "Nodes with #NRFrequency definitions per node above limit (64)",
+                        int(over_limit.size),
+                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
+                        + (" (truncated)" if over_limit.size > 50 else ""),
+                    )
+                else:
+                    add_row(
+                        "Cardinality Audit",
+                        "Cardinality",
+                        "NRFrequency per node (NodeId missing)",
+                        "N/A",
+                    )
+            else:
+                add_row(
+                    "Cardinality Audit",
+                    "Cardinality",
+                    "NRFrequency per node",
+                    "Table not found or empty",
+                )
+        except Exception as ex:
+            add_row(
+                "Cardinality Audit",
+                "Cardinality",
+                "Error while checking NRFrequency cardinality",
+                f"ERROR: {ex}",
+            )
+
         # Max 16 GUtranFreqRelation per LTE cell
         try:
             if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
@@ -746,56 +806,6 @@ def build_summary_audit(
                 f"ERROR: {ex}",
             )
 
-        # Max 64 NRFrequency per node
-        try:
-            if df_nr_freq is not None and not df_nr_freq.empty:
-                node_col = resolve_column_case_insensitive(df_nr_freq,["NodeId"])
-                if node_col:
-                    counts = df_nr_freq[node_col].astype(str).value_counts(dropna=False)
-                    max_count = int(counts.max()) if not counts.empty else 0
-
-                    at_limit_or_above = counts[counts >= 64]
-                    over_limit = counts[counts > 64]
-
-                    add_row(
-                        "Cardinality Audit",
-                        "Cardinality",
-                        "Max NRFrequency definitions per node (limit 64)",
-                        max_count,
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in at_limit_or_above.head(50).items())
-                        + (" (truncated)" if at_limit_or_above.size > 50 else ""),
-                    )
-
-                    add_row(
-                        "Cardinality Inconsistencies",
-                        "Cardinality",
-                        "Nodes with #NRFrequency definitions per node above limit (64)",
-                        int(over_limit.size),
-                        "; ".join(f"{idx}: {cnt}" for idx, cnt in over_limit.head(50).items())
-                        + (" (truncated)" if over_limit.size > 50 else ""),
-                    )
-                else:
-                    add_row(
-                        "Cardinality Audit",
-                        "Cardinality",
-                        "NRFrequency per node (NodeId missing)",
-                        "N/A",
-                    )
-            else:
-                add_row(
-                    "Cardinality Audit",
-                    "Cardinality",
-                    "NRFrequency per node",
-                    "Table not found or empty",
-                )
-        except Exception as ex:
-            add_row(
-                "Cardinality Audit",
-                "Cardinality",
-                "Error while checking NRFrequency cardinality",
-                f"ERROR: {ex}",
-            )
-
 
     # =======================================================================
     # ============================ MAIN CODE ================================
@@ -828,68 +838,51 @@ def build_summary_audit(
 
         # Custom logical ordering for SummaryAudit (also drives PPT order)
         if not df.empty and all(col in df.columns for col in ["Category", "SubCategory", "Metric"]):
+            # We now order only by (Category, SubCategory).
+            # Inside each group, rows keep the insertion order.
             desired_order = [
                 # NR Frequency Audit
-                ("NR Frequency Audit", "NRFrequency", "NR nodes with ARFCN defined in NRFrequency"),
-                ("NR Frequency Audit", "NRFrequency", f"NR nodes with the new ARFCN ({new_arfcn}) in NRFrequency"),
-                ("NR Frequency Audit", "NRFrequency", f"NR nodes with the old ARFCN ({old_arfcn}) in NRFrequency"),
-                ("NR Frequency Audit", "NRFreqRelation", f"NR nodes with the new ARFCN ({new_arfcn}) in NRFreqRelation"),
-                ("NR Frequency Audit", "NRFreqRelation", f"NR nodes with the old ARFCN ({old_arfcn}) in NRFreqRelation"),
-                ("NR Frequency Audit", "NRSectorCarrier", "NR nodes with ARFCN starting with '6' in NRSectorCarrier"),
-                ("NR Frequency Audit", "NRCellDU", "NR nodes with SSB starting with '6' in NRCellDU"),
+                ("NR Frequency Audit", "NRFrequency"),
+                ("NR Frequency Audit", "NRFreqRelation"),
+                ("NR Frequency Audit", "NRSectorCarrier"),
+                ("NR Frequency Audit", "NRCellDU"),
 
                 # NR Frequency Inconsistencies
-                ("NR Frequency Inconsistencies", "NRSectorCarrier", "NR nodes with ARFCN not in allowed list"),
-                ("NR Frequency Inconsistencies", "NRFrequency", f"NR nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) in NRFrequency"),
-                ("NR Frequency Inconsistencies", "NRFreqRelation", f"NR nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) in NRFreqRelation"),
+                ("NR Frequency Inconsistencies", "NRFrequency"),
+                ("NR Frequency Inconsistencies", "NRFreqRelation"),
+                ("NR Frequency Inconsistencies", "NRSectorCarrier"),
 
                 # GUtran Frequency Audit
-                ("GUtran Frequency Audit", "GUtranSyncSignalFrequency", f"LTE nodes with the new ARFCN ({new_arfcn}) in GUtranSyncSignalFrequency"),
-                ("GUtran Frequency Audit", "GUtranSyncSignalFrequency", f"LTE nodes with the old ARFCN ({old_arfcn}) in GUtranSyncSignalFrequency"),
-                ("GUtran Frequency Audit", "GUtranFreqRelation", f"LTE nodes with the new ARFCN ({new_arfcn}) in GUtranFreqRelation"),
-                ("GUtran Frequency Audit", "GUtranFreqRelation", f"LTE nodes with the old ARFCN ({old_arfcn}) in GUtranFreqRelation"),
+                ("GUtran Frequency Audit", "GUtranSyncSignalFrequency"),
+                ("GUtran Frequency Audit", "GUtranFreqRelation"),
 
                 # GUtran Frequency Inconsistences
-                ("GUtran Frequency Inconsistences", "GUtranSyncSignalFrequency", f"LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) in GUtranSyncSignalFrequency"),
-                ("GUtran Frequency Inconsistences", "GUtranFreqRelation", f"LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) in GUtranFreqRelation"),
+                ("GUtran Frequency Inconsistences", "GUtranSyncSignalFrequency"),
+                ("GUtran Frequency Inconsistences", "GUtranFreqRelation"),
 
-                # EndcDistrProfile Audit
-                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {old_arfcn} and {n77b_ssb}"),
-                ("EndcDistrProfile Audit", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency containing {new_arfcn} and {n77b_ssb}"),
-                ("EndcDistrProfile Inconsistencies", "EndcDistrProfile", f"Nodes with GUtranSyncSignalFrequency not containing ({old_arfcn} or {new_arfcn}) together with {n77b_ssb}"),
+                # EndcDistrProfile
+                ("EndcDistrProfile Audit", "EndcDistrProfile"),
+                ("EndcDistrProfile Inconsistencies", "EndcDistrProfile"),
 
-                # Cardinality Audit
-                ("Cardinality Audit", "Cardinality", "Max NRFreqRelation per NR cell (limit 16)"),
-                ("Cardinality Audit", "Cardinality", "Max NRFrequency definitions per node (limit 64)"),
-                ("Cardinality Audit", "Cardinality", "Max GUtranFreqRelation per LTE cell (limit 16)"),
-                ("Cardinality Audit", "Cardinality", "Max GUtranSyncSignalFrequency definitions per node (limit 24)"),
-
-                # Cardinality Inconsistencies
-                ("Cardinality Inconsistencies", "Cardinality", "Nodes with #NRFreqRelation per NR cell above limit (16)"),
-                ("Cardinality Inconsistencies", "Cardinality", "Nodes with #NRFrequency definitions per node above limit (64)"),
-                ("Cardinality Inconsistencies", "Cardinality", "Nodes with #GUtranFreqRelation per LTE cell above limit (16)"),
-                ("Cardinality Inconsistencies", "Cardinality", "Nodes with #GUtranSyncSignalFrequency definitions per node above limit (24)"),
-
+                # Cardinality
+                ("Cardinality Audit", "Cardinality"),
+                ("Cardinality Inconsistencies", "Cardinality"),
             ]
 
-            # Map (Category, SubCategory, Metric) to an integer order
-            order_map: Dict[tuple, int] = {
-                key: idx for idx, key in enumerate(desired_order)
-            }
+            # Map (Category, SubCategory) to an integer order
+            order_map: Dict[tuple, int] = {key: idx for idx, key in enumerate(desired_order)}
 
-            # Order row
             def order_row(r: pd.Series) -> int:
                 """Return the desired order index for each row (or a large value if not explicitly listed)."""
                 key = (
                     str(r.get("Category", "")),
                     str(r.get("SubCategory", "")),
-                    str(r.get("Metric", "")),
                 )
                 return order_map.get(key, len(desired_order) + 100)
 
             df["__order__"] = df.apply(order_row, axis=1)
             df = (
-                df.sort_values("__order__", kind="mergesort")
+                df.sort_values("__order__", kind="mergesort")  # stable: keeps insertion order inside each group
                 .drop(columns=["__order__"])
                 .reset_index(drop=True)
             )

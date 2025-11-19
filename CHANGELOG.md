@@ -15,8 +15,10 @@
 
   - #### 🚀 Enhancements:
     - Refactor main module `RetuningAutomations` to simplify the logic.
+    - Added 'LTE nodes with GUtranSyncSignalFrequency defined' to GUtran Frequency Audit
   
   - #### 🐛 Bug fixes:
+    - Fix PPT template not found
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
