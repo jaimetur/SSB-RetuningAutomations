@@ -314,8 +314,8 @@ class ConfigurationAudit:
         pivot_gu_sync_signal_freq = apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
 
         # Extra tables for audit logic
+        df_freq_prio_nr = concat_or_empty(mo_collectors["FreqPrioNR"])
         df_gu_freq_rel = concat_or_empty(mo_collectors["GUtranFreqRelation"])
-        # df_nr_sector_carrier = concat_or_empty(mo_collectors["NRSectorCarrier"])
         df_endc_distr_profile = concat_or_empty(mo_collectors["EndcDistrProfile"])
 
         # =====================================================================
@@ -326,6 +326,7 @@ class ConfigurationAudit:
             df_nr_freq=df_nr_freq,
             df_nr_freq_rel=df_nr_freq_rel,
             df_nr_sector_carrier=df_nr_sector_carrier,
+            df_freq_prio_nr=df_freq_prio_nr,
             df_gu_sync_signal_freq=df_gu_sync_signal_freq,
             df_gu_freq_rel=df_gu_freq_rel,
             df_endc_distr_profile=df_endc_distr_profile,
