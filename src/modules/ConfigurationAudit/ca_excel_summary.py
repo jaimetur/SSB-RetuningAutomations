@@ -213,7 +213,7 @@ def build_summary_audit(
                 f"ERROR: {ex}",
             )
 
-    # ----------------------------- NRFreqRelation (OLD/NEW ARFCN on NR rows) -----------------------------
+    # ----------------------------- NRFreqRelation (OLD/NEW SSB on NR rows) -----------------------------
     def process_nr_freq_rel():
         try:
             if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
@@ -224,6 +224,7 @@ def build_summary_audit(
                     work = df_nr_freq_rel[[node_col, arfcn_col]].copy()
                     work[node_col] = work[node_col].astype(str)
 
+                    # Solo filas N77 (según el string de NRFreqRelationId)
                     n77_work = work.loc[work[arfcn_col].map(is_n77_from_string)].copy()
 
                     if not n77_work.empty:
@@ -249,7 +250,7 @@ def build_summary_audit(
                             ", ".join(new_nodes),
                         )
 
-                        # NEW: node-level check old_arfcn vs new_arfcn presence
+                        # NEW: node-level check old_ssb vs new_ssb presence
                         old_set = set(old_nodes)
                         new_set = set(new_nodes)
 
@@ -257,7 +258,7 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Audit",
                             "NRFreqRelation",
-                            f"NR nodes with both, the old SSB ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
                             len(nodes_old_and_new),
                             ", ".join(nodes_old_and_new),
                         )
@@ -266,12 +267,12 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRFreqRelation",
-                            f"NR nodes with the old SSB ({old_ssb}) but without the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from NRFreqRelation table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
 
-                        # NR Frequency Inconsistencies: NR nodes with the SSB not in ({old_arfcn}, {new_arfcn}) (from NRFreqRelation table)
+                        # NR Frequency Inconsistencies: NR nodes with the SSB not in ({old_ssb}, {new_ssb}) (from NRFreqRelation table)
                         not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                         add_row(
                             "NR Frequency Inconsistencies",
@@ -281,7 +282,7 @@ def build_summary_audit(
                             ", ".join(not_old_not_new_nodes),
                         )
 
-                        # NEW: nodes where NRFreqRelationId contains new ARFCN but has extra characters (e.g. 'auto_647328')
+                        # NEW: nodes where NRFreqRelationId contains new SSB but has extra characters (e.g. 'auto_647328')
                         post_freq_str = str(new_ssb)
                         pattern_work = df_nr_freq_rel[[node_col, arfcn_col]].copy()
                         pattern_work[node_col] = pattern_work[node_col].astype(str)
@@ -306,12 +307,16 @@ def build_summary_audit(
                             ", ".join(bad_pattern_nodes),
                         )
 
-                        # NEW: cell-level check on NRCellCUId: presence and parameter equality (except some columns)
+                        # NEW: cell-level check on NRCellCUId: presence and parameter equality (except some columns),
                         cell_col = resolve_column_case_insensitive(df_nr_freq_rel, ["NRCellCUId", "NRCellId", "CellId"])
+                        rel_col = resolve_column_case_insensitive(df_nr_freq_rel, ["NRCellRelationId"])
+
                         if cell_col:
                             full = df_nr_freq_rel.copy()
                             full[node_col] = full[node_col].astype(str)
                             full[cell_col] = full[cell_col].astype(str)
+                            if rel_col:
+                                full[rel_col] = full[rel_col].astype(str)
 
                             # Restrict to N77 rows (based on ARFCN inside NRFreqRelationId)
                             mask_n77_full = full[arfcn_col].map(is_n77_from_string)
@@ -330,7 +335,7 @@ def build_summary_audit(
                             add_row(
                                 "NR Frequency Audit",
                                 "NRFreqRelation",
-                                f"NR cells with the old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
                                 len(cells_both),
                                 ", ".join(cells_both),
                             )
@@ -338,7 +343,7 @@ def build_summary_audit(
                             add_row(
                                 "NR Frequency Inconsistencies",
                                 "NRFreqRelation",
-                                f"NR cells with the old ARFCN ({old_ssb}) but without new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with the old SSB ({old_ssb}) but without new SSB ({new_ssb}) (from NRFreqRelation table)",
                                 len(cells_old_without_new),
                                 ", ".join(cells_old_without_new),
                             )
@@ -351,35 +356,78 @@ def build_summary_audit(
                                     cols_to_ignore.add(name)
 
                             bad_cells_params = []
+
                             for cell_id in cells_both:
-                                cell_rows = full_n77.loc[full_n77[cell_col].astype(str) == cell_id].copy()
+                                cell_rows = full_n77.loc[
+                                    full_n77[cell_col].astype(str) == cell_id
+                                    ].copy()
                                 old_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == old_ssb]
                                 new_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == new_ssb]
 
                                 if old_rows.empty or new_rows.empty:
                                     continue
 
-                                old_clean = old_rows.drop(columns=list(cols_to_ignore), errors="ignore").drop_duplicates().reset_index(drop=True)
-                                new_clean = new_rows.drop(columns=list(cols_to_ignore), errors="ignore").drop_duplicates().reset_index(drop=True)
+                                if rel_col:
+                                    # Only compares pairs OLD/NEW with same NRCellRelationId
+                                    rel_old = set(old_rows[rel_col].astype(str))
+                                    rel_new = set(new_rows[rel_col].astype(str))
+                                    common_rels = rel_old & rel_new
 
-                                # Align column order
-                                old_clean = old_clean.reindex(sorted(old_clean.columns), axis=1)
-                                new_clean = new_clean.reindex(sorted(new_clean.columns), axis=1)
+                                    for rel_id in common_rels:
+                                        old_rel = old_rows.loc[old_rows[rel_col].astype(str) == rel_id]
+                                        new_rel = new_rows.loc[new_rows[rel_col].astype(str) == rel_id]
 
-                                # Sort rows by all columns to make comparison order-independent
-                                sort_cols = list(old_clean.columns)
-                                old_clean = old_clean.sort_values(by=sort_cols).reset_index(drop=True)
-                                new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
+                                        if old_rel.empty or new_rel.empty:
+                                            continue
 
-                                if not old_clean.equals(new_clean):
-                                    bad_cells_params.append(str(cell_id))
+                                        old_clean = (old_rel.drop(columns=list(cols_to_ignore),errors="ignore",)
+                                            .drop_duplicates()
+                                            .reset_index(drop=True)
+                                        )
+                                        new_clean = (new_rel.drop(columns=list(cols_to_ignore),errors="ignore",)
+                                            .drop_duplicates()
+                                            .reset_index(drop=True)
+                                        )
+
+                                        # Alinear columnas y ordenar filas
+                                        old_clean = old_clean.reindex(sorted(old_clean.columns), axis=1)
+                                        new_clean = new_clean.reindex(sorted(new_clean.columns), axis=1)
+
+                                        sort_cols = list(old_clean.columns)
+                                        old_clean = old_clean.sort_values(by=sort_cols).reset_index(drop=True)
+                                        new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
+
+                                        if not old_clean.equals(new_clean):
+                                            bad_cells_params.append(str(cell_id))
+                                            # con una relación que falle es suficiente para marcar la celda
+                                            break
+                                else:
+                                    # Fallback: sin NRCellRelationId, se compara todo el bloque OLD vs NEW
+                                    old_clean = (old_rows.drop(columns=list(cols_to_ignore),errors="ignore",)
+                                        .drop_duplicates()
+                                        .reset_index(drop=True)
+                                    )
+                                    new_clean = (new_rows.drop(columns=list(cols_to_ignore),errors="ignore",)
+                                        .drop_duplicates()
+                                        .reset_index(drop=True)
+                                    )
+
+                                    old_clean = old_clean.reindex(sorted(old_clean.columns), axis=1)
+                                    new_clean = new_clean.reindex(sorted(new_clean.columns), axis=1)
+
+                                    sort_cols = list(old_clean.columns)
+                                    old_clean = old_clean.sort_values(by=sort_cols).reset_index(drop=True)
+                                    new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
+
+                                    if not old_clean.equals(new_clean):
+                                        bad_cells_params.append(str(cell_id))
 
                             bad_cells_params = sorted(set(bad_cells_params))
 
                             add_row(
                                 "NR Frequency Inconsistencies",
                                 "NRFreqRelation",
-                                f"NR cells with mismatching params between old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with mismatching params between old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
                                 len(bad_cells_params),
                                 ", ".join(bad_cells_params),
                             )
