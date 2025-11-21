@@ -133,27 +133,27 @@ def build_summary_audit(
                             ", ".join(all_nodes_with_freq),
                         )
 
-                        # NR Frequency Audit: NR nodes with the old ARFCN (from NRFrequency table)
+                        # NR Frequency Audit: NR nodes with the old SSB (from NRFrequency table)
                         old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                         add_row(
                             "NR Frequency Audit",
                             "NRFrequency",
-                            f"NR nodes with the old ARFCN ({old_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the old SSB ({old_ssb}) (from NRFrequency table)",
                             len(old_nodes),
                             ", ".join(old_nodes),
                         )
 
-                        # NR Frequency Audit: NR nodes with the new ARFCN (from NRFrequency table)
+                        # NR Frequency Audit: NR nodes with the new SSB (from NRFrequency table)
                         new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                         add_row(
                             "NR Frequency Audit",
                             "NRFrequency",
-                            f"NR nodes with the new ARFCN ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the new SSB ({new_ssb}) (from NRFrequency table)",
                             len(new_nodes),
                             ", ".join(new_nodes),
                         )
 
-                        # NEW: check nodes that have old_arfcn and also new_arfcn vs those missing the new_arfcn (from NRFrequency table)
+                        # NEW: check nodes that have old_ssb and also new_ssb vs those missing the new_arfcn (from NRFrequency table)
                         old_set = set(old_nodes)
                         new_set = set(new_nodes)
 
@@ -161,7 +161,7 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Audit",
                             "NRFrequency",
-                            f"NR nodes with both, the old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFrequency table)",
                             len(nodes_old_and_new),
                             ", ".join(nodes_old_and_new),
                         )
@@ -170,17 +170,17 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRFrequency",
-                            f"NR nodes with the old ARFCN ({old_ssb}) but without the new ARFCN ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from NRFrequency table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
 
-                        # NR Frequency Inconsistencies: NR nodes with the ARFCN not in (old_freq, new_freq) (from NRFrequency table)
+                        # NR Frequency Inconsistencies: NR nodes with the N77 ARFCN not in (old_freq, new_freq) (from NRFrequency table)
                         not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRFrequency",
-                            f"NR nodes with the ARFCN not in ({old_ssb}, {new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the N77 ARFCN not in ({old_ssb}, {new_ssb}) (from NRFrequency table)",
                             len(not_old_not_new_nodes),
                             ", ".join(not_old_not_new_nodes),
                         )
@@ -229,22 +229,22 @@ def build_summary_audit(
                     if not n77_work.empty:
                         grouped = n77_work.groupby(node_col)[arfcn_col]
 
-                        # NR Frequency Audit: NR nodes with the old ARFCN (from NRFreqRelation table)
+                        # NR Frequency Audit: NR nodes with the old SSB (from NRFreqRelation table)
                         old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                         add_row(
                             "NR Frequency Audit",
                             "NRFreqRelation",
-                            f"NR nodes with the old ARFCN ({old_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the old SSB ({old_ssb}) (from NRFreqRelation table)",
                             len(old_nodes),
                             ", ".join(old_nodes),
                         )
 
-                        # NR Frequency Audit: NR nodes with the new ARFCN (from NRFreqRelation table)
+                        # NR Frequency Audit: NR nodes with the new SSB (from NRFreqRelation table)
                         new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                         add_row(
                             "NR Frequency Audit",
                             "NRFreqRelation",
-                            f"NR nodes with the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the new SSB ({new_ssb}) (from NRFreqRelation table)",
                             len(new_nodes),
                             ", ".join(new_nodes),
                         )
@@ -257,7 +257,7 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Audit",
                             "NRFreqRelation",
-                            f"NR nodes with both, the old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with both, the old SSB ({old_ssb}) and the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
                             len(nodes_old_and_new),
                             ", ".join(nodes_old_and_new),
                         )
@@ -266,17 +266,17 @@ def build_summary_audit(
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRFreqRelation",
-                            f"NR nodes with the old ARFCN ({old_ssb}) but without the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the old SSB ({old_ssb}) but without the new ARFCN ({new_ssb}) (from NRFreqRelation table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
 
-                        # NR Frequency Inconsistencies: NR nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) (from NRFreqRelation table)
+                        # NR Frequency Inconsistencies: NR nodes with the SSB not in ({old_arfcn}, {new_arfcn}) (from NRFreqRelation table)
                         not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                         add_row(
                             "NR Frequency Inconsistencies",
                             "NRFreqRelation",
-                            f"NR nodes with the ARFCN not in ({old_ssb}, {new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the SSB not in ({old_ssb}, {new_ssb}) (from NRFreqRelation table)",
                             len(not_old_not_new_nodes),
                             ", ".join(not_old_not_new_nodes),
                         )
@@ -677,27 +677,27 @@ def build_summary_audit(
 
                     grouped = work.groupby(node_col)[arfcn_col]
 
-                    # LTE Frequency Audit: LTE nodes with the old ARFCN (from GUtranSyncSignalFrequency table)
+                    # LTE Frequency Audit: LTE nodes with the old SSB (from GUtranSyncSignalFrequency table)
                     old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with the old ARFCN ({old_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the old SSB ({old_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
 
-                    # LTE Frequency Audit: LTE nodes with the new ARFCN (from GUtranSyncSignalFrequency table)
+                    # LTE Frequency Audit: LTE nodes with the new SSB (from GUtranSyncSignalFrequency table)
                     new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with the new ARFCN ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
 
-                    # NEW: nodes with old_arfcn that should also have new_arfcn
+                    # NEW: nodes with old_ssb that should also have new_ssb
                     old_set = set(old_nodes)
                     new_set = set(new_nodes)
 
@@ -705,7 +705,7 @@ def build_summary_audit(
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with both, the old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(nodes_old_and_new),
                         ", ".join(nodes_old_and_new),
                     )
@@ -714,7 +714,7 @@ def build_summary_audit(
                     add_row(
                         "LTE Frequency Inconsistences",
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with the old ARFCN ({old_ssb}) but without the new ARFCN ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(nodes_old_without_new),
                         ", ".join(nodes_old_without_new),
                     )
@@ -724,7 +724,7 @@ def build_summary_audit(
                     add_row(
                         "LTE Frequency Inconsistences",
                         "GUtranSyncSignalFrequency",
-                        f"LTE nodes with the ARFCN not in ({old_ssb}, {new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
                     )
@@ -763,22 +763,22 @@ def build_summary_audit(
 
                     grouped = work.groupby(node_col)[arfcn_col]
 
-                    # LTE Frequency Audit: LTE nodes with the old ARFCN (from GUtranFreqRelation table)
+                    # LTE Frequency Audit: LTE nodes with the old SSB (from GUtranFreqRelation table)
                     old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranFreqRelation",
-                        f"LTE nodes with the old ARFCN ({old_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the old SSB ({old_ssb}) (from GUtranFreqRelation table)",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
 
-                    # LTE Frequency Audit: LTE nodes with the new ARFCN (from GUtranFreqRelation table)
+                    # LTE Frequency Audit: LTE nodes with the new SSB (from GUtranFreqRelation table)
                     new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranFreqRelation",
-                        f"LTE nodes with the new ARFCN ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -791,7 +791,7 @@ def build_summary_audit(
                     add_row(
                         "LTE Frequency Audit",
                         "GUtranFreqRelation",
-                        f"LTE nodes with both, the old ARFCN ({old_ssb}) and the new ARFCN ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
                         len(nodes_old_and_new),
                         ", ".join(nodes_old_and_new),
                     )
@@ -800,28 +800,28 @@ def build_summary_audit(
                     add_row(
                         "LTE Frequency Inconsistences",
                         "GUtranFreqRelation",
-                        f"LTE nodes with the old ARFCN ({old_ssb}) but without the new ARFCN ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
                         len(nodes_old_without_new),
                         ", ".join(nodes_old_without_new),
                     )
 
-                    # LTE Frequency Inconsistences: LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) (from GUtranFreqRelation table)
+                    # LTE Frequency Inconsistences: LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)
                     not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                     add_row(
                         "LTE Frequency Inconsistences",
                         "GUtranFreqRelation",
-                        f"LTE nodes with the ARFCN not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
                     )
 
-                    # NEW: LTE nodes whose GUtranFreqRelationId containing post ARFCN do not follow pattern new_arfcn-*-*-*-* (3 hyphens)
+                    # NEW: LTE nodes whose GUtranFreqRelationId containing post SSB do not follow pattern new_arfcn-*-*-*-* (3 hyphens)
                     post_freq_str = str(new_ssb)
                     pattern_work = df_gu_freq_rel[[node_col, arfcn_col]].copy()
                     pattern_work[node_col] = pattern_work[node_col].astype(str)
                     pattern_work[arfcn_col] = pattern_work[arfcn_col].astype(str)
 
-                    # Only rows whose GUtranFreqRelationId string contains the new ARFCN
+                    # Only rows whose GUtranFreqRelationId string contains the new SSB
                     mask_contains_post = pattern_work[arfcn_col].str.contains(post_freq_str, na=False)
 
                     def has_four_hyphens(value: object) -> bool:
