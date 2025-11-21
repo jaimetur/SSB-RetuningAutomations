@@ -362,8 +362,14 @@ def build_summary_audit(
                                 old_clean = old_rows.drop(columns=list(cols_to_ignore), errors="ignore").drop_duplicates().reset_index(drop=True)
                                 new_clean = new_rows.drop(columns=list(cols_to_ignore), errors="ignore").drop_duplicates().reset_index(drop=True)
 
+                                # Align column order
                                 old_clean = old_clean.reindex(sorted(old_clean.columns), axis=1)
                                 new_clean = new_clean.reindex(sorted(new_clean.columns), axis=1)
+
+                                # Sort rows by all columns to make comparison order-independent
+                                sort_cols = list(old_clean.columns)
+                                old_clean = old_clean.sort_values(by=sort_cols).reset_index(drop=True)
+                                new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
 
                                 if not old_clean.equals(new_clean):
                                     bad_cells_params.append(str(cell_id))
