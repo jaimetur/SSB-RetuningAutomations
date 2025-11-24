@@ -6,6 +6,10 @@ from typing import Dict, Optional, List
 
 import pandas as pd
 
+from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_index_by_keys
+from src.utils.utils_datetime import extract_date
+from src.utils.utils_excel import color_summary_tabs, enable_header_filters
+from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
 from src.utils.utils_io import read_text_lines
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 
@@ -342,12 +346,6 @@ class ConsistencyChecks:
 
             discrepancies = pd.DataFrame(rows)
             discrepancies = reorder_cols(discrepancies, table_name)
-
-            # New/Missing limpias (sin meta)
-            def drop_meta(df: pd.DataFrame) -> pd.DataFrame:
-                if df is None or df.empty:
-                    return df
-                return df.drop(columns=[c for c in ["Date_Pre", "Date_Post", "Freq_Pre", "Freq_Post", "Pre/Post", "Date"] if c in df.columns], errors="ignore")
 
             if not new_in_post.empty:
                 for col in new_in_post.columns:

@@ -29,8 +29,8 @@ class ConfigurationAudit:
 
     def __init__(
         self,
-        old_ssb: int,
-        new_ssb: int,
+        n77_ssb_pre: int,
+        n77_ssb_post: int,
         allowed_n77_ssb_pre: Optional[set[int]] = None,
         allowed_n77_arfcn_pre: Optional[set[int]] = None,
         allowed_n77_ssb_post: Optional[set[int]] = None,
@@ -43,8 +43,8 @@ class ConfigurationAudit:
         All values are converted to integers/sets of integers internally to make checks robust.
         """
         # Core ARFCN values
-        self.OLD_ARFCN: int = int(old_ssb)
-        self.NEW_ARFCN: int = int(new_ssb)
+        self.OLD_SSB: int = int(n77_ssb_pre)
+        self.NEW_SSB: int = int(n77_ssb_post)
         self.N77B_SSB: int = int(n77b_ssb_arfcn)
 
         # Allowed SSB (Pre) values for N77 cells (e.g. {648672, 653952})
@@ -76,12 +76,13 @@ class ConfigurationAudit:
     #                            PUBLIC API
     # =====================================================================
     def run(
-        self,
-        input_dir: str,
-        module_name: Optional[str] = "",
-        versioned_suffix: Optional[str] = None,
-        tables_order: Optional[List[str]] = None,      # optional sheet ordering
-        filter_frequencies: Optional[List[str]] = None # substrings to filter pivot columns
+            self,
+            input_dir: str,
+            module_name: Optional[str] = "",
+            versioned_suffix: Optional[str] = None,
+            tables_order: Optional[List[str]] = None,  # optional sheet ordering
+            filter_frequencies: Optional[List[str]] = None,  # substrings to filter pivot columns
+            output_dir: Optional[str] = None,  # <<< NEW: optional dedicated output folder
     ) -> str:
         """
         Main entry point: creates an Excel file with one sheet per detected table.
@@ -103,6 +104,12 @@ class ConfigurationAudit:
         if not os.path.isdir(input_dir):
             raise NotADirectoryError(f"Invalid directory: {input_dir}")
 
+        # <<< NEW: decide the base output folder and ensure it exists >>>
+        # If output_dir is provided, all generated files (Excel/PPT) will be written there.
+        # Otherwise, legacy behavior is kept and files are created under input_dir.
+        base_output_dir = output_dir or input_dir
+        os.makedirs(base_output_dir, exist_ok=True)
+
         # --- Detect log/txt files ---
         log_files = find_log_files(input_dir)
         if not log_files:
@@ -118,7 +125,7 @@ class ConfigurationAudit:
             mo_rank = {name: i for i, name in enumerate(tables_order)}
 
         # --- Prepare Excel output path ---
-        excel_path = os.path.join(input_dir, f"ConfigurationAudit{versioned_suffix}.xlsx")
+        excel_path = os.path.join(base_output_dir, f"ConfigurationAudit{versioned_suffix}.xlsx")
         table_entries: List[Dict[str, object]] = []
 
         # --- Keep a per-file index to preserve order of multiple tables inside same file ---
@@ -255,13 +262,13 @@ class ConfigurationAudit:
         # Collect dataframes for the specific MOs we need
         mo_collectors: Dict[str, List[pd.DataFrame]] = {
             "GUtranSyncSignalFrequency": [],
-            "GUtranFreqRelation": [],   # for LTE freq relation checks
+            "GUtranFreqRelation": [],  # for LTE freq relation checks
             "NRCellDU": [],
             "NRFrequency": [],
             "NRFreqRelation": [],
-            "NRSectorCarrier": [],      # for N77 ARFCN checks
-            "FreqPrioNR": [],           # for RATFreqPrioId checks
-            "EndcDistrProfile": [],     # for gUtranFreqRef checks
+            "NRSectorCarrier": [],  # for N77 ARFCN checks
+            "FreqPrioNR": [],  # for RATFreqPrioId checks
+            "EndcDistrProfile": [],  # for gUtranFreqRef checks
         }
         for entry in table_entries:
             mo_name = str(entry.get("sheet_candidate", "")).strip()
@@ -357,8 +364,8 @@ class ConfigurationAudit:
             df_gu_sync_signal_freq=df_gu_sync_signal_freq,
             df_gu_freq_rel=df_gu_freq_rel,
             df_endc_distr_profile=df_endc_distr_profile,
-            old_ssb=self.OLD_ARFCN,
-            new_ssb=self.NEW_ARFCN,
+            n77_ssb_pre=self.OLD_SSB,
+            n77_ssb_post=self.NEW_SSB,
             n77b_ssb=self.N77B_SSB,
             allowed_n77_ssb_pre=self.ALLOWED_N77_SSB_PRE,
             allowed_n77_arfcn_pre=self.ALLOWED_N77_ARFCN_PRE,
@@ -413,3 +420,4 @@ class ConfigurationAudit:
             print(f"{module_name} [WARN] PPT summary generation failed: {ex}")
 
         return excel_path
+
