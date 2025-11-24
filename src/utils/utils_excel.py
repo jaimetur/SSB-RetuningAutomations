@@ -4,7 +4,7 @@ import re
 from typing import Set
 
 from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, PatternFill, Font
 
 
 # ============================ EXCEL HELPERS ============================
