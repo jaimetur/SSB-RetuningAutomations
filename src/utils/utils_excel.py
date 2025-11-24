@@ -4,7 +4,7 @@ import re
 from typing import Set
 
 from openpyxl.worksheet.worksheet import Worksheet
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, PatternFill, Font
 
 
 # ============================ EXCEL HELPERS ============================
@@ -96,15 +96,24 @@ def apply_alternating_category_row_fills(
     Each time the value in the Category column changes, the row fill color
     toggles between two similar colors so that each Category block is visually
     separated in the Excel sheet.
+
+    Additionally:
+    - Any row whose SubCategory contains the string "inconsist" (case-insensitive)
+      will have its font colored red.
     """
 
     # Find the Category column index based on the header name
     category_col_idx: int | None = None
+    subcategory_col_idx: int | None = None
+
     for cell in ws[header_row]:
         header_value = str(cell.value).strip() if cell.value is not None else ""
+        header_lower = header_value.lower()
+
         if header_value == category_header:
             category_col_idx = cell.column
-            break
+        elif header_lower == "subcategory":
+            subcategory_col_idx = cell.column
 
     if category_col_idx is None:
         # Category column not found, nothing to do
@@ -118,14 +127,20 @@ def apply_alternating_category_row_fills(
     fill1 = PatternFill(fill_type="solid", fgColor=fill_color_1)
     fill2 = PatternFill(fill_type="solid", fgColor=fill_color_2)
 
+    # Red font for inconsistency rows
+    red_font = Font(color="FF0000")
+
     last_category = None
     use_first = True
     current_fill = fill1
 
     for row_idx in range(start_row, end_row + 1):
+
+        # Read the Category value in the current row
         cell_category = ws.cell(row=row_idx, column=category_col_idx).value
+
+        # Detect category changes → toggle background color
         if cell_category != last_category:
-            # Category changed: toggle fill (starting with fill1 for the first block)
             if last_category is None:
                 use_first = True
             else:
@@ -133,7 +148,19 @@ def apply_alternating_category_row_fills(
             current_fill = fill1 if use_first else fill2
             last_category = cell_category
 
-        # Apply the current fill to the entire row
+        # Detect whether this row is an "Inconsistencies" row
+        is_inconsistency_row = False
+        if subcategory_col_idx is not None:
+            sub_val = ws.cell(row=row_idx, column=subcategory_col_idx).value
+            if sub_val is not None:
+                if "inconsist" in str(sub_val).strip().lower():
+                    is_inconsistency_row = True
+
+        # Apply background color and (optionally) red font to the entire row
         for col_idx in range(1, ws.max_column + 1):
-            ws.cell(row=row_idx, column=col_idx).fill = current_fill
+            cell = ws.cell(row=row_idx, column=col_idx)
+            cell.fill = current_fill
+            if is_inconsistency_row:
+                cell.font = red_font
+
 

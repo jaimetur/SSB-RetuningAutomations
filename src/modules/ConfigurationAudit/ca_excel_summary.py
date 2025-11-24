@@ -5,12 +5,6 @@ import pandas as pd
 
 from src.utils.utils_frequency import resolve_column_case_insensitive, parse_int_frequency, is_n77_from_string, extract_sync_frequencies
 
-
-# =====================================================================
-#              GENERIC HELPERS (columns, frequencies, pivots)
-# =====================================================================
-
-
 # =====================================================================
 #                        SUMMARY AUDIT BUILDER
 # =====================================================================
@@ -24,8 +18,8 @@ def build_summary_audit(
     df_gu_freq_rel: pd.DataFrame,
     df_nr_sector_carrier: pd.DataFrame,
     df_endc_distr_profile: pd.DataFrame,
-    old_ssb: int,
-    new_ssb: int,
+    n77_ssb_pre: int,
+    n77_ssb_post: int,
     n77b_ssb: int,
     allowed_n77_ssb_pre,
     allowed_n77_arfcn_pre,
@@ -56,18 +50,18 @@ def build_summary_audit(
 
     def is_not_old_not_new(v: object) -> bool:
         freq = parse_int_frequency(v)
-        return freq not in (old_ssb, new_ssb)
+        return freq not in (n77_ssb_pre, n77_ssb_post)
 
     def series_only_not_old_not_new(series) -> bool:
         return all(is_not_old_not_new(v) for v in series)
 
     def is_new(v: object) -> bool:
         freq = parse_int_frequency(v)
-        return freq == new_ssb
+        return freq == n77_ssb_post
 
     def is_old(v: object) -> bool:
         freq = parse_int_frequency(v)
-        return freq == old_ssb
+        return freq == n77_ssb_pre
     
     def has_value(v: object) -> bool:
         freq = parse_int_frequency(v)
@@ -150,7 +144,7 @@ def build_summary_audit(
                         add_row(
                             "NRFrequency",
                             "NR Frequency Audit",
-                            f"NR nodes with the old SSB ({old_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the old SSB ({n77_ssb_pre}) (from NRFrequency table)",
                             len(old_nodes),
                             ", ".join(old_nodes),
                         )
@@ -160,7 +154,7 @@ def build_summary_audit(
                         add_row(
                             "NRFrequency",
                             "NR Frequency Audit",
-                            f"NR nodes with the new SSB ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the new SSB ({n77_ssb_post}) (from NRFrequency table)",
                             len(new_nodes),
                             ", ".join(new_nodes),
                         )
@@ -173,7 +167,7 @@ def build_summary_audit(
                         add_row(
                             "NRFrequency",
                             "NR Frequency Audit",
-                            f"NR nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with both, the old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from NRFrequency table)",
                             len(nodes_old_and_new),
                             ", ".join(nodes_old_and_new),
                         )
@@ -182,7 +176,7 @@ def build_summary_audit(
                         add_row(
                             "NRFrequency",
                             "NR Frequency Audit",
-                            f"NR nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from NRFrequency table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
@@ -192,7 +186,7 @@ def build_summary_audit(
                         add_row(
                             "NRFrequency",
                             "NR Frequency Inconsistencies",
-                            f"NR nodes with the N77 ARFCN not in ({old_ssb}, {new_ssb}) (from NRFrequency table)",
+                            f"NR nodes with the N77 ARFCN not in ({n77_ssb_pre}, {n77_ssb_post}) (from NRFrequency table)",
                             len(not_old_not_new_nodes),
                             ", ".join(not_old_not_new_nodes),
                         )
@@ -247,7 +241,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Audit",
-                            f"NR nodes with the old SSB ({old_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the old SSB ({n77_ssb_pre}) (from NRFreqRelation table)",
                             len(old_nodes),
                             ", ".join(old_nodes),
                         )
@@ -257,7 +251,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Audit",
-                            f"NR nodes with the new SSB ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                             len(new_nodes),
                             ", ".join(new_nodes),
                         )
@@ -270,7 +264,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Audit",
-                            f"NR nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with both, the old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                             len(nodes_old_and_new),
                             ", ".join(nodes_old_and_new),
                         )
@@ -279,7 +273,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Audit",
-                            f"NR nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
@@ -289,13 +283,13 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Inconsistencies",
-                            f"NR nodes with the SSB not in ({old_ssb}, {new_ssb}) (from NRFreqRelation table)",
+                            f"NR nodes with the SSB not in ({n77_ssb_pre}, {n77_ssb_post}) (from NRFreqRelation table)",
                             len(not_old_not_new_nodes),
                             ", ".join(not_old_not_new_nodes),
                         )
 
                         # NEW: nodes where NRFreqRelationId contains new SSB but has extra characters (e.g. 'auto_647328')
-                        post_freq_str = str(new_ssb)
+                        post_freq_str = str(n77_ssb_post)
                         pattern_work = df_nr_freq_rel[[node_col, arfcn_col]].copy()
                         pattern_work[node_col] = pattern_work[node_col].astype(str)
                         pattern_work[arfcn_col] = pattern_work[arfcn_col].astype(str)
@@ -305,7 +299,7 @@ def build_summary_audit(
                         def _has_same_int_and_extra(value: object) -> bool:
                             s = str(value).strip()
                             int_val = parse_int_frequency(s)
-                            return int_val == new_ssb and s != post_freq_str
+                            return int_val == n77_ssb_post and s != post_freq_str
 
                         mask_bad_pattern = mask_contains_post & pattern_work[arfcn_col].map(_has_same_int_and_extra)
 
@@ -314,7 +308,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Inconsistencies",
-                            f"NR nodes with Auto-created NRFreqRelationId to new SSB ({new_ssb}) but not following VZ naming convention (e.g. with extra characters: 'auto_{new_ssb}')",
+                            f"NR nodes with Auto-created NRFreqRelationId to new SSB ({n77_ssb_post}) but not following VZ naming convention (e.g. with extra characters: 'auto_{n77_ssb_post}')",
                             len(bad_pattern_nodes),
                             ", ".join(bad_pattern_nodes),
                         )
@@ -335,8 +329,8 @@ def build_summary_audit(
                             full_n77 = full.loc[mask_n77_full].copy()
                             full_n77["_arfcn_int_"] = full_n77[arfcn_col].map(parse_int_frequency)
 
-                            old_mask = full_n77["_arfcn_int_"] == old_ssb
-                            new_mask = full_n77["_arfcn_int_"] == new_ssb
+                            old_mask = full_n77["_arfcn_int_"] == n77_ssb_pre
+                            new_mask = full_n77["_arfcn_int_"] == n77_ssb_post
 
                             cells_with_old = set(full_n77.loc[old_mask, cell_col].astype(str))
                             cells_with_new = set(full_n77.loc[new_mask, cell_col].astype(str))
@@ -347,7 +341,7 @@ def build_summary_audit(
                             add_row(
                                 "NRFreqRelation",
                                 "NR Frequency Audit",
-                                f"NR cells with the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with the old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                                 len(cells_both),
                                 ", ".join(cells_both),
                             )
@@ -355,7 +349,7 @@ def build_summary_audit(
                             add_row(
                                 "NRFreqRelation",
                                 "NR Frequency Audit",
-                                f"NR cells with the old SSB ({old_ssb}) but without new SSB ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with the old SSB ({n77_ssb_pre}) but without new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                                 len(cells_old_without_new),
                                 ", ".join(cells_old_without_new),
                             )
@@ -373,8 +367,8 @@ def build_summary_audit(
                                 cell_rows = full_n77.loc[
                                     full_n77[cell_col].astype(str) == cell_id
                                     ].copy()
-                                old_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == old_ssb]
-                                new_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == new_ssb]
+                                old_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == n77_ssb_pre]
+                                new_rows = cell_rows.loc[cell_rows["_arfcn_int_"] == n77_ssb_post]
 
                                 if old_rows.empty or new_rows.empty:
                                     continue
@@ -439,7 +433,7 @@ def build_summary_audit(
                             add_row(
                                 "NRFreqRelation",
                                 "NR Frequency Inconsistencies",
-                                f"NR cells with mismatching params between old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from NRFreqRelation table)",
+                                f"NR cells with mismatching params between old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                                 len(bad_cells_params),
                                 ", ".join(bad_cells_params),
                             )
@@ -760,7 +754,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranSyncSignalFrequency",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the old SSB ({old_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the old SSB ({n77_ssb_pre}) (from GUtranSyncSignalFrequency table)",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
@@ -770,7 +764,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranSyncSignalFrequency",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the new SSB ({n77_ssb_post}) (from GUtranSyncSignalFrequency table)",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -783,7 +777,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranSyncSignalFrequency",
                         "LTE Frequency Audit",
-                        f"LTE nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with both, the old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from GUtranSyncSignalFrequency table)",
                         len(nodes_old_and_new),
                         ", ".join(nodes_old_and_new),
                     )
@@ -792,7 +786,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranSyncSignalFrequency",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from GUtranSyncSignalFrequency table)",
                         len(nodes_old_without_new),
                         ", ".join(nodes_old_without_new),
                     )
@@ -802,7 +796,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranSyncSignalFrequency",
                         "LTE Frequency Inconsistencies",
-                        f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranSyncSignalFrequency table)",
+                        f"LTE nodes with the SSB not in ({n77_ssb_pre}, {n77_ssb_post}) (from GUtranSyncSignalFrequency table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
                     )
@@ -846,7 +840,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the old SSB ({old_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the old SSB ({n77_ssb_pre}) (from GUtranFreqRelation table)",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
@@ -856,7 +850,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the new SSB ({n77_ssb_post}) (from GUtranFreqRelation table)",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -869,7 +863,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Audit",
-                        f"LTE nodes with both, the old SSB ({old_ssb}) and the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with both, the old SSB ({n77_ssb_pre}) and the new SSB ({n77_ssb_post}) (from GUtranFreqRelation table)",
                         len(nodes_old_and_new),
                         ", ".join(nodes_old_and_new),
                     )
@@ -878,7 +872,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the old SSB ({old_ssb}) but without the new SSB ({new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from GUtranFreqRelation table)",
                         len(nodes_old_without_new),
                         ", ".join(nodes_old_without_new),
                     )
@@ -888,13 +882,13 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Inconsistencies",
-                        f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the SSB not in ({n77_ssb_pre}, {n77_ssb_post}) (from GUtranFreqRelation table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
                     )
 
                     # NEW: LTE nodes whose GUtranFreqRelationId containing post SSB do not follow pattern new_arfcn-*-*-*-* (3 hyphens)
-                    post_freq_str = str(new_ssb)
+                    post_freq_str = str(n77_ssb_post)
                     pattern_work = df_gu_freq_rel[[node_col, arfcn_col]].copy()
                     pattern_work[node_col] = pattern_work[node_col].astype(str)
                     pattern_work[arfcn_col] = pattern_work[arfcn_col].astype(str)
@@ -920,15 +914,15 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Inconsistencies",
-                        f"LTE nodes with Auto-created GUtranFreqRelationId to new SSB ({new_ssb}) but not following VZ naming convention ({new_ssb}-30-20-0-1) (from GUtranFreqRelation table)",
+                        f"LTE nodes with Auto-created GUtranFreqRelationId to new SSB ({n77_ssb_post}) but not following VZ naming convention ({n77_ssb_post}-30-20-0-1) (from GUtranFreqRelation table)",
                         len(bad_nodes),
                         extra_bad,
                     )
 
                     # NEW: LTE cell-level check using GUtranFreqRelationId strings old_arfcn-30-20-0-1 / new_arfcn-30-20-0-1 (from GUtranFreqRelation table)
                     cell_col_gu = resolve_column_case_insensitive(df_gu_freq_rel, ["EUtranCellFDDId", "EUtranCellId", "CellId", "GUCellId"])
-                    expected_old_rel_id = f"{old_ssb}-30-20-0-1"
-                    expected_new_rel_id = f"{new_ssb}-30-20-0-1"
+                    expected_old_rel_id = f"{n77_ssb_pre}-30-20-0-1"
+                    expected_new_rel_id = f"{n77_ssb_post}-30-20-0-1"
 
                     if cell_col_gu:
                         full = df_gu_freq_rel.copy()
@@ -955,7 +949,7 @@ def build_summary_audit(
 
                         add_row(
                             "GUtranFreqRelation",
-                            "LTE Frequency Inconsistencies",
+                            "LTE Frequency Audit",
                             f"LTE cells with GUtranFreqRelationId {expected_old_rel_id} but without {expected_new_rel_id} (from GUtranFreqRelation table)",
                             len(cells_old_without_new),
                             ", ".join(cells_old_without_new),
@@ -1045,8 +1039,8 @@ def build_summary_audit(
                     freq_sets = work[ref_col].map(extract_sync_frequencies)
 
                     # Make sure we compare strings with strings
-                    expected_old = str(old_ssb)
-                    expected_new = str(new_ssb)
+                    expected_old = str(n77_ssb_pre)
+                    expected_new = str(n77_ssb_post)
                     expected_n77b = str(n77b_ssb)
 
                     # Nodes with GUtranSyncSignalFrequency containing old_arfcn and n77b_ssb (from EndcDistrProfile table)
@@ -1060,7 +1054,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile",
                         "ENDC Audit",
-                        f"Nodes with gUtranFreqRef containing {old_ssb} and {n77b_ssb} (from EndcDistrProfile table)",
+                        f"Nodes with gUtranFreqRef containing {n77_ssb_pre} and {n77b_ssb} (from EndcDistrProfile table)",
                         len(old_nodes),
                         ", ".join(old_nodes),
                     )
@@ -1076,7 +1070,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile",
                         "ENDC Audit",
-                        f"Nodes with gUtranFreqRef containing {new_ssb} and {n77b_ssb} (from EndcDistrProfile table)",
+                        f"Nodes with gUtranFreqRef containing {n77_ssb_post} and {n77b_ssb} (from EndcDistrProfile table)",
                         len(new_nodes),
                         ", ".join(new_nodes),
                     )
@@ -1095,7 +1089,7 @@ def build_summary_audit(
                     add_row(
                         "EndcDistrProfile",
                         "ENDC Inconsistencies",
-                        f"Nodes with gUtranFreqRef not containing ({old_ssb} or {new_ssb}) together with {n77b_ssb} (from EndcDistrProfile table)",
+                        f"Nodes with gUtranFreqRef not containing ({n77_ssb_pre} or {n77_ssb_post}) together with {n77b_ssb} (from EndcDistrProfile table)",
                         len(bad_nodes),
                         ", ".join(bad_nodes),
                     )

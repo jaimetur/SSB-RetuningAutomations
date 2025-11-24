@@ -66,12 +66,12 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 - Produces:
   - `CellRelation.xlsx` (all relevant tables)  
   - `CellRelationDiscrepancies.xlsx` (summary + detailed discrepancies) **only** if both frequencies are provided.  
-- 📁 Output is written under: `<INPUT_FOLDER>/CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
+- 📁 Output is written under: `<INPUT_FOLDER>/ConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
 - 📁 Output Example Structure: 
   ```
   <InputFolder>/
   ├─ LogsCombined_<timestamp>_v0.2.0.xlsx
-  └─ CellRelationConsistencyChecks_<timestamp>_v0.2.0/
+  └─ ConsistencyChecks_<timestamp>_v0.2.0/
      ├─ CellRelation.xlsx
      └─ CellRelationConsistencyChecks.xlsx
   ```
@@ -149,7 +149,7 @@ python RetuningAutomations.py --module consistency-checks   -i "C:\Projects\Retu
 - Writes:
   - `CellRelation.xlsx`
   - `CellRelationDiscrepancies.xlsx`
-  - Under: `CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/`
+  - Under: `ConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/`
 
 **C. Consistency Checks (Pre/Post comparison) (tables only):**
 ```bash
@@ -179,7 +179,7 @@ The loader in `PrePostRelations.loadPrePost(input_dir)` expects the needed table
 ### Output structure
 ```
 <INPUT_FOLDER>/
-└─ CellRelationConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/
+└─ ConsistencyChecks_<YYYYMMDD-HHMMSS>_v0.2.0/
    ├─ CellRelation.xlsx
    └─ CellRelationDiscrepancies.xlsx        # only when both frequencies provided
 ```

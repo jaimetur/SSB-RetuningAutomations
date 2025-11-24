@@ -14,11 +14,15 @@
   - #### 🌟 New Features:
 
   - #### 🚀 Enhancements:
-    - Swapped columns Category/SubCategory in 'ConfigurationAudit`.
+    - Swapped columns Category/SubCategory in `ConfigurationAudit`.
     - Added more Checks to `NRCellDU` Category.
-    - Other changes to 'ConfigurationAudit`.
+    - Included colors in `SummaryAudit` table for an easier visibility of each category. 
+    - `ConfigurationAudit` output is now saved into a subfolder per execution within the log folder.
+    - Other changes to `ConfigurationAudit`.
+    - Input folders now are not cleaned when a module that requires two input folders is selected.
   
   - #### 🐛 Bug fixes:
+    - Fixed errors when running `Consistency Checks` module after refactoring.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
