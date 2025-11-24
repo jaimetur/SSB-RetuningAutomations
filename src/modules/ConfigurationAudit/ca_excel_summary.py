@@ -797,11 +797,11 @@ def build_summary_audit(
                         ", ".join(nodes_old_without_new),
                     )
 
-                    # LTE Frequency Inconsistences: LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) (from GUtranSyncSignalFrequency table)
+                    # LTE Frequency Inconsistencies: LTE nodes with the ARFCN not in ({old_arfcn}, {new_arfcn}) (from GUtranSyncSignalFrequency table)
                     not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                     add_row(
                         "GUtranSyncSignalFrequency",
-                        "LTE Frequency Inconsistences",
+                        "LTE Frequency Inconsistencies",
                         f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranSyncSignalFrequency table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
@@ -883,11 +883,11 @@ def build_summary_audit(
                         ", ".join(nodes_old_without_new),
                     )
 
-                    # LTE Frequency Inconsistences: LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)
+                    # LTE Frequency Inconsistencies: LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)
                     not_old_not_new_nodes = sorted(str(node) for node, series in grouped if series_only_not_old_not_new(series))
                     add_row(
                         "GUtranFreqRelation",
-                        "LTE Frequency Inconsistences",
+                        "LTE Frequency Inconsistencies",
                         f"LTE nodes with the SSB not in ({old_ssb}, {new_ssb}) (from GUtranFreqRelation table)",
                         len(not_old_not_new_nodes),
                         ", ".join(not_old_not_new_nodes),
@@ -919,7 +919,7 @@ def build_summary_audit(
 
                     add_row(
                         "GUtranFreqRelation",
-                        "LTE Frequency Inconsistences",
+                        "LTE Frequency Inconsistencies",
                         f"LTE nodes with Auto-created GUtranFreqRelationId to new SSB ({new_ssb}) but not following VZ naming convention ({new_ssb}-30-20-0-1) (from GUtranFreqRelation table)",
                         len(bad_nodes),
                         extra_bad,
@@ -955,7 +955,7 @@ def build_summary_audit(
 
                         add_row(
                             "GUtranFreqRelation",
-                            "LTE Frequency Inconsistences",
+                            "LTE Frequency Inconsistencies",
                             f"LTE cells with GUtranFreqRelationId {expected_old_rel_id} but without {expected_new_rel_id} (from GUtranFreqRelation table)",
                             len(cells_old_without_new),
                             ", ".join(cells_old_without_new),
@@ -996,7 +996,7 @@ def build_summary_audit(
 
                         add_row(
                             "GUtranFreqRelation",
-                            "LTE Frequency Inconsistences",
+                            "LTE Frequency Inconsistencies",
                             f"LTE cells with mismatching params between GUtranFreqRelationId {expected_old_rel_id} and {expected_new_rel_id} (from GUtranFreqRelation table)",
                             len(bad_cells_params),
                             ", ".join(bad_cells_params),
@@ -1486,11 +1486,11 @@ def build_summary_audit(
 
                 # LTE Frequency GUtranSyncSignalFrequency
                 ("GUtranSyncSignalFrequency", "LTE Frequency Audit"),
-                ("GUtranSyncSignalFrequency", "LTE Frequency Inconsistences"),
+                ("GUtranSyncSignalFrequency", "LTE Frequency Inconsistencies"),
 
                 # LTE Frequency GUtranSyncSignalFrequency
                 ("GUtranFreqRelation", "LTE Frequency Audit"),
-                ("GUtranFreqRelation", "LTE Frequency Inconsistences"),
+                ("GUtranFreqRelation", "LTE Frequency Inconsistencies"),
 
                 # EndcDistrProfile
                 ("EndcDistrProfile", "ENDC Audit"),
