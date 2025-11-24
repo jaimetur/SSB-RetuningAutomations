@@ -55,8 +55,8 @@ INPUT_FOLDER_PRE = ""    # default Pre folder for dual-input GUI
 INPUT_FOLDER_POST = ""   # default Post folder for dual-input GUI
 
 # Frequencies (single Pre/Post used by ConsistencyChecks)
-DEFAULT_FREQ_PRE = "648672"
-DEFAULT_FREQ_POST = "647328"
+DEFAULT_N77_SSB_PRE = "648672"
+DEFAULT_N77_SSBQ_POST = "647328"
 
 # Default N77B SSB frequency
 DEFAULT_N77B_SSB = "653952"
@@ -95,9 +95,9 @@ CONFIG_SECTION = "general"
 CONFIG_KEY_LAST_INPUT               = "last_input_dir"
 CONFIG_KEY_LAST_INPUT_PRE           = "last_input_dir_pre"
 CONFIG_KEY_LAST_INPUT_POST          = "last_input_dir_post"
-CONFIG_KEY_FREQ_PRE                 = "n77_ssb_pre"
-CONFIG_KEY_FREQ_POST                = "n77_ssb_post"
-CONFIG_KEY_N77B_SSB                 = "n77b_ssb_freq"
+CONFIG_KEY_N77_SSB_PRE              = "n77_ssb_pre"
+CONFIG_KEY_N77_SSB_POST             = "n77_ssb_post"
+CONFIG_KEY_N77B_SSB                 = "n77b_ssb"
 CONFIG_KEY_FREQ_FILTERS             = "summary_freq_filters"
 CONFIG_KEY_ALLOWED_N77_SSB_PRE      = "allowed_n77_ssb_pre_csv"
 CONFIG_KEY_ALLOWED_N77_ARFCN_PRE    = "allowed_n77_arfcn_pre_csv"
@@ -109,8 +109,8 @@ CFG_FIELD_MAP = {
     "last_input":             CONFIG_KEY_LAST_INPUT,
     "last_input_pre":         CONFIG_KEY_LAST_INPUT_PRE,
     "last_input_post":        CONFIG_KEY_LAST_INPUT_POST,
-    "n77_ssb_pre":               CONFIG_KEY_FREQ_PRE,
-    "n77_ssb_post":              CONFIG_KEY_FREQ_POST,
+    "n77_ssb_pre":            CONFIG_KEY_N77_SSB_PRE,
+    "n77_ssb_post":           CONFIG_KEY_N77_SSB_POST,
     "n77b_ssb":               CONFIG_KEY_N77B_SSB,
     "freq_filters":           CONFIG_KEY_FREQ_FILTERS,
     "allowed_n77_ssb_pre":    CONFIG_KEY_ALLOWED_N77_SSB_PRE,
@@ -142,7 +142,7 @@ class GuiResult:
     n77_ssb_pre: str
     n77_ssb_post: str
     # N77B SSB frequency
-    n77b_ssb_freq: str
+    n77b_ssb: str
     # Summary filters for ConfigurationAudit
     freq_filters_csv: str
     # SSB/ARFCN lists for ConfigurationAudit (PRE)
@@ -165,8 +165,9 @@ def is_consistency_module(selected_text: str) -> bool:
 
 def gui_config_dialog(
     default_input: str = "",
-    default_n77_ssb_pre: str = DEFAULT_FREQ_PRE,
-    default_n77_ssb_post: str = DEFAULT_FREQ_POST,
+    default_n77_ssb_pre: str = DEFAULT_N77_SSB_PRE,
+    default_n77_ssb_post: str = DEFAULT_N77_SSBQ_POST,
+    default_n77b_ssb: str = DEFAULT_N77B_SSB,
     default_filters_csv: str = "",
     default_input_pre: str = "",
     default_input_post: str = "",
@@ -174,7 +175,6 @@ def gui_config_dialog(
     default_allowed_n77_arfcn_csv: str = DEFAULT_ALLOWED_N77_ARFCN_PRE_CSV,
     default_allowed_n77_ssb_post_csv: str = DEFAULT_ALLOWED_N77_SSB_POST_CSV,
     default_allowed_n77_arfcn_post_csv: str = DEFAULT_ALLOWED_N77_ARFCN_POST_CSV,
-    default_n77b_ssb: str = DEFAULT_N77B_SSB,
 ) -> Optional[GuiResult]:
     """
     Ventana única con:
@@ -208,8 +208,8 @@ def gui_config_dialog(
     input_var = tk.StringVar(value=default_input or "")
     input_pre_var = tk.StringVar(value=default_input_pre or "")
     input_post_var = tk.StringVar(value=default_input_post or "")
-    pre_var = tk.StringVar(value=default_n77_ssb_pre or "")
-    post_var = tk.StringVar(value=default_n77_ssb_post or "")
+    n77_ssb_pre_var = tk.StringVar(value=default_n77_ssb_pre or "")
+    n77_ssb_post_var = tk.StringVar(value=default_n77_ssb_post or "")
     n77b_ssb_var = tk.StringVar(value=default_n77b_ssb or "")
     selected_csv_var = tk.StringVar(value=normalize_csv_list(default_filters_csv))
     allowed_n77_ssb_pre_var = tk.StringVar(value=normalize_csv_list(default_allowed_n77_ssb_csv))
@@ -275,10 +275,10 @@ def gui_config_dialog(
 
     # Frecuencias
     ttk.Label(frm, text="N77 SSB Frequency (Pre):").grid(row=2, column=0, sticky="w", **pad)
-    ttk.Entry(frm, textvariable=pre_var, width=22).grid(row=2, column=1, sticky="w", **pad)
+    ttk.Entry(frm, textvariable=n77_ssb_pre_var, width=22).grid(row=2, column=1, sticky="w", **pad)
 
     ttk.Label(frm, text="N77 SSB Frequency (Post):").grid(row=3, column=0, sticky="w", **pad)
-    ttk.Entry(frm, textvariable=post_var, width=22).grid(row=3, column=1, sticky="w", **pad)
+    ttk.Entry(frm, textvariable=n77_ssb_post_var, width=22).grid(row=3, column=1, sticky="w", **pad)
 
     ttk.Label(frm, text="N77B SSB Frequency:").grid(row=4, column=0, sticky="w", **pad)
     ttk.Entry(frm, textvariable=n77b_ssb_var, width=22).grid(row=4, column=1, sticky="w", **pad)
@@ -388,9 +388,9 @@ def gui_config_dialog(
                 input_dir="",
                 input_pre_dir=sel_input_pre,
                 input_post_dir=sel_input_post,
-                n77_ssb_pre=pre_var.get().strip(),
-                n77_ssb_post=post_var.get().strip(),
-                n77b_ssb_freq=n77b_ssb_var.get().strip(),
+                n77_ssb_pre=n77_ssb_pre_var.get().strip(),
+                n77_ssb_post=n77_ssb_post_var.get().strip(),
+                n77b_ssb=n77b_ssb_var.get().strip(),
                 freq_filters_csv=normalize_csv_list(selected_csv_var.get()),
                 allowed_n77_ssb_pre_csv=normalized_allowed_n77_ssb_pre,
                 allowed_n77_arfcn_pre_csv=normalized_allowed_n77_arfcn_pre,
@@ -407,9 +407,9 @@ def gui_config_dialog(
                 input_dir=sel_input,
                 input_pre_dir="",
                 input_post_dir="",
-                n77_ssb_pre=pre_var.get().strip(),
-                n77_ssb_post=post_var.get().strip(),
-                n77b_ssb_freq=n77b_ssb_var.get().strip(),
+                n77_ssb_pre=n77_ssb_pre_var.get().strip(),
+                n77_ssb_post=n77_ssb_post_var.get().strip(),
+                n77b_ssb=n77b_ssb_var.get().strip(),
                 freq_filters_csv=normalize_csv_list(selected_csv_var.get()),
                 allowed_n77_ssb_pre_csv=normalized_allowed_n77_ssb_pre,
                 allowed_n77_arfcn_pre_csv=normalized_allowed_n77_arfcn_pre,
@@ -448,7 +448,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--n77-ssb-pre", help="Frequency before refarming (Pre)")
     parser.add_argument("--n77-ssb-post", help="Frequency after refarming (Post)")
-    parser.add_argument("--n77b-ssb-freq", help="N77B SSB frequency (ARFCN).")
+    parser.add_argument("--n77b-ssb", help="N77B SSB frequency (ARFCN).")
     parser.add_argument("--freq-filters", help="Comma-separated list of frequencies to filter pivot columns in Configuration Audit (substring match per column header).")
 
     # ARFCN list options for ConfigurationAudit (PRE)
@@ -472,7 +472,7 @@ def run_configuration_audit(
     freq_filters_csv: str = "",
     n77_ssb_pre: Optional[str] = None,
     n77_ssb_post: Optional[str] = None,
-    n77b_ssb_freq: Optional[str] = None,
+    n77b_ssb: Optional[str] = None,
     allowed_n77_ssb_pre_csv: Optional[str] = None,
     allowed_n77_arfcn_pre_csv: Optional[str] = None,
     allowed_n77_ssb_post_csv: Optional[str] = None,
@@ -487,23 +487,22 @@ def run_configuration_audit(
 
     # ARFCN principales
     try:
-        n77_ssb_pre = int(n77_ssb_pre) if n77_ssb_pre else int(DEFAULT_FREQ_PRE)
+        n77_ssb_pre = int(n77_ssb_pre) if n77_ssb_pre else int(DEFAULT_N77_SSB_PRE)
     except ValueError:
-        n77_ssb_pre = int(DEFAULT_FREQ_PRE)
+        n77_ssb_pre = int(DEFAULT_N77_SSB_PRE)
 
     try:
-        n77_ssb_post = int(n77_ssb_post) if n77_ssb_post else int(DEFAULT_FREQ_POST)
+        n77_ssb_post = int(n77_ssb_post) if n77_ssb_post else int(DEFAULT_N77_SSBQ_POST)
     except ValueError:
-        n77_ssb_post = int(DEFAULT_FREQ_POST)
+        n77_ssb_post = int(DEFAULT_N77_SSBQ_POST)
 
     # N77B SSB
-    n77b_ssb_arfcn = None
-    if n77b_ssb_freq:
+    if n77b_ssb:
         try:
-            n77b_ssb_arfcn = int(n77b_ssb_freq)
+            n77b_ssb = int(n77b_ssb)
         except ValueError:
-            print(f"{module_name} [WARN] Invalid N77B SSB frequency '{n77b_ssb_freq}'. Ignoring.")
-            n77b_ssb_arfcn = None
+            print(f"{module_name} [WARN] Invalid N77B SSB frequency '{n77b_ssb}'. Ignoring.")
+            n77b_ssb = None
 
     # Allowed sets (PRE)
     default_n77_ssb_pre_list = [n77_ssb_post, 653952]
@@ -536,8 +535,8 @@ def run_configuration_audit(
     )
 
     print(f"{module_name} Using old N77 SSB = {n77_ssb_pre} --> new N77 SSB = {n77_ssb_post}")
-    if n77b_ssb_arfcn is not None:
-        print(f"{module_name} N77B SSB = {n77b_ssb_arfcn}")
+    if n77b_ssb is not None:
+        print(f"{module_name} N77B SSB = {n77b_ssb}")
     else:
         print(f"{module_name} N77B SSB not provided or invalid.")
 
@@ -559,11 +558,11 @@ def run_configuration_audit(
         app = ConfigurationAudit(
             n77_ssb_pre=n77_ssb_pre,
             n77_ssb_post=n77_ssb_post,
+            n77b_ssb_arfcn=n77b_ssb,
             allowed_n77_ssb_pre=allowed_n77_ssb_pre,
             allowed_n77_arfcn_pre=allowed_n77_arfcn_pre,
             allowed_n77_ssb_post=allowed_n77_ssb_post,
             allowed_n77_arfcn_post=allowed_n77_arfcn_post,
-            n77b_ssb_arfcn=n77b_ssb_arfcn,
         )
     except TypeError:
         print(f"{module_name} [WARN] Installed ConfigurationAudit does not support full PRE/POST + N77B parameters.")
@@ -754,12 +753,12 @@ def resolve_module_callable(name: str):
 # =============================== EXECUTION CORE ============================= #
 def execute_module(
     module_fn,
-    input_dir: str,
-    n77_ssb_pre: str,
-    n77_ssb_post: str,
+    input_dir: str = "",
     input_pre_dir: str = "",
     input_post_dir: str = "",
-    n77b_ssb_freq: str = "",
+    n77_ssb_pre: str = "",
+    n77_ssb_post: str = "",
+    n77b_ssb: str = "",
     freq_filters_csv: str = "",
     allowed_n77_ssb_pre_csv: str = "",
     allowed_n77_arfcn_pre_csv: str = "",
@@ -789,7 +788,7 @@ def execute_module(
                 allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
                 allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
                 allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
-                n77b_ssb_freq=n77b_ssb_freq,
+                n77b_ssb=n77b_ssb,
             )
         elif module_fn is run_initial_cleanup:
             module_fn(input_dir, n77_ssb_pre, n77_ssb_post)
@@ -901,10 +900,11 @@ def main():
     default_input_pre = args.input_pre or persisted_pre_dir or INPUT_FOLDER_PRE or ""
     default_input_post = args.input_post or persisted_post_dir or INPUT_FOLDER_POST or ""
 
+    default_n77_ssb_pre = args.n77_ssb_pre or persisted_n77_ssb_pre or DEFAULT_N77_SSB_PRE
+    default_n77_ssb_post = args.n77_ssb_post or persisted_n77_ssb_post or DEFAULT_N77_SSBQ_POST
+    default_n77b_ssb = args.n77b_ssb or persisted_n77b_ssb or DEFAULT_N77B_SSB
+
     default_filters_csv = normalize_csv_list(args.freq_filters or persisted_filters)
-    default_n77_ssb_pre = args.n77_ssb_pre or persisted_n77_ssb_pre or DEFAULT_FREQ_PRE
-    default_n77_ssb_post = args.n77_ssb_post or persisted_n77_ssb_post or DEFAULT_FREQ_POST
-    default_n77b_ssb = args.n77b_ssb_freq or persisted_n77b_ssb or DEFAULT_N77B_SSB
 
     default_allowed_n77_ssb_pre_csv = normalize_csv_list(args.allowed_n77_ssb_pre or persisted_allowed_ssb_pre or DEFAULT_ALLOWED_N77_SSB_PRE_CSV)
     default_allowed_n77_arfcn_pre_csv = normalize_csv_list(args.allowed_n77_arfcn_pre or persisted_allowed_arfcn_pre or DEFAULT_ALLOWED_N77_ARFCN_PRE_CSV)
@@ -954,7 +954,7 @@ def main():
             persist_kwargs = dict(
                 n77_ssb_pre=sel.n77_ssb_pre,
                 n77_ssb_post=sel.n77_ssb_post,
-                n77b_ssb=sel.n77b_ssb_freq,
+                n77b_ssb=sel.n77b_ssb,
                 freq_filters=sel.freq_filters_csv,
                 allowed_n77_ssb_pre=sel.allowed_n77_ssb_pre_csv,
                 allowed_n77_arfcn_pre=sel.allowed_n77_arfcn_pre_csv,
@@ -982,7 +982,7 @@ def main():
             # Update defaults in memory
             default_n77_ssb_pre = sel.n77_ssb_pre
             default_n77_ssb_post = sel.n77_ssb_post
-            default_n77b_ssb = sel.n77b_ssb_freq
+            default_n77b_ssb = sel.n77b_ssb
             default_filters_csv = sel.freq_filters_csv
             default_allowed_n77_ssb_pre_csv = sel.allowed_n77_ssb_pre_csv
             default_allowed_n77_arfcn_pre_csv = sel.allowed_n77_arfcn_pre_csv
@@ -997,7 +997,7 @@ def main():
                     input_post_dir=sel.input_post_dir,
                     n77_ssb_pre=sel.n77_ssb_pre,
                     n77_ssb_post=sel.n77_ssb_post,
-                    n77b_ssb_freq=sel.n77b_ssb_freq,
+                    n77b_ssb=sel.n77b_ssb,
                     freq_filters_csv=sel.freq_filters_csv,
                     allowed_n77_ssb_pre_csv=sel.allowed_n77_ssb_pre_csv,
                     allowed_n77_arfcn_pre_csv=sel.allowed_n77_arfcn_pre_csv,
@@ -1025,7 +1025,7 @@ def main():
 
     n77_ssb_pre = default_n77_ssb_pre
     n77_ssb_post = default_n77_ssb_post
-    n77b_ssb_freq = default_n77b_ssb
+    n77b_ssb = default_n77b_ssb
     freq_filters_csv = default_filters_csv
     allowed_n77_ssb_pre_csv = default_allowed_n77_ssb_pre_csv
     allowed_n77_arfcn_pre_csv = default_allowed_n77_arfcn_pre_csv
@@ -1050,7 +1050,7 @@ def main():
             last_input_post=input_post_dir,
             n77_ssb_pre=n77_ssb_pre,
             n77_ssb_post=n77_ssb_post,
-            n77b_ssb=n77b_ssb_freq,
+            n77b_ssb=n77b_ssb,
             freq_filters=freq_filters_csv,
             allowed_n77_ssb_pre=allowed_n77_ssb_pre_csv,
             allowed_n77_arfcn_pre=allowed_n77_arfcn_pre_csv,
@@ -1060,12 +1060,11 @@ def main():
 
         execute_module(
             module_fn,
-            input_dir="",
             input_pre_dir=input_pre_dir,
             input_post_dir=input_post_dir,
             n77_ssb_pre=n77_ssb_pre,
             n77_ssb_post=n77_ssb_post,
-            n77b_ssb_freq=n77b_ssb_freq,
+            n77b_ssb=n77b_ssb,
             freq_filters_csv=freq_filters_csv,
             allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv,
             allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
@@ -1089,7 +1088,7 @@ def main():
         last_input=input_dir,
         n77_ssb_pre=n77_ssb_pre,
         n77_ssb_post=n77_ssb_post,
-        n77b_ssb=n77b_ssb_freq,
+        n77b_ssb=n77b_ssb,
         freq_filters=freq_filters_csv,
         allowed_n77_ssb_pre=allowed_n77_ssb_pre_csv,
         allowed_n77_arfcn_pre=allowed_n77_arfcn_pre_csv,
@@ -1102,7 +1101,7 @@ def main():
         input_dir=input_dir,
         n77_ssb_pre=n77_ssb_pre,
         n77_ssb_post=n77_ssb_post,
-        n77b_ssb_freq=n77b_ssb_freq,
+        n77b_ssb=n77b_ssb,
         freq_filters_csv=freq_filters_csv,
         allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv,
         allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
