@@ -54,6 +54,14 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 - Public API in place (`ConfigurationAudit.run(input_dir, ...)`).  
 - Produces a versioned artifact (timestamp + tool version) when it writes output.  
 - Parsing/formatting rules can be extended to your specific log structure.
+- 📁 Output is written under: `<INPUT_FOLDER>/ConfigurationAudit__<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
+- 📁 Output Example Structure: 
+  ```
+  <InputFolder>/
+  └─ ConfigurationAudit_<timestamp>_v0.2.0/
+     ├─ ConfigurationAudit_<timestamp>_v0.2.0.xlsx
+     └─ ConfigurationAudit_<timestamp>_v0.2.0.pptx
+  ```
 
 ---
 
@@ -66,14 +74,13 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 - Produces:
   - `CellRelation.xlsx` (all relevant tables)  
   - `CellRelationDiscrepancies.xlsx` (summary + detailed discrepancies) **only** if both frequencies are provided.  
-- 📁 Output is written under: `<INPUT_FOLDER>/ConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
+- 📁 Output is written under: `<POST_INPUT_FOLDER>/ConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
 - 📁 Output Example Structure: 
   ```
-  <InputFolder>/
-  ├─ LogsCombined_<timestamp>_v0.2.0.xlsx
+  <PostInputFolder>/
   └─ ConsistencyChecks_<timestamp>_v0.2.0/
-     ├─ CellRelation.xlsx
-     └─ CellRelationConsistencyChecks.xlsx
+     ├─ CellRelation_<timestamp>_v0.2.0.xlsx
+     └─ CellRelationConsistencyChecks_<timestamp>_v0.2.0.xlsx
   ```
 
 ---

@@ -125,7 +125,7 @@ class ConfigurationAudit:
             mo_rank = {name: i for i, name in enumerate(tables_order)}
 
         # --- Prepare Excel output path ---
-        excel_path = os.path.join(base_output_dir, f"ConfigurationAudit{versioned_suffix}.xlsx")
+        excel_path = os.path.join(base_output_dir, f"ConfigurationAudit_{versioned_suffix}.xlsx")
         table_entries: List[Dict[str, object]] = []
 
         # --- Keep a per-file index to preserve order of multiple tables inside same file ---
