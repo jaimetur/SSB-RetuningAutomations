@@ -95,8 +95,8 @@ on:
   #      - .idea/**
 
   # ──────────────── 3) Disparador automático por cron ──────────────────────
-  #  schedule:
-  #    - cron: '0 2 * * *' # Ejecución diaria a las 2 AM UTC
+    schedule:
+      - cron: '0 9 * * *' # Ejecución diaria a las 9 AM UTC
   # ─────────────────────────────────────────────────────────────────────────
 
 
