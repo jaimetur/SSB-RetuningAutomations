@@ -95,8 +95,8 @@ on:
   #      - .idea/**
 
   # ──────────────── 3) Disparador automático por cron ──────────────────────
-    schedule:
-      - cron: '0 9 * * *' # Ejecución diaria a las 9 AM UTC
+  schedule:
+    - cron: '0 9 * * *' # Ejecución diaria a las 9 AM UTC
   # ─────────────────────────────────────────────────────────────────────────
 
 
@@ -123,6 +123,7 @@ jobs:
             macos_arm64=${{ toJSON(github.event.inputs.macos_arm64) }}
             windows_x64=${{ toJSON(github.event.inputs.windows_x64) }}
             windows_arm64=${{ toJSON(github.event.inputs.windows_arm64) }}
+            final_release="${{ github.event.inputs.final_release }}"
             compiler="${{ github.event.inputs.compiler }}"
             compilation_mode="${{ github.event.inputs.compilation_mode }}"
             # build_mode="${{ github.event.inputs.build_mode }}"
@@ -137,6 +138,7 @@ jobs:
             macos_arm64="true"
             windows_x64="true"
             windows_arm64="true"
+            final_release="true"
             compiler="nuitka"
             compilation_mode="onefile"
             build_mode="default"
@@ -428,7 +430,7 @@ jobs:
           # fi
 
 
-  # ==========================================================================================================================
+    # ==========================================================================================================================
   # JOB Create Release
   # ==========================================================================================================================
   create-release:
@@ -437,6 +439,12 @@ jobs:
       - build-binaries
 
     runs-on: ubuntu-22.04
+
+    # FINAL_RELEASE:
+    # - Si es workflow_dispatch -> usa inputs.final_release
+    # - Si NO es workflow_dispatch (schedule/push) -> true por defecto
+    env:
+      FINAL_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.final_release == true }}
 
     outputs:
       tool_version: ${{ steps.extract_version.outputs.tool_version }}
@@ -447,7 +455,9 @@ jobs:
 
       - name: ✅ Check Final-Release
         run: |
-          echo "Final-Release: ${{ inputs.final_release }}"
+          echo "GitHub event_name : ${{ github.event_name }}"
+          echo "Input final_release (raw) : '${{ inputs.final_release }}'"
+          echo "FINAL_RELEASE (computed) : '${FINAL_RELEASE}'"
 
       - name: 🏷️ Extract TOOL_VERSION from GlobalVariables.py
         id: extract_version                   # Importante añadir el ID para que outputs pueda encontrar la variable
@@ -464,6 +474,8 @@ jobs:
           echo "✅ TOOL_VERSION = ${TOOL_VERSION}"
 
       - name: 🧼 Delete GitHub release, tag and associated discussion (only for stable releases)
+        # Solo tiene sentido borrar releases/tags si vamos a crear un release "estable"
+        if: ${{ env.FINAL_RELEASE == 'true' }}
         run: |
           set -e
           TAG="v${{ env.TOOL_VERSION }}"
@@ -568,7 +580,7 @@ jobs:
 
       # 🚀 Crear release estable (final_release == true)
       - name: 🚀 Create GitHub Release (stable)
-        if: ${{ inputs.final_release == true }}
+        if: ${{ env.FINAL_RELEASE == 'true' }}
         uses: softprops/action-gh-release@v2.2.2
         with:
           tag_name: v${{ env.TOOL_VERSION }}
@@ -584,10 +596,10 @@ jobs:
             ./release_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
-      
+
       # 🚀 Crear prerelease (final_release == false)
       - name: 🚀 Create GitHub Release (prerelease)
-        if: ${{ inputs.final_release == false }}
+        if: ${{ env.FINAL_RELEASE != 'true' }}
         uses: softprops/action-gh-release@v2.2.2
         with:
           tag_name: v${{ env.TOOL_VERSION }}
@@ -602,4 +614,5 @@ jobs:
             ./release_files/*
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN_GITHUB }}
+
 
