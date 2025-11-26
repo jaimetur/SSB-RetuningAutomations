@@ -13,6 +13,7 @@ from src.utils.utils_frequency import detect_freq_column, detect_key_columns, ex
 from src.utils.utils_io import read_text_lines
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 
+
 class ConsistencyChecks:
     """
     Loads and compares GU/NR relation tables before (Pre) and after (Post) a refarming process.
@@ -242,7 +243,7 @@ class ConsistencyChecks:
 
             pre_date = pre_df_full["Date"].max() if not pre_df_full.empty and "Date" in pre_df_full.columns else ""
             post_date = post_df_full["Date"].max() if not post_df_full.empty and "Date" in post_df_full.columns else ""
-            pre_source_file  = _pick_src(table_name, "Pre",  pre_date)
+            pre_source_file = _pick_src(table_name, "Pre", pre_date)
             post_source_file = _pick_src(table_name, "Post", post_date)
 
             pre_norm = normalize_df(pre_df_full)
@@ -472,6 +473,211 @@ class ConsistencyChecks:
 
         return results
 
+    # ----------------------------- HELPERS FOR OUTPUT ----------------------------- #
+    @staticmethod
+    def _add_correction_command_gu_new(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add 'Correction_Cmd' column for GU_new sheet, using existing row fields.
+
+        Format example:
+          647328\tdel EUtranCellFDD=<EUtranCellFDDId>,GUtranFreqRelation=<GUtranFreqRelationId>,GUtranCellRelation=<GUtranCellRelationId>
+        If any of the required fields is missing/empty, an empty string is used.
+        """
+        if df is None or df.empty:
+            df = df.copy()
+            df["Correction_Cmd"] = ""
+            return df
+
+        df = df.copy()
+
+        def build_command(row: pd.Series) -> str:
+            # Prefer Freq_Post for GU_new rows, fall back to Freq_Pre if needed
+            freq_val = str(row.get("Freq_Post") or row.get("Freq_Pre") or "").strip()
+            eu_cell = str(row.get("EUtranCellFDDId") or "").strip()
+            freq_rel = str(row.get("GUtranFreqRelationId") or "").strip()
+            cell_rel = str(row.get("GUtranCellRelationId") or "").strip()
+
+            if not (freq_val and eu_cell and freq_rel and cell_rel):
+                return ""
+
+            return f"del EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}"
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+        return df
+
+    @staticmethod
+    def _add_correction_command_nr_new(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add 'Correction_Cmd' column for NR_new sheet, using existing row fields.
+
+        Format example:
+          del NRCellCU=<NRCellCUId>,NRCellRelation=<NRCellRelationId>
+        If any of the required fields is missing/empty, an empty string is used.
+        """
+        if df is None or df.empty:
+            df = df.copy()
+            df["Correction_Cmd"] = ""
+            return df
+
+        df = df.copy()
+
+        def build_command(row: pd.Series) -> str:
+            nr_cell_cu = str(row.get("NRCellCUId") or "").strip()
+            nr_cell_rel = str(row.get("NRCellRelationId") or "").strip()
+
+            if not (nr_cell_cu and nr_cell_rel):
+                return ""
+
+            return f"del NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel}"
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+        return df
+
+    @staticmethod
+    def _add_correction_command_gu_missing(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add 'Correction_Cmd' column for GU_missing sheet, building a multiline correction script.
+
+        All placeholders are taken from the row itself (no external parameters).
+        """
+        if df is None or df.empty:
+            df = df.copy()
+            df["Correction_Cmd"] = ""
+            return df
+
+        df = df.copy()
+
+        def build_command(row: pd.Series) -> str:
+            enb_func = str(row.get("ENodeBFunctionId") or "").strip()
+            eu_cell = str(row.get("EUtranCellFDDId") or "").strip()
+            freq_rel = str(row.get("GUtranFreqRelationId") or "").strip()
+            cell_rel = str(row.get("GUtranCellRelationId") or "").strip()
+            neighbor_ref = str(row.get("neighborCellRef") or "").strip()
+            is_endc = str(row.get("isEndcAllowed") or "").strip()
+            is_ho = str(row.get("isHoAllowed") or "").strip()
+            is_remove = str(row.get("isRemoveAllowed") or "").strip()
+            is_voice_ho = str(row.get("isVoiceHoAllowed") or "").strip()
+            user_label = str(row.get("userLabel") or "").strip()
+            coverage = str(row.get("coverageIndicator") or "").strip()
+
+            freq_rel = "647328-30-20-0-1" # Overwrite GUtranFreqRelationId to a hardcoded value (the new SSB)
+
+            if not user_label:
+                # Safe default label if none is provided in the row
+                user_label = "SSBretune"
+
+            # If core identifiers are missing, do not generate the command
+            if not (enb_func and eu_cell and freq_rel and cell_rel):
+                return ""
+
+            # NEW: keep only GUtraNetwork / ExternalGNodeBFunction / ExternalGUtranCell part
+            clean_neighbor_ref = neighbor_ref
+            if "GUtraNetwork=" in neighbor_ref:
+                pos = neighbor_ref.find("GUtraNetwork=")
+                clean_neighbor_ref = neighbor_ref[pos:]
+
+            parts = [
+                f"crn ENodeBFunction={enb_func},EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}",
+                f"neighborCellRef {clean_neighbor_ref}" if clean_neighbor_ref else "",
+                f"isEndcAllowed {is_endc}" if is_endc else "",
+                f"isHoAllowed {is_ho}" if is_ho else "",
+                f"isRemoveAllowed {is_remove}" if is_remove else "",
+                f"isVoiceHoAllowed {is_voice_ho}" if is_voice_ho else "",
+                f"userlabel {user_label}",
+                "end",
+                f"set EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel} coverageIndicator {coverage}" if coverage else f"set EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}"
+            ]
+
+            # Keep non-empty lines only, preserving the line breaks
+            lines = [p for p in parts if p]
+            return "\n".join(lines)
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+        return df
+
+    @staticmethod
+    def _add_correction_command_nr_missing(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Add 'Correction_Cmd' column for NR_missing sheet, building a multiline correction script.
+
+        All placeholders are taken from the row itself (no external parameters).
+        """
+        if df is None or df.empty:
+            df = df.copy()
+            df["Correction_Cmd"] = ""
+            return df
+
+        df = df.copy()
+
+        def build_command(row: pd.Series) -> str:
+            nr_cell_cu = str(row.get("NRCellCUId") or "").strip()
+            nr_cell_rel = str(row.get("NRCellRelationId") or "").strip()
+            coverage = str(row.get("coverageIndicator") or "").strip()
+            is_ho = str(row.get("isHoAllowed") or "").strip()
+            is_remove = str(row.get("isRemoveAllowed") or "").strip()
+            s_cell_candidate = str(row.get("sCellCandidate") or "").strip()
+            nrcell_ref = str(row.get("nRCellRef") or "").strip()
+            nrfreq_ref = str(row.get("nRFreqRelationRef") or "").strip()
+
+            # If core identifiers are missing, do not generate the command
+            if not (nr_cell_cu and nr_cell_rel):
+                return ""
+
+            # --------- nRCellRef cleanup: GNBCUCPFunction=X,NRCellCU=Y ---------
+            clean_nrcell_ref = ""
+            if "GNBCUCPFunction=" in nrcell_ref:
+                sub = nrcell_ref[nrcell_ref.find("GNBCUCPFunction="):]
+                # Extract GNBCUCPFunction value
+                gnb_part = sub.split(",", 1)[0]  # e.g. "GNBCUCPFunction=1"
+                gnb_val = gnb_part.split("=", 1)[1] if "=" in gnb_part else ""
+
+                # Try to get ExternalNRCellCU or NRCellCU from the same path
+                target_nr_cu = ""
+                m_ext = re.search(r"ExternalNRCellCU=([^,]+)", sub)
+                m_int = re.search(r"NRCellCU=([^,]+)", sub)
+                if m_ext:
+                    target_nr_cu = m_ext.group(1)
+                elif m_int:
+                    target_nr_cu = m_int.group(1)
+
+                if gnb_val and target_nr_cu:
+                    clean_nrcell_ref = f"GNBCUCPFunction={gnb_val},NRCellCU={target_nr_cu}"
+
+            # --------- nRFreqRelationRef cleanup: GNBCUCPFunction=X,NRCellCU=Y,NRFreqRelation=Z ---------
+            clean_nrfreq_ref = ""
+            if "GNBCUCPFunction=" in nrfreq_ref:
+                sub = nrfreq_ref[nrfreq_ref.find("GNBCUCPFunction="):]
+                gnb_part = sub.split(",", 1)[0]
+                gnb_val = gnb_part.split("=", 1)[1] if "=" in gnb_part else ""
+
+                m_nr_cell = re.search(r"NRCellCU=([^,]+)", sub)
+                m_freq = re.search(r"NRFreqRelation=([^,]+)", sub)
+                nr_cell_for_freq = m_nr_cell.group(1) if m_nr_cell else ""
+                freq_id = m_freq.group(1) if m_freq else ""
+
+                freq_id = "647328" # Overwrite NRFreqRelation to a hardcoded value (new SSB)
+
+                if gnb_val and nr_cell_for_freq and freq_id:
+                    clean_nrfreq_ref = f"GNBCUCPFunction={gnb_val},NRCellCU={nr_cell_for_freq},NRFreqRelation={freq_id}"
+
+            parts = [
+                f"crn NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel}",
+                f"nRCellRef {clean_nrcell_ref}" if clean_nrcell_ref else "",
+                f"nRFreqRelationRef {clean_nrfreq_ref}" if clean_nrfreq_ref else "",
+                f"isHoAllowed {is_ho}" if is_ho else "",
+                f"isRemoveAllowed {is_remove}" if is_remove else "",
+                "end",
+                f"set NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel} coverageIndicator {coverage}" if coverage else f"set NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel}",
+                f"set NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel} sCellCandidate {s_cell_candidate}" if s_cell_candidate else ""
+            ]
+
+            # Keep non-empty lines only, preserving the line breaks
+            lines = [p for p in parts if p]
+            return "\n".join(lines)
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+        return df
+
     # ----------------------------- OUTPUT TO EXCEL ----------------------------- #
     def save_outputs_excel(self, output_dir: str, results: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None, versioned_suffix: Optional[str] = None) -> None:
         import os
@@ -485,7 +691,7 @@ class ConsistencyChecks:
             if "NRCellRelation" in self.tables:
                 self.tables["NRCellRelation"].to_excel(writer, sheet_name="NR_all", index=False)
 
-        excel_disc = os.path.join(output_dir, f"CellRelationConsistencyChecks{suf}.xlsx")
+        excel_disc = os.path.join(output_dir, f"ConsistencyChecks_CellRelation{suf}.xlsx")
         with pd.ExcelWriter(excel_disc, engine="openpyxl") as writer:
             # Summary
             summary_rows = []
@@ -593,31 +799,48 @@ class ConsistencyChecks:
                     "New_Relations", "Missing_Relations"
                 ]
             )
+
             detailed_df.to_excel(writer, sheet_name="Summary_Detailed", index=False)
 
             # GU / NR sheets
             if results and "GUtranCellRelation" in results:
                 b = results["GUtranCellRelation"]
-                enforce_gu_columns(b.get("discrepancies")).to_excel(writer, sheet_name="GU_disc", index=False)
-                enforce_gu_columns(b.get("missing_in_post")).to_excel(writer, sheet_name="GU_missing", index=False)
-                enforce_gu_columns(b.get("new_in_post")).to_excel(writer, sheet_name="GU_new", index=False)
+                gu_disc_df = enforce_gu_columns(b.get("discrepancies"))
+                gu_missing_df = enforce_gu_columns(b.get("missing_in_post"))
+                gu_new_df = enforce_gu_columns(b.get("new_in_post"))
+                # NEW: add correction commands
+                gu_new_df = self._add_correction_command_gu_new(gu_new_df)
+                gu_missing_df = self._add_correction_command_gu_missing(gu_missing_df)
+                gu_disc_df.to_excel(writer, sheet_name="GU_disc", index=False)
+                gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
+                gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
                 b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="GU_relations", index=False)
             else:
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_disc", index=False)
-                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_missing", index=False)
-                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_new", index=False)
+                empty_gu_missing_df = self._add_correction_command_gu_missing(enforce_gu_columns(pd.DataFrame()))
+                empty_gu_new_df = self._add_correction_command_gu_new(enforce_gu_columns(pd.DataFrame()))
+                empty_gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
+                empty_gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
 
             if results and "NRCellRelation" in results:
                 b = results["NRCellRelation"]
-                enforce_nr_columns(b.get("discrepancies")).to_excel(writer, sheet_name="NR_disc", index=False)
-                enforce_nr_columns(b.get("missing_in_post")).to_excel(writer, sheet_name="NR_missing", index=False)
-                enforce_nr_columns(b.get("new_in_post")).to_excel(writer, sheet_name="NR_new", index=False)
+                nr_disc_df = enforce_nr_columns(b.get("discrepancies"))
+                nr_missing_df = enforce_nr_columns(b.get("missing_in_post"))
+                nr_new_df = enforce_nr_columns(b.get("new_in_post"))
+                # NEW: add correction commands
+                nr_new_df = self._add_correction_command_nr_new(nr_new_df)
+                nr_missing_df = self._add_correction_command_nr_missing(nr_missing_df)
+                nr_disc_df.to_excel(writer, sheet_name="NR_disc", index=False)
+                nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
+                nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
                 b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="NR_relations", index=False)
             else:
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_disc", index=False)
-                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_missing", index=False)
-                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_new", index=False)
+                empty_nr_missing_df = self._add_correction_command_nr_missing(enforce_nr_columns(pd.DataFrame()))
+                empty_nr_new_df = self._add_correction_command_nr_new(enforce_nr_columns(pd.DataFrame()))
+                empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
+                empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
 
             # <<< NEW: color the 'Summary*' tabs in green >>>

@@ -4,6 +4,30 @@
 
 ---
 
+## Release: v0.3.6
+- ### Release Date: 2025-11-27
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - Added commands to `Consistency Checks` module.
+      - Correction_Command to 'GU_new' table.
+      - Correction_Command to 'NR_new' table.
+      - Correction_Command to 'GU_missing' table.
+      - Correction_Command to 'NR_missing' table.
+
+  - #### 🚀 Enhancements:
+  
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
+
+---
+
 ## Release: v0.3.5
 - ### Release Date: 2025-11-26
 

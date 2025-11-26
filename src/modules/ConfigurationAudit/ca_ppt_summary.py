@@ -84,13 +84,13 @@ def generate_ppt_summary(
         print(f"{module_name} [INFO] python-pptx is not installed. Skipping PPT summary.")
         return None
 
-    MAIN_BULLET_SIZE = Pt(14)
+    MAIN_BULLET_SIZE = Pt(11)
     SUB_BULLET_SIZE = Pt(10)
 
     sections = build_text_summary_structure(summary_audit_df)
 
     base, _ = os.path.splitext(excel_path)
-    ppt_path = base + "_Summary.pptx"
+    ppt_path = base + ".pptx"
 
     def _set_paragraph_font_size(paragraph, size: Pt) -> None:
         for run in paragraph.runs:

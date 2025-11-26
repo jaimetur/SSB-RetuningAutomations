@@ -80,7 +80,7 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
   <PostInputFolder>/
   └─ ConsistencyChecks_<timestamp>_v0.2.0/
      ├─ CellRelation_<timestamp>_v0.2.0.xlsx
-     └─ CellRelationConsistencyChecks_<timestamp>_v0.2.0.xlsx
+     └─ ConsistencyChecks_CellRelation_<timestamp>_v0.2.0.xlsx
   ```
 
 ---
