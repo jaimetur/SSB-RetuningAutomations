@@ -25,7 +25,11 @@ class ConsistencyChecks:
     DATE_RE = re.compile(r"(?P<date>(19|20)\d{6})")  # yyyymmdd
     SUMMARY_RE = re.compile(r"^\s*\d+\s+instance\(s\)\s*$", re.IGNORECASE)
 
-    def __init__(self) -> None:
+    def __init__(self, n77_ssb_pre: Optional[str] = None, n77_ssb_post: Optional[str] = None) -> None:
+        # NEW: store N77 SSB frequencies for Pre and Post
+        self.n77_ssb_pre: Optional[str] = n77_ssb_pre
+        self.n77_ssb_post: Optional[str] = n77_ssb_post
+
         self.tables: Dict[str, pd.DataFrame] = {}
         # NEW: flags to signal whether at least one Pre/Post folder was found
         self.pre_folder_found: bool = False
@@ -475,8 +479,7 @@ class ConsistencyChecks:
         return results
 
     # ----------------------------- HELPERS FOR OUTPUT ----------------------------- #
-    @staticmethod
-    def _add_correction_command_gu_new(df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_gu_new(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for GU_new sheet, using existing row fields.
 
@@ -506,8 +509,7 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    @staticmethod
-    def _add_correction_command_nr_new(df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_nr_new(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for NR_new sheet, using existing row fields.
 
@@ -534,8 +536,7 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    @staticmethod
-    def _add_correction_command_gu_missing(df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_gu_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for GU_missing sheet, building a multiline correction script.
 
@@ -562,8 +563,8 @@ class ConsistencyChecks:
             coverage = str(row.get("coverageIndicator") or "").strip()
 
             # Overwrite GUtranFreqRelationId to a hardcoded value (new SSB) only when old SSB (648672) is found
-            if freq_rel.startswith("648672"):
-                freq_rel = "647328-30-20-0-1"
+            if self.n77_ssb_pre and freq_rel.startswith(self.n77_ssb_pre):
+                freq_rel = f"{self.n77_ssb_post}-30-20-0-1" if self.n77_ssb_post else freq_rel
 
             if not user_label:
                 # Safe default label if none is provided in the row
@@ -598,8 +599,7 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    @staticmethod
-    def _add_correction_command_nr_missing(df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_nr_missing(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for NR_missing sheet, building a multiline correction script.
 
@@ -629,10 +629,9 @@ class ConsistencyChecks:
             # --------- nRCellRef cleanup: keep everything from GNBCUCPFunction= ---------
             clean_nrcell_ref = ""
             if "GNBCUCPFunction=" in nrcell_ref:
-                # Keep the full tail starting at GNBCUCPFunction (NRNetwork, ExternalGNBCUCPFunction, ExternalNRCellCU, etc.)
                 clean_nrcell_ref = nrcell_ref[nrcell_ref.find("GNBCUCPFunction="):]
 
-            # --------- nRFreqRelationRef cleanup: GNBCUCPFunction=X,NRCellCU=Y,NRFreqRelation=Z ---------
+            # --------- nRFreqRelationRef cleanup ---------
             clean_nrfreq_ref = ""
             if "GNBCUCPFunction=" in nrfreq_ref:
                 sub = nrfreq_ref[nrfreq_ref.find("GNBCUCPFunction="):]
@@ -644,9 +643,9 @@ class ConsistencyChecks:
                 nr_cell_for_freq = m_nr_cell.group(1) if m_nr_cell else ""
                 freq_id = m_freq.group(1) if m_freq else ""
 
-                # Overwrite NRFreqRelation to a hardcoded value (new SSB) only when old SSB (648672) is found
-                if freq_id == "648672":
-                    freq_id = "647328"
+                # NEW: replace old SSB (Pre) with Post SSB using class attributes
+                if freq_id == self.n77_ssb_pre:
+                    freq_id = self.n77_ssb_post
 
                 if gnb_val and nr_cell_for_freq and freq_id:
                     clean_nrfreq_ref = f"GNBCUCPFunction={gnb_val},NRCellCU={nr_cell_for_freq},NRFreqRelation={freq_id}"
@@ -662,7 +661,6 @@ class ConsistencyChecks:
                 f"set NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel} sCellCandidate {s_cell_candidate}" if s_cell_candidate else ""
             ]
 
-            # Keep non-empty lines only, preserving the line breaks
             lines = [p for p in parts if p]
             return "\n".join(lines)
 
@@ -670,8 +668,7 @@ class ConsistencyChecks:
         return df
 
     # ----------------------------- CORRECTION COMMNADS TO TXT ----------------------------- #
-    @staticmethod
-    def _export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.DataFrame]) -> int:
+    def export_correction_cmd_texts(self, output_dir: str, dfs_by_category: Dict[str, pd.DataFrame]) -> int:
         """
         Export Correction_Cmd values to text files grouped by NodeId and category.
 
@@ -851,8 +848,8 @@ class ConsistencyChecks:
                 gu_missing_df = enforce_gu_columns(b.get("missing_in_post"))
                 gu_new_df = enforce_gu_columns(b.get("new_in_post"))
                 # NEW: add correction commands
-                gu_new_df = self._add_correction_command_gu_new(gu_new_df)
-                gu_missing_df = self._add_correction_command_gu_missing(gu_missing_df)
+                gu_new_df = self.add_correction_command_gu_new(gu_new_df)
+                gu_missing_df = self.add_correction_command_gu_missing(gu_missing_df)
                 # NEW: register GU dataframes with Correction_Cmd for text export
                 correction_cmd_sources["GU_missing"] = gu_missing_df
                 correction_cmd_sources["GU_new"] = gu_new_df
@@ -863,8 +860,8 @@ class ConsistencyChecks:
                 b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="GU_relations", index=False)
             else:
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_disc", index=False)
-                empty_gu_missing_df = self._add_correction_command_gu_missing(enforce_gu_columns(pd.DataFrame()))
-                empty_gu_new_df = self._add_correction_command_gu_new(enforce_gu_columns(pd.DataFrame()))
+                empty_gu_missing_df = self.add_correction_command_gu_missing(enforce_gu_columns(pd.DataFrame()))
+                empty_gu_new_df = self.add_correction_command_gu_new(enforce_gu_columns(pd.DataFrame()))
                 empty_gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 empty_gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
@@ -876,8 +873,8 @@ class ConsistencyChecks:
                 nr_missing_df = enforce_nr_columns(b.get("missing_in_post"))
                 nr_new_df = enforce_nr_columns(b.get("new_in_post"))
                 # NEW: add correction commands
-                nr_new_df = self._add_correction_command_nr_new(nr_new_df)
-                nr_missing_df = self._add_correction_command_nr_missing(nr_missing_df)
+                nr_new_df = self.add_correction_command_nr_new(nr_new_df)
+                nr_missing_df = self.add_correction_command_nr_missing(nr_missing_df)
                 # NEW: register NR dataframes with Correction_Cmd for text export
                 correction_cmd_sources["NR_missing"] = nr_missing_df
                 correction_cmd_sources["NR_new"] = nr_new_df
@@ -888,15 +885,15 @@ class ConsistencyChecks:
                 b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="NR_relations", index=False)
             else:
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_disc", index=False)
-                empty_nr_missing_df = self._add_correction_command_nr_missing(enforce_nr_columns(pd.DataFrame()))
-                empty_nr_new_df = self._add_correction_command_nr_new(enforce_nr_columns(pd.DataFrame()))
+                empty_nr_missing_df = self.add_correction_command_nr_missing(enforce_nr_columns(pd.DataFrame()))
+                empty_nr_new_df = self.add_correction_command_nr_new(enforce_nr_columns(pd.DataFrame()))
                 empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
 
             # NEW: export all Correction_Cmd blocks to per-node text files
             if correction_cmd_sources:
-                cmd_files = self._export_correction_cmd_texts(output_dir, correction_cmd_sources)
+                cmd_files = self.export_correction_cmd_texts(output_dir, correction_cmd_sources)
                 print(f"\n[Consistency Checks (Pre/Post Comparison)] Generated {cmd_files} Correction_Cmd text files in: '{os.path.join(output_dir, 'Correction_Cmd')}'")
 
             # -------------------------------------------------------------------

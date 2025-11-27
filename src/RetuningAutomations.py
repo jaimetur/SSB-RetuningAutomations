@@ -624,7 +624,8 @@ def run_consistency_checks(input_pre_dir: Optional[str], input_post_dir: Optiona
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
 
-    app = ConsistencyChecks()
+    # Pass N77 frequencies to constructor
+    app = ConsistencyChecks(n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post)
 
     if input_pre_dir and input_post_dir:
         print(f"{module_name} PRE folder:  '{input_pre_dir}'")
