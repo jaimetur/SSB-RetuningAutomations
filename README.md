@@ -70,17 +70,23 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 **Key capabilities**
 - Loads and validates the required input tables from the selected folder.  
-- Optional **frequency comparison** when both `--freq-pre` and `--freq-post` are provided.  
+- Optional **frequency comparison** when both `----n77-ssb-pre` and `----n77-ssb-post` are provided.  
 - Produces:
   - `CellRelation.xlsx` (all relevant tables)  
   - `CellRelationDiscrepancies.xlsx` (summary + detailed discrepancies) **only** if both frequencies are provided.  
 - 📁 Output is written under: `<POST_INPUT_FOLDER>/ConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/`
+- 📁 Correction Commands are written under: `<POST_INPUT_FOLDER>/ConsistencyChecks_<YYYYMMDD-HHMMSS>_v<TOOL_VERSION>/Correction_Cmd`
 - 📁 Output Example Structure: 
   ```
   <PostInputFolder>/
   └─ ConsistencyChecks_<timestamp>_v0.2.0/
      ├─ CellRelation_<timestamp>_v0.2.0.xlsx
      └─ ConsistencyChecks_CellRelation_<timestamp>_v0.2.0.xlsx
+     └─ Correction_Cmd/
+        └─ <NODE_NAME>_NR_New.txt
+        └─ <NODE_NAME>_NR_Missing.txt
+        └─ <NODE_NAME>_GU_New.txt
+        └─ <NODE_NAME>_GU_Missing.txt
   ```
 
 ---

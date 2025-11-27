@@ -97,7 +97,6 @@ on:
   # ──────────────── 3) Disparador automático por cron ──────────────────────
   schedule:
     - cron: '0 8 * * *' # Ejecución diaria a las 8 AM UTC
-    - cron: '21 15 * * *'  # Ejecución diaria a las 15:00 UTC
     - cron: '00 20 * * *'  # Ejecución diaria a las 20:00 UTC
   # ─────────────────────────────────────────────────────────────────────────
 

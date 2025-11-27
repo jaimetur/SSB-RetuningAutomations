@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from typing import List, Dict, Any
+from openpyxl.styles import PatternFill, Alignment, Font
+
 import pandas as pd
 from pandas import DataFrame, Series
 

@@ -3,12 +3,13 @@
 import os
 import re
 from typing import Dict, Optional, List
+from openpyxl.styles import PatternFill, Alignment, Font
 
 import pandas as pd
 
 from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_index_by_keys
 from src.utils.utils_datetime import extract_date
-from src.utils.utils_excel import color_summary_tabs, enable_header_filters
+from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit
 from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
 from src.utils.utils_io import read_text_lines
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
@@ -468,8 +469,8 @@ class ConsistencyChecks:
             print(f"\n{module_name} === {table_name} ===")
             print(f"{module_name} Key: {key_cols} | Freq column: {freq_col}")
             print(f"{module_name} - Discrepancies: {len(discrepancies)}")
-            print(f"{module_name} - New in Post: {len(new_in_post_clean)}")
-            print(f"{module_name} - Missing in Post: {len(missing_in_post_clean)}")
+            print(f"{module_name} - New Relations in Post: {len(new_in_post_clean)}")
+            print(f"{module_name} - Missing Relations in Post: {len(missing_in_post_clean)}")
 
         return results
 
@@ -668,6 +669,54 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
+    # ----------------------------- CORRECTION COMMNADS TO TXT ----------------------------- #
+    @staticmethod
+    def _export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.DataFrame]) -> int:
+        """
+        Export Correction_Cmd values to text files grouped by NodeId and category.
+
+        For each category (e.g. GU_missing, NR_new), one file per NodeId is created in:
+          <output_dir>/Correction_Cmd/<NodeId>_<Category>.txt
+
+        Each file contains all non-empty Correction_Cmd blocks for that NodeId and category,
+        separated by a blank line.
+        """
+        base_dir = os.path.join(output_dir, "Correction_Cmd")
+        os.makedirs(base_dir, exist_ok=True)
+
+        total_files = 0  # Counter for generated command files
+
+        for category, df in dfs_by_category.items():
+            if df is None or df.empty:
+                continue
+            if "NodeId" not in df.columns or "Correction_Cmd" not in df.columns:
+                continue
+
+            # Ensure string types to avoid issues when grouping/writing
+            work = df.copy()
+            work["NodeId"] = work["NodeId"].astype(str).str.strip()
+            work["Correction_Cmd"] = work["Correction_Cmd"].astype(str)
+
+            for node_id, group in work.groupby("NodeId"):
+                node_str = str(node_id).strip()
+                if not node_str:
+                    continue
+
+                cmds = [cmd for cmd in group["Correction_Cmd"] if cmd.strip()]
+                if not cmds:
+                    continue
+
+                file_name = f"{node_str}_{category}.txt"
+                file_path = os.path.join(base_dir, file_name)
+
+                # One command block per entry, separated by a blank line
+                with open(file_path, "w", encoding="utf-8") as f:
+                    f.write("\n\n".join(cmds))
+
+                total_files += 1
+
+        return total_files
+
     # ----------------------------- OUTPUT TO EXCEL ----------------------------- #
     def save_outputs_excel(self, output_dir: str, results: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None, versioned_suffix: Optional[str] = None) -> None:
         import os
@@ -792,7 +841,10 @@ class ConsistencyChecks:
 
             detailed_df.to_excel(writer, sheet_name="Summary_Detailed", index=False)
 
-            # GU / NR sheets
+            # Collect all dataframes that contain Correction_Cmd to export them later
+            correction_cmd_sources: Dict[str, pd.DataFrame] = {}
+
+            # GU sheets
             if results and "GUtranCellRelation" in results:
                 b = results["GUtranCellRelation"]
                 gu_disc_df = enforce_gu_columns(b.get("discrepancies"))
@@ -801,6 +853,10 @@ class ConsistencyChecks:
                 # NEW: add correction commands
                 gu_new_df = self._add_correction_command_gu_new(gu_new_df)
                 gu_missing_df = self._add_correction_command_gu_missing(gu_missing_df)
+                # NEW: register GU dataframes with Correction_Cmd for text export
+                correction_cmd_sources["GU_missing"] = gu_missing_df
+                correction_cmd_sources["GU_new"] = gu_new_df
+
                 gu_disc_df.to_excel(writer, sheet_name="GU_disc", index=False)
                 gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
@@ -813,6 +869,7 @@ class ConsistencyChecks:
                 empty_gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
 
+            # NR sheets
             if results and "NRCellRelation" in results:
                 b = results["NRCellRelation"]
                 nr_disc_df = enforce_nr_columns(b.get("discrepancies"))
@@ -821,6 +878,10 @@ class ConsistencyChecks:
                 # NEW: add correction commands
                 nr_new_df = self._add_correction_command_nr_new(nr_new_df)
                 nr_missing_df = self._add_correction_command_nr_missing(nr_missing_df)
+                # NEW: register NR dataframes with Correction_Cmd for text export
+                correction_cmd_sources["NR_missing"] = nr_missing_df
+                correction_cmd_sources["NR_new"] = nr_new_df
+
                 nr_disc_df.to_excel(writer, sheet_name="NR_disc", index=False)
                 nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
@@ -833,8 +894,19 @@ class ConsistencyChecks:
                 empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
 
-            # <<< NEW: color the 'Summary*' tabs in green >>>
+            # NEW: export all Correction_Cmd blocks to per-node text files
+            if correction_cmd_sources:
+                cmd_files = self._export_correction_cmd_texts(output_dir, correction_cmd_sources)
+                print(f"\n[Consistency Checks (Pre/Post Comparison)] Generated {cmd_files} Correction_Cmd text files in: '{os.path.join(output_dir, 'Correction_Cmd')}'")
+
+            # -------------------------------------------------------------------
+            #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
+            # -------------------------------------------------------------------
+
+            # Keep: color the 'Summary*' tabs in green
             color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
 
-            # <<< NEW: enable filters (and freeze header row) on all sheets >>>
-            enable_header_filters(writer, freeze_header=True)
+            # New: apply header style + autofit columns (replaces the manual loop)
+            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
+
+

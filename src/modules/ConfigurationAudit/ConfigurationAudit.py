@@ -6,7 +6,7 @@ import pandas as pd
 
 from src.utils.utils_io import find_log_files, read_text_file
 from src.utils.utils_parsing import SUMMARY_RE, find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork, parse_log_lines, find_subnetwork_header_index, extract_mo_name_from_previous_line, cap_rows
-from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, enable_header_filters, apply_alternating_category_row_fills
+from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, enable_header_filters, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit
 from src.utils.utils_sorting import natural_logfile_key
 from src.utils.utils_pivot import concat_or_empty, safe_pivot_count, safe_crosstab_count, apply_frequency_column_filter
 from .ca_excel_summary import build_summary_audit
@@ -416,8 +416,8 @@ class ConfigurationAudit:
             # Color the 'Summary*' tabs in green
             color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
 
-            # Enable filters (and freeze header row) on all sheets
-            enable_header_filters(writer, freeze_header=True)
+            # Apply header color + auto-fit to all sheets
+            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
 
         print(f"{module_name} Wrote Excel with {len(table_entries)} sheet(s) in: '{excel_path}'")
 
