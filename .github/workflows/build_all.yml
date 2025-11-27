@@ -444,7 +444,7 @@ jobs:
     # - Si es workflow_dispatch -> usa inputs.final_release
     # - Si NO es workflow_dispatch (schedule/push) -> true por defecto
     env:
-      FINAL_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.final_release == 'true' }}
+      FINAL_RELEASE: ${{ github.event_name != 'workflow_dispatch' || inputs.final_release }}
 
     outputs:
       tool_version: ${{ steps.extract_version.outputs.tool_version }}
