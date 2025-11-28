@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from src.utils.utils_infrastructure import get_resource_path
+from src.utils.utils_io import to_long_path
 
 
 def build_text_summary_structure(
@@ -91,6 +92,7 @@ def generate_ppt_summary(
 
     base, _ = os.path.splitext(excel_path)
     ppt_path = base + ".pptx"
+    ppt_path_long = to_long_path(ppt_path)
 
     def _set_paragraph_font_size(paragraph, size: Pt) -> None:
         for run in paragraph.runs:
@@ -279,6 +281,5 @@ def generate_ppt_summary(
                     p.level = 0
                     _set_paragraph_font_size(p, MAIN_BULLET_SIZE)
 
-    prs.save(ppt_path)
+    prs.save(ppt_path_long)
     return ppt_path
-

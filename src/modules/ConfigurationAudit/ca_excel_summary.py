@@ -110,7 +110,7 @@ def build_summary_audit(
 
     def is_n77_ssb_post_allowed(v: object) -> bool:
         freq = parse_int_frequency(v)
-        return freq in allowed_n77_ssb_postset if freq is not None else False
+        return freq in allowed_n77_ssb_post_set if freq is not None else False
 
     def is_n77_arfcn_pre_allowed(v: object) -> bool:
         freq = parse_int_frequency(v)
@@ -1422,8 +1422,8 @@ def build_summary_audit(
                     # ------------------------------------------------------------------
                     # New checks: old SSB (648672) vs new SSB (647328) in FreqPrioNR
                     # ------------------------------------------------------------------
-                    old_ssb = 648672
-                    new_ssb = 647328
+                    old_ssb = n77_ssb_pre
+                    new_ssb = n77_ssb_post
 
                     old_rows = work.loc[work["_freq_int_"] == old_ssb].copy()
                     new_rows = work.loc[work["_freq_int_"] == new_ssb].copy()

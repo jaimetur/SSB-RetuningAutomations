@@ -19,13 +19,16 @@ ENCODINGS_TRY = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf
 
 
 def read_text_with_encoding(path: str) -> Tuple[List[str], Optional[str]]:
+    # <<< Ensure Windows long path compatibility >>>
+    path_long = to_long_path(path)
+
     for enc in ENCODINGS_TRY:
         try:
-            with open(path, "r", encoding=enc, errors="strict") as f:
+            with open(path_long, "r", encoding=enc, errors="strict") as f:
                 return [ln.rstrip("\n") for ln in f], enc
         except Exception:
             continue
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
         return [ln.rstrip("\n") for ln in f], None
 
 
@@ -42,15 +45,18 @@ def try_read_text_file_with_encoding(path: str) -> Tuple[List[str], Optional[str
     Robust text reader that tries several encodings and returns (lines, encoding_used).
     If it falls back to 'replace' mode, returns (lines, None) to signal that encoding is uncertain.
     """
+    # <<< Ensure Windows long path compatibility >>>
+    path_long = to_long_path(path)
+
     encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
     for enc in encodings:
         try:
-            with open(path, "r", encoding=enc, errors="strict") as f:
+            with open(path_long, "r", encoding=enc, errors="strict") as f:
                 return [ln.rstrip("\n") for ln in f], enc
         except Exception:
             continue
     # last permissive attempt
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
+    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
         return [ln.rstrip("\n") for ln in f], None
 
 
@@ -70,10 +76,14 @@ def find_log_files(folder: str) -> List[str]:
     Return a sorted list of *.log / *.logs / *.txt files found in 'folder'.
     """
     files: List[str] = []
-    for name in os.listdir(folder):
+
+    # <<< Ensure Windows long path compatibility >>>
+    folder_long = to_long_path(folder)
+
+    for name in os.listdir(folder_long):
         lower = name.lower()
         if lower.endswith((".log", ".logs", ".txt")):
-            p = os.path.join(folder, name)
+            p = os.path.join(folder_long, name)
             if os.path.isfile(p):
                 files.append(p)
     files.sort()
@@ -128,6 +138,7 @@ def parse_arfcn_csv_to_set(
 def ensure_cfg_section(config_section, parser: configparser.ConfigParser) -> None:
     if config_section not in parser:
         parser[config_section] = {}
+
 
 def read_cfg(config_path) -> configparser.ConfigParser:
     parser = configparser.ConfigParser()
@@ -211,3 +222,36 @@ def log_module_exception(module_label: str, exc: BaseException) -> None:
             pass
 
 
+def to_long_path(path: str) -> str:
+    r"""
+    Convert a normal Windows path to a long-path format with \\?\ prefix.
+
+    Rules:
+      - If path already starts with \\?\ it is returned unchanged.
+      - If path is a UNC path (\\server\share\...), it becomes \\?\UNC\server\share\...
+      - Otherwise, it becomes \\?\C:\... (absolute local path).
+
+    On non-Windows platforms, the path is returned unchanged.
+    """
+    import os
+    if os.name != "nt":
+        return path
+
+    if not path:
+        return path
+
+    # Normalize to absolute path and backslashes
+    abs_path = os.path.abspath(path)
+    abs_path = abs_path.replace("/", "\\")
+
+    # Already in long-path form
+    if abs_path.startswith("\\\\?\\"):
+        return abs_path
+
+    # UNC path: \\server\share\...
+    if abs_path.startswith("\\\\"):
+        # Strip leading \\ and prefix with \\?\UNC\
+        return "\\\\?\\UNC\\" + abs_path.lstrip("\\")
+    else:
+        # Local drive path: C:\...
+        return "\\\\?\\" + abs_path

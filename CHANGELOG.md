@@ -16,6 +16,7 @@
   - #### 🚀 Enhancements:
   
   - #### 🐛 Bug fixes:
+    - Fixed Long path issues on Windows.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 

@@ -3,7 +3,6 @@
 import os
 import re
 from typing import Dict, Optional, List
-from openpyxl.styles import PatternFill, Alignment, Font
 
 import pandas as pd
 
@@ -11,7 +10,7 @@ from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_
 from src.utils.utils_datetime import extract_date
 from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit
 from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
-from src.utils.utils_io import read_text_lines
+from src.utils.utils_io import read_text_lines, to_long_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 
 
@@ -706,8 +705,11 @@ class ConsistencyChecks:
                 file_name = f"{node_str}_{category}.txt"
                 file_path = os.path.join(base_dir, file_name)
 
+                # Convert path to long-path form on Windows to avoid MAX_PATH issues
+                file_path_long = to_long_path(file_path)
+
                 # One command block per entry, separated by a blank line
-                with open(file_path, "w", encoding="utf-8") as f:
+                with open(file_path_long, "w", encoding="utf-8") as f:
                     f.write("\n\n".join(cmds))
 
                 total_files += 1
@@ -720,15 +722,21 @@ class ConsistencyChecks:
         os.makedirs(output_dir, exist_ok=True)
         suf = f"_{versioned_suffix}" if versioned_suffix else ""
 
+        # Path for output files
         excel_all = os.path.join(output_dir, f"CellRelation{suf}.xlsx")
-        with pd.ExcelWriter(excel_all, engine="openpyxl") as writer:
+        excel_disc = os.path.join(output_dir, f"ConsistencyChecks_CellRelation{suf}.xlsx")
+
+        # Convert paths to long-path form on Windows to avoid MAX_PATH issues
+        excel_all_long = to_long_path(excel_all)
+        excel_disc_long = to_long_path(excel_disc)
+
+        with pd.ExcelWriter(excel_all_long, engine="openpyxl") as writer:
             if "GUtranCellRelation" in self.tables:
                 self.tables["GUtranCellRelation"].to_excel(writer, sheet_name="GU_all", index=False)
             if "NRCellRelation" in self.tables:
                 self.tables["NRCellRelation"].to_excel(writer, sheet_name="NR_all", index=False)
 
-        excel_disc = os.path.join(output_dir, f"ConsistencyChecks_CellRelation{suf}.xlsx")
-        with pd.ExcelWriter(excel_disc, engine="openpyxl") as writer:
+        with pd.ExcelWriter(excel_disc_long, engine="openpyxl") as writer:
             # Summary
             summary_rows = []
             if results:

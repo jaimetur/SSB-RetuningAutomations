@@ -4,9 +4,9 @@ import os
 from typing import List, Tuple, Optional, Dict
 import pandas as pd
 
-from src.utils.utils_io import find_log_files, read_text_file
+from src.utils.utils_io import find_log_files, read_text_file, to_long_path
 from src.utils.utils_parsing import SUMMARY_RE, find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork, parse_log_lines, find_subnetwork_header_index, extract_mo_name_from_previous_line, cap_rows
-from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, enable_header_filters, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit
+from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit
 from src.utils.utils_sorting import natural_logfile_key
 from src.utils.utils_pivot import concat_or_empty, safe_pivot_count, safe_crosstab_count, apply_frequency_column_filter
 from .ca_excel_summary import build_summary_audit
@@ -108,7 +108,8 @@ class ConfigurationAudit:
         # If output_dir is provided, all generated files (Excel/PPT) will be written there.
         # Otherwise, legacy behavior is kept and files are created under input_dir.
         base_output_dir = output_dir or input_dir
-        os.makedirs(base_output_dir, exist_ok=True)
+        base_output_dir_long = to_long_path(base_output_dir)
+        os.makedirs(base_output_dir_long, exist_ok=True)
 
         # --- Detect log/txt files ---
         log_files = find_log_files(input_dir)
@@ -125,7 +126,9 @@ class ConfigurationAudit:
             mo_rank = {name: i for i, name in enumerate(tables_order)}
 
         # --- Prepare Excel output path ---
-        excel_path = os.path.join(base_output_dir, f"ConfigurationAudit_{versioned_suffix}.xlsx")
+        excel_path = os.path.join(base_output_dir_long, f"ConfigurationAudit_{versioned_suffix}.xlsx")
+        excel_path_long = to_long_path(excel_path)
+
         table_entries: List[Dict[str, object]] = []
 
         # --- Keep a per-file index to preserve order of multiple tables inside same file ---
@@ -382,7 +385,7 @@ class ConfigurationAudit:
         # =====================================================================
         #                PHASE 5: Write the Excel file
         # =====================================================================
-        with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
+        with pd.ExcelWriter(excel_path_long, engine="openpyxl") as writer:
             # Write Summary first
             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
