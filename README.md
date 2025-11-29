@@ -83,10 +83,15 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
      ├─ CellRelation_<timestamp>_v0.2.0.xlsx
      └─ ConsistencyChecks_CellRelation_<timestamp>_v0.2.0.xlsx
      └─ Correction_Cmd/
-        └─ <NODE_NAME>_NR_New.txt
-        └─ <NODE_NAME>_NR_Missing.txt
-        └─ <NODE_NAME>_GU_New.txt
-        └─ <NODE_NAME>_GU_Missing.txt
+        └─ New_Relations/
+           └─ <NODE_NAME>_NR_New.txt
+           └─ <NODE_NAME>_GU_New.txt
+        └─ Missing_Relations/
+           └─ <NODE_NAME>_NR_Missing.txt
+           └─ <NODE_NAME>_GU_Missing.txt
+        └─ Discrepancies/
+           └─ <NODE_NAME>_NR_Disc.txt
+           └─ <NODE_NAME>_GU_Disc.txt
   ```
 
 ---

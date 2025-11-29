@@ -4,6 +4,28 @@
 
 ---
 
+## Release: v0.3.8
+- ### Release Date: 2025-12-01
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - Added Correction Commands on GU_Disc and NR_Disc tables.
+
+  - #### 🚀 Enhancements:
+    - Created separated subfolders for each type of Correction Commands.
+  
+  - #### 🐛 Bug fixes:
+    - Fixed abnormal prefix for long paths in Windows.
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
+
+---
+
 ## Release: v0.3.7
 - ### Release Date: 2025-11-28
 

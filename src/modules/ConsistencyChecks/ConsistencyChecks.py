@@ -10,7 +10,7 @@ from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_
 from src.utils.utils_datetime import extract_date
 from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit
 from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
-from src.utils.utils_io import read_text_lines, to_long_path
+from src.utils.utils_io import read_text_lines, to_long_path, pretty_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 
 
@@ -478,13 +478,18 @@ class ConsistencyChecks:
         return results
 
     # ----------------------------- HELPERS FOR OUTPUT ----------------------------- #
-    def add_correction_command_gu_new(self, df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_gu_new(self, df: pd.DataFrame, relations_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
-        Add 'Correction_Cmd' column for GU_new sheet, using existing row fields.
+        Add 'Correction_Cmd' column for GU_new sheet, using relation table as main data source.
 
         Format example:
-          647328\tdel EUtranCellFDD=<EUtranCellFDDId>,GUtranFreqRelation=<GUtranFreqRelationId>,GUtranCellRelation=<GUtranCellRelationId>
+          del EUtranCellFDD=<EUtranCellFDDId>,GUtranFreqRelation=<GUtranFreqRelationId>,GUtranCellRelation=<GUtranCellRelationId>
         If any of the required fields is missing/empty, an empty string is used.
+
+        The values used to build the command are taken from the GU_relations table
+        (all_relations) whenever possible, using (EUtranCellFDDId, GUtranCellRelationId)
+        as lookup key. If the relation is not found, the function falls back to the
+        values present in the df row.
         """
         if df is None or df.empty:
             df = df.copy()
@@ -493,12 +498,39 @@ class ConsistencyChecks:
 
         df = df.copy()
 
+        # Build lookup dict from relations_df keyed by (EUtranCellFDDId, GUtranCellRelationId)
+        relations_lookup: Dict[tuple, pd.Series] = {}
+        if relations_df is not None and not relations_df.empty:
+            rel = relations_df.copy()
+            for col in ("EUtranCellFDDId", "GUtranCellRelationId"):
+                if col not in rel.columns:
+                    rel[col] = ""
+                rel[col] = rel[col].astype(str).str.strip()
+            for _, r in rel.iterrows():
+                key = (r.get("EUtranCellFDDId", ""), r.get("GUtranCellRelationId", ""))
+                relations_lookup[(str(key[0]), str(key[1]))] = r
+
+        # Ensure key columns exist in df
+        for col in ("NodeId", "EUtranCellFDDId", "GUtranCellRelationId", "GUtranFreqRelationId"):
+            if col not in df.columns:
+                df[col] = ""
+
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["EUtranCellFDDId"] = df["EUtranCellFDDId"].astype(str).str.strip()
+        df["GUtranCellRelationId"] = df["GUtranCellRelationId"].astype(str).str.strip()
+
         def build_command(row: pd.Series) -> str:
-            # Prefer Freq_Post for GU_new rows, fall back to Freq_Pre if needed
-            freq_val = str(row.get("Freq_Post") or row.get("Freq_Pre") or "").strip()
-            eu_cell = str(row.get("EUtranCellFDDId") or "").strip()
-            freq_rel = str(row.get("GUtranFreqRelationId") or "").strip()
-            cell_rel = str(row.get("GUtranCellRelationId") or "").strip()
+            key = (row.get("EUtranCellFDDId", ""), row.get("GUtranCellRelationId", ""))
+            key = (str(key[0]).strip(), str(key[1]).strip())
+
+            # Prefer the relation row as source of truth
+            rel_row = relations_lookup.get(key)
+            src = rel_row if rel_row is not None else row
+
+            freq_val = str(src.get("GUtranFreqRelationId") or "").strip()
+            eu_cell = str(src.get("EUtranCellFDDId") or "").strip()
+            freq_rel = str(src.get("GUtranFreqRelationId") or "").strip()
+            cell_rel = str(src.get("GUtranCellRelationId") or "").strip()
 
             if not (freq_val and eu_cell and freq_rel and cell_rel):
                 return ""
@@ -508,13 +540,18 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    def add_correction_command_nr_new(self, df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_nr_new(self, df: pd.DataFrame, relations_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
-        Add 'Correction_Cmd' column for NR_new sheet, using existing row fields.
+        Add 'Correction_Cmd' column for NR_new sheet, using relation table as main data source.
 
         Format example:
           del NRCellCU=<NRCellCUId>,NRCellRelation=<NRCellRelationId>
         If any of the required fields is missing/empty, an empty string is used.
+
+        The values used to build the command are taken from the NR_relations table
+        (all_relations) whenever possible, using (NodeId, NRCellCUId, NRCellRelationId)
+        as lookup key. If the relation is not found, the function falls back to the
+        values present in the df row.
         """
         if df is None or df.empty:
             df = df.copy()
@@ -523,9 +560,37 @@ class ConsistencyChecks:
 
         df = df.copy()
 
+        # Build lookup dict from relations_df keyed by (NodeId, NRCellCUId, NRCellRelationId)
+        relations_lookup: Dict[tuple, pd.Series] = {}
+        if relations_df is not None and not relations_df.empty:
+            rel = relations_df.copy()
+            for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+                if col not in rel.columns:
+                    rel[col] = ""
+                rel[col] = rel[col].astype(str).str.strip()
+            for _, r in rel.iterrows():
+                key = (r.get("NodeId", ""), r.get("NRCellCUId", ""), r.get("NRCellRelationId", ""))
+                relations_lookup[(str(key[0]), str(key[1]), str(key[2]))] = r
+
+        # Ensure key columns exist in df
+        for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
+
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["NRCellCUId"] = df["NRCellCUId"].astype(str).str.strip()
+        df["NRCellRelationId"] = df["NRCellRelationId"].astype(str).str.strip()
+
         def build_command(row: pd.Series) -> str:
-            nr_cell_cu = str(row.get("NRCellCUId") or "").strip()
-            nr_cell_rel = str(row.get("NRCellRelationId") or "").strip()
+            key = (row.get("NodeId", ""), row.get("NRCellCUId", ""), row.get("NRCellRelationId", ""))
+            key = (str(key[0]).strip(), str(key[1]).strip(), str(key[2]).strip())
+
+            # Prefer the relation row as source of truth
+            rel_row = relations_lookup.get(key)
+            src = rel_row if rel_row is not None else row
+
+            nr_cell_cu = str(src.get("NRCellCUId") or "").strip()
+            nr_cell_rel = str(src.get("NRCellRelationId") or "").strip()
 
             if not (nr_cell_cu and nr_cell_rel):
                 return ""
@@ -535,11 +600,13 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    def add_correction_command_gu_missing(self, df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_gu_missing(self, df: pd.DataFrame, relations_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for GU_missing sheet, building a multiline correction script.
 
-        All placeholders are taken from the row itself (no external parameters).
+        All placeholders are taken from the relation table whenever possible (GU_relations),
+        using (EUtranCellFDDId, GUtranCellRelationId) as lookup key. If the relation
+        is not found, values from the df row are used as fallback.
         """
         if df is None or df.empty:
             df = df.copy()
@@ -548,18 +615,70 @@ class ConsistencyChecks:
 
         df = df.copy()
 
+        # Build lookup dict from relations_df keyed by (EUtranCellFDDId, GUtranCellRelationId)
+        relations_lookup: Dict[tuple, pd.Series] = {}
+        if relations_df is not None and not relations_df.empty:
+            rel = relations_df.copy()
+            for col in ("EUtranCellFDDId", "GUtranCellRelationId"):
+                if col not in rel.columns:
+                    rel[col] = ""
+                rel[col] = rel[col].astype(str).str.strip()
+            for _, r in rel.iterrows():
+                key = (r.get("EUtranCellFDDId", ""), r.get("GUtranCellRelationId", ""))
+                relations_lookup[(str(key[0]), str(key[1]))] = r
+
+        # Ensure key columns exist in df
+        for col in ("NodeId", "ENodeBFunctionId", "EUtranCellFDDId", "GUtranFreqRelationId", "GUtranCellRelationId", "neighborCellRef", "isEndcAllowed", "isHoAllowed", "isRemoveAllowed", "isVoiceHoAllowed", "userLabel", "coverageIndicator"):
+            if col not in df.columns:
+                df[col] = ""
+
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["EUtranCellFDDId"] = df["EUtranCellFDDId"].astype(str).str.strip()
+        df["GUtranCellRelationId"] = df["GUtranCellRelationId"].astype(str).str.strip()
+
+        def pick_value(rel_row: Optional[pd.Series], row: pd.Series, field: str) -> str:
+            """
+            Prefer value from relations_df; if empty/NaN, fallback to value in df row.
+            Avoid returning literal 'nan'.
+            """
+            candidates = []
+            if rel_row is not None:
+                candidates.append(rel_row.get(field))
+            candidates.append(row.get(field))
+
+            for v in candidates:
+                if v is None:
+                    continue
+                # Skip real NaN
+                try:
+                    if pd.isna(v):
+                        continue
+                except TypeError:
+                    pass
+                s = str(v).strip()
+                if not s or s.lower() == "nan":
+                    continue
+                return s
+            return ""
+
         def build_command(row: pd.Series) -> str:
-            enb_func = str(row.get("ENodeBFunctionId") or "").strip()
-            eu_cell = str(row.get("EUtranCellFDDId") or "").strip()
-            freq_rel = str(row.get("GUtranFreqRelationId") or "").strip()
-            cell_rel = str(row.get("GUtranCellRelationId") or "").strip()
-            neighbor_ref = str(row.get("neighborCellRef") or "").strip()
-            is_endc = str(row.get("isEndcAllowed") or "").strip()
-            is_ho = str(row.get("isHoAllowed") or "").strip()
-            is_remove = str(row.get("isRemoveAllowed") or "").strip()
-            is_voice_ho = str(row.get("isVoiceHoAllowed") or "").strip()
-            user_label = str(row.get("userLabel") or "").strip()
-            coverage = str(row.get("coverageIndicator") or "").strip()
+            key = (row.get("EUtranCellFDDId", ""), row.get("GUtranCellRelationId", ""))
+            key = (str(key[0]).strip(), str(key[1]).strip())
+
+            # Prefer the relation row as source of truth
+            rel_row = relations_lookup.get(key)
+
+            enb_func = pick_value(rel_row, row, "ENodeBFunctionId")
+            eu_cell = pick_value(rel_row, row, "EUtranCellFDDId")
+            freq_rel = pick_value(rel_row, row, "GUtranFreqRelationId")
+            cell_rel = pick_value(rel_row, row, "GUtranCellRelationId")
+            neighbor_ref = pick_value(rel_row, row, "neighborCellRef")
+            is_endc = pick_value(rel_row, row, "isEndcAllowed")
+            is_ho = pick_value(rel_row, row, "isHoAllowed")
+            is_remove = pick_value(rel_row, row, "isRemoveAllowed")
+            is_voice_ho = pick_value(rel_row, row, "isVoiceHoAllowed")
+            user_label = pick_value(rel_row, row, "userLabel")
+            coverage = pick_value(rel_row, row, "coverageIndicator")
 
             # Overwrite GUtranFreqRelationId to a hardcoded value (new SSB) only when old SSB (648672) is found
             if self.n77_ssb_pre and freq_rel.startswith(self.n77_ssb_pre):
@@ -598,11 +717,13 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
-    def add_correction_command_nr_missing(self, df: pd.DataFrame) -> pd.DataFrame:
+    def add_correction_command_nr_missing(self, df: pd.DataFrame, relations_df: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """
         Add 'Correction_Cmd' column for NR_missing sheet, building a multiline correction script.
 
-        All placeholders are taken from the row itself (no external parameters).
+        All placeholders are taken from the relation table whenever possible (NR_relations),
+        using (NodeId, NRCellCUId, NRCellRelationId) as lookup key. If the relation
+        is not found, values from the df row are used as fallback.
         """
         if df is None or df.empty:
             df = df.copy()
@@ -611,15 +732,66 @@ class ConsistencyChecks:
 
         df = df.copy()
 
+        # Build lookup dict from relations_df keyed by (NodeId, NRCellCUId, NRCellRelationId)
+        relations_lookup: Dict[tuple, pd.Series] = {}
+        if relations_df is not None and not relations_df.empty:
+            rel = relations_df.copy()
+            for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+                if col not in rel.columns:
+                    rel[col] = ""
+                rel[col] = rel[col].astype(str).str.strip()
+            for _, r in rel.iterrows():
+                key = (r.get("NodeId", ""), r.get("NRCellCUId", ""), r.get("NRCellRelationId", ""))
+                relations_lookup[(str(key[0]), str(key[1]), str(key[2]))] = r
+
+        # Ensure key columns exist in df
+        for col in ("NodeId", "NRCellCUId", "NRCellRelationId", "coverageIndicator", "isHoAllowed", "isRemoveAllowed", "sCellCandidate", "nRCellRef", "nRFreqRelationRef"):
+            if col not in df.columns:
+                df[col] = ""
+
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["NRCellCUId"] = df["NRCellCUId"].astype(str).str.strip()
+        df["NRCellRelationId"] = df["NRCellRelationId"].astype(str).str.strip()
+
+        def pick_value(rel_row: Optional[pd.Series], row: pd.Series, field: str) -> str:
+            """
+            Prefer value from relations_df; if empty/NaN, fallback to value in df row.
+            Avoid returning literal 'nan'.
+            """
+            candidates = []
+            if rel_row is not None:
+                candidates.append(rel_row.get(field))
+            candidates.append(row.get(field))
+
+            for v in candidates:
+                if v is None:
+                    continue
+                try:
+                    if pd.isna(v):
+                        continue
+                except TypeError:
+                    pass
+                s = str(v).strip()
+                if not s or s.lower() == "nan":
+                    continue
+                return s
+            return ""
+
         def build_command(row: pd.Series) -> str:
-            nr_cell_cu = str(row.get("NRCellCUId") or "").strip()
-            nr_cell_rel = str(row.get("NRCellRelationId") or "").strip()
-            coverage = str(row.get("coverageIndicator") or "").strip()
-            is_ho = str(row.get("isHoAllowed") or "").strip()
-            is_remove = str(row.get("isRemoveAllowed") or "").strip()
-            s_cell_candidate = str(row.get("sCellCandidate") or "").strip()
-            nrcell_ref = str(row.get("nRCellRef") or "").strip()
-            nrfreq_ref = str(row.get("nRFreqRelationRef") or "").strip()
+            key = (row.get("NodeId", ""), row.get("NRCellCUId", ""), row.get("NRCellRelationId", ""))
+            key = (str(key[0]).strip(), str(key[1]).strip(), str(key[2]).strip())
+
+            # Prefer the relation row as source of truth
+            rel_row = relations_lookup.get(key)
+
+            nr_cell_cu = pick_value(rel_row, row, "NRCellCUId")
+            nr_cell_rel = pick_value(rel_row, row, "NRCellRelationId")
+            coverage = pick_value(rel_row, row, "coverageIndicator")
+            is_ho = pick_value(rel_row, row, "isHoAllowed")
+            is_remove = pick_value(rel_row, row, "isRemoveAllowed")
+            s_cell_candidate = pick_value(rel_row, row, "sCellCandidate")
+            nrcell_ref = pick_value(rel_row, row, "nRCellRef")
+            nrfreq_ref = pick_value(rel_row, row, "nRFreqRelationRef")
 
             # If core identifiers are missing, do not generate the command
             if not (nr_cell_cu and nr_cell_rel):
@@ -666,6 +838,86 @@ class ConsistencyChecks:
         df["Correction_Cmd"] = df.apply(build_command, axis=1)
         return df
 
+    def add_correction_command_gu_disc(self, disc_df: pd.DataFrame, relations_df: Optional[pd.DataFrame]) -> pd.DataFrame:
+        """
+        Build delete+create Correction_Cmd blocks for GU_disc rows using GU_new/GU_missing logic.
+
+        For each relation in GU_disc:
+          - First a delete command (same format as GU_new)
+          - Then a create command (same format as GU_missing)
+        """
+        if disc_df is None or disc_df.empty:
+            work = disc_df.copy() if disc_df is not None else pd.DataFrame()
+            work["Correction_Cmd"] = ""
+            return work
+
+        # Ensure NodeId column exists for later grouping/export
+        work = disc_df.copy()
+        if "NodeId" not in work.columns:
+            work["NodeId"] = ""
+
+        # Build delete commands in bulk (as GU_new) using the same disc_df
+        del_df = self.add_correction_command_gu_new(disc_df.copy(), relations_df)
+        # Build create commands in bulk (as GU_missing) using the same disc_df
+        create_df = self.add_correction_command_gu_missing(disc_df.copy(), relations_df)
+
+        # Align indices and ensure string type to avoid NaN issues
+        del_cmds = del_df.get("Correction_Cmd", pd.Series("", index=disc_df.index)).astype(str)
+        create_cmds = create_df.get("Correction_Cmd", pd.Series("", index=disc_df.index)).astype(str)
+
+        def combine_cmds(del_cmd: str, create_cmd: str) -> str:
+            del_cmd = del_cmd.strip()
+            create_cmd = create_cmd.strip()
+            if del_cmd and create_cmd:
+                return f"{del_cmd}\n{create_cmd}"
+            return del_cmd or create_cmd
+
+        work["Correction_Cmd"] = [
+            combine_cmds(d, c) for d, c in zip(del_cmds, create_cmds)
+        ]
+
+        return work
+
+    def add_correction_command_nr_disc(self, disc_df: pd.DataFrame, relations_df: Optional[pd.DataFrame]) -> pd.DataFrame:
+        """
+        Build delete+create Correction_Cmd blocks for NR_disc rows using NR_new/NR_missing logic.
+
+        For each relation in NR_disc:
+          - First a delete command (same format as NR_new)
+          - Then a create command (same format as NR_missing)
+        """
+        if disc_df is None or disc_df.empty:
+            work = disc_df.copy() if disc_df is not None else pd.DataFrame()
+            work["Correction_Cmd"] = ""
+            return work
+
+        # Ensure NodeId column exists for later grouping/export
+        work = disc_df.copy()
+        if "NodeId" not in work.columns:
+            work["NodeId"] = ""
+
+        # Build delete commands in bulk (as NR_new) using the same disc_df
+        del_df = self.add_correction_command_nr_new(disc_df.copy(), relations_df)
+        # Build create commands in bulk (as NR_missing) using the same disc_df
+        create_df = self.add_correction_command_nr_missing(disc_df.copy(), relations_df)
+
+        # Align indices and ensure string type to avoid NaN issues
+        del_cmds = del_df.get("Correction_Cmd", pd.Series("", index=disc_df.index)).astype(str)
+        create_cmds = create_df.get("Correction_Cmd", pd.Series("", index=disc_df.index)).astype(str)
+
+        def combine_cmds(del_cmd: str, create_cmd: str) -> str:
+            del_cmd = del_cmd.strip()
+            create_cmd = create_cmd.strip()
+            if del_cmd and create_cmd:
+                return f"{del_cmd}\n{create_cmd}"
+            return del_cmd or create_cmd
+
+        work["Correction_Cmd"] = [
+            combine_cmds(d, c) for d, c in zip(del_cmds, create_cmds)
+        ]
+
+        return work
+
     # ----------------------------- CORRECTION COMMNADS TO TXT ----------------------------- #
     def export_correction_cmd_texts(self, output_dir: str, dfs_by_category: Dict[str, pd.DataFrame]) -> int:
         """
@@ -679,6 +931,14 @@ class ConsistencyChecks:
         """
         base_dir = os.path.join(output_dir, "Correction_Cmd")
         os.makedirs(base_dir, exist_ok=True)
+
+        # NEW: subfolders
+        new_dir = os.path.join(base_dir, "New Relations")
+        missing_dir = os.path.join(base_dir, "Missing Relations")
+        discrepancies_dir = os.path.join(base_dir, "Discrepancies")
+        os.makedirs(new_dir, exist_ok=True)
+        os.makedirs(missing_dir, exist_ok=True)
+        os.makedirs(discrepancies_dir, exist_ok=True)
 
         total_files = 0  # Counter for generated command files
 
@@ -702,13 +962,20 @@ class ConsistencyChecks:
                 if not cmds:
                     continue
 
-                file_name = f"{node_str}_{category}.txt"
-                file_path = os.path.join(base_dir, file_name)
+                # NEW: choose destination folder
+                if "new" in category.lower():
+                    target_dir = new_dir
+                elif "missing" in category.lower():
+                    target_dir = missing_dir
+                elif "disc" in category.lower():
+                    target_dir = discrepancies_dir
+                else:
+                    target_dir = base_dir
 
-                # Convert path to long-path form on Windows to avoid MAX_PATH issues
+                file_name = f"{node_str}_{category}.txt"
+                file_path = os.path.join(target_dir, file_name)
                 file_path_long = to_long_path(file_path)
 
-                # One command block per entry, separated by a blank line
                 with open(file_path_long, "w", encoding="utf-8") as f:
                     f.write("\n\n".join(cmds))
 
@@ -755,8 +1022,8 @@ class ConsistencyChecks:
                         "Frequency_Discrepancies": freq_disc,
                         "New_Relations": len(bucket.get("new_in_post", pd.DataFrame())),
                         "Missing_Relations": len(bucket.get("missing_in_post", pd.DataFrame())),
-                        "SourceFile_Pre": meta.get("pre_source_file", ""),  # NEW (at the end)
-                        "SourceFile_Post": meta.get("post_source_file", ""),  # NEW (at the end)
+                        "SourceFile_Pre": pretty_path(meta.get("pre_source_file", "")),
+                        "SourceFile_Post": pretty_path(meta.get("post_source_file", "")),
                     })
 
             summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(
@@ -852,20 +1119,27 @@ class ConsistencyChecks:
             # GU sheets
             if results and "GUtranCellRelation" in results:
                 b = results["GUtranCellRelation"]
+                gu_rel_df = b.get("all_relations", pd.DataFrame())
                 gu_disc_df = enforce_gu_columns(b.get("discrepancies"))
                 gu_missing_df = enforce_gu_columns(b.get("missing_in_post"))
                 gu_new_df = enforce_gu_columns(b.get("new_in_post"))
-                # NEW: add correction commands
-                gu_new_df = self.add_correction_command_gu_new(gu_new_df)
-                gu_missing_df = self.add_correction_command_gu_missing(gu_missing_df)
+                # NEW: add correction commands (using GU_relations as data source)
+                gu_new_df = self.add_correction_command_gu_new(gu_new_df, gu_rel_df)
+                gu_missing_df = self.add_correction_command_gu_missing(gu_missing_df, gu_rel_df)
+                # NEW: build delete+create commands for discrepancies
+                gu_disc_cmd_df = self.add_correction_command_gu_disc(gu_disc_df, gu_rel_df)
+
                 # NEW: register GU dataframes with Correction_Cmd for text export
                 correction_cmd_sources["GU_missing"] = gu_missing_df
                 correction_cmd_sources["GU_new"] = gu_new_df
+                correction_cmd_sources["GU_disc"] = gu_disc_cmd_df
 
-                gu_disc_df.to_excel(writer, sheet_name="GU_disc", index=False)
+                gu_disc_cmd_df.to_excel(writer, sheet_name="GU_disc", index=False)
+
                 gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
-                b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="GU_relations", index=False)
+                gu_rel_df.to_excel(writer, sheet_name="GU_relations", index=False)
+
             else:
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_disc", index=False)
                 empty_gu_missing_df = self.add_correction_command_gu_missing(enforce_gu_columns(pd.DataFrame()))
@@ -877,20 +1151,26 @@ class ConsistencyChecks:
             # NR sheets
             if results and "NRCellRelation" in results:
                 b = results["NRCellRelation"]
+                nr_rel_df = b.get("all_relations", pd.DataFrame())
                 nr_disc_df = enforce_nr_columns(b.get("discrepancies"))
                 nr_missing_df = enforce_nr_columns(b.get("missing_in_post"))
                 nr_new_df = enforce_nr_columns(b.get("new_in_post"))
-                # NEW: add correction commands
-                nr_new_df = self.add_correction_command_nr_new(nr_new_df)
-                nr_missing_df = self.add_correction_command_nr_missing(nr_missing_df)
+                # NEW: add correction commands (using NR_relations as data source)
+                nr_new_df = self.add_correction_command_nr_new(nr_new_df, nr_rel_df)
+                nr_missing_df = self.add_correction_command_nr_missing(nr_missing_df, nr_rel_df)
+                # NEW: build delete+create commands for discrepancies
+                nr_disc_cmd_df = self.add_correction_command_nr_disc(nr_disc_df, nr_rel_df)
                 # NEW: register NR dataframes with Correction_Cmd for text export
                 correction_cmd_sources["NR_missing"] = nr_missing_df
                 correction_cmd_sources["NR_new"] = nr_new_df
+                correction_cmd_sources["NR_disc"] = nr_disc_cmd_df
 
-                nr_disc_df.to_excel(writer, sheet_name="NR_disc", index=False)
+                nr_disc_cmd_df.to_excel(writer, sheet_name="NR_disc", index=False)
+
                 nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
-                b.get("all_relations", pd.DataFrame()).to_excel(writer, sheet_name="NR_relations", index=False)
+                nr_rel_df.to_excel(writer, sheet_name="NR_relations", index=False)
+
             else:
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_disc", index=False)
                 empty_nr_missing_df = self.add_correction_command_nr_missing(enforce_nr_columns(pd.DataFrame()))
@@ -902,7 +1182,7 @@ class ConsistencyChecks:
             # NEW: export all Correction_Cmd blocks to per-node text files
             if correction_cmd_sources:
                 cmd_files = self.export_correction_cmd_texts(output_dir, correction_cmd_sources)
-                print(f"\n[Consistency Checks (Pre/Post Comparison)] Generated {cmd_files} Correction_Cmd text files in: '{os.path.join(output_dir, 'Correction_Cmd')}'")
+                print(f"\n[Consistency Checks (Pre/Post Comparison)] Generated {cmd_files} Correction_Cmd text files in: '{pretty_path(os.path.join(output_dir, 'Correction_Cmd'))}'")
 
             # -------------------------------------------------------------------
             #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
@@ -913,5 +1193,3 @@ class ConsistencyChecks:
 
             # New: apply header style + autofit columns (replaces the manual loop)
             style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
-
-

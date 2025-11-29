@@ -38,8 +38,8 @@ from src.modules.CleanUp.FinalCleanUp import FinalCleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "RetuningAutomations"
-TOOL_VERSION        = "0.3.7"
-TOOL_DATE           = "2025-11-28"
+TOOL_VERSION        = "0.3.8"
+TOOL_DATE           = "2025-12-01"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
 COPYRIGHT_TEXT      = "(c) 2025 - Jaime Tur (jaime.tur@ericsson.com)"
 TOOL_DESCRIPTION    = textwrap.dedent(f"""
