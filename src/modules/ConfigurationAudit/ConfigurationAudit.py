@@ -451,6 +451,13 @@ class ConfigurationAudit:
             if ws_summary_audit is not None:
                 apply_alternating_category_row_fills(ws_summary_audit, category_header="Category")
 
+            # New: separate NR / LTE param mismatching sheets
+            if not param_mismatch_nr_df.empty:
+                param_mismatch_nr_df.to_excel(writer, sheet_name="Summary NR Param Mismatching", index=False)
+
+            if not param_mismatch_gu_df.empty:
+                param_mismatch_gu_df.to_excel(writer, sheet_name="Summary LTE Param Mismatching", index=False)
+
             # Extra summary sheets
             pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CellDU", index=False)
             pivot_nr_sector_carrier.to_excel(writer, sheet_name="Summary NR_SectorCarrier", index=False)
@@ -458,13 +465,6 @@ class ConfigurationAudit:
             pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
             pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
             pivot_gu_freq_rel.to_excel(writer, sheet_name="Summary GU_FreqRelation", index=False)
-
-            # New: separate NR / LTE param mismatching sheets
-            if not param_mismatch_nr_df.empty:
-                param_mismatch_nr_df.to_excel(writer, sheet_name="Summary NR Param Mismatching", index=False)
-
-            if not param_mismatch_gu_df.empty:
-                param_mismatch_gu_df.to_excel(writer, sheet_name="Summary LTE Param Mismatching", index=False)
 
             # Then write each table in the final determined order
             for entry in table_entries:

@@ -761,7 +761,7 @@ def build_summary_audit(
                             add_row(
                                 "NRFreqRelation",
                                 "NR Frequency Inconsistencies",
-                                f"NR cells with mismatching params between old N77 SSB ({n77_ssb_pre}) and the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table). See 'Summary NR Param Mismatching' sheet for more details",
+                                f"NR cells with mismatching params between old N77 SSB ({n77_ssb_pre}) and the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                                 len(bad_cells_params),
                                 ", ".join(bad_cells_params),
                             )
@@ -801,7 +801,7 @@ def build_summary_audit(
                 f"ERROR: {ex}",
             )
 
-    # ----------------------------- NRSectorCarrier (N77 + allowed SSB) -----------------------------
+    # ----------------------------- NRSectorCarrier (N77 + allowed ARCFN) -----------------------------
     def process_nr_sector_carrier():
         try:
             if df_nr_sector_carrier is not None and not df_nr_sector_carrier.empty:
@@ -813,22 +813,22 @@ def build_summary_audit(
 
                     work[node_col] = work[node_col].astype(str).str.strip()
 
-                    # N77 nodes = those having at least one SSB in N77 band (646600-660000)
+                    # N77 nodes = those having at least one ARCFN in N77 band (646600-660000)
                     mask_n77 = work[arfcn_col].map(is_n77_from_string)
                     n77_rows = work.loc[mask_n77].copy()
 
-                    # NR Frequency Audit: NR nodes with SSB in N77 band (646600-660000) (from NRSectorCarrier table)
+                    # NR Frequency Audit: NR nodes with ARCFN in N77 band (646600-660000) (from NRSectorCarrier table)
                     n77_nodes = sorted(n77_rows[node_col].astype(str).unique())
 
                     add_row(
                         "NRSectorCarrier",
                         "NR Frequency Audit",
-                        "NR nodes with N77 SSB in band (646600-660000) (from NRSectorCarrier table)",
+                        "NR nodes with N77 ARCFN in band (646600-660000) (from NRSectorCarrier table)",
                         len(n77_nodes),
                         ", ".join(n77_nodes),
                     )
 
-                    # NR nodes whose ALL N77 SSBs are in Pre-Retune allowed list (from NRSectorCarrier table)
+                    # NR nodes whose ALL N77 ARCFNs are in Pre-Retune allowed list (from NRSectorCarrier table)
                     if allowed_n77_arfcn_pre_set:
                         grouped_n77 = n77_rows.groupby(node_col)[arfcn_col]
 
@@ -838,12 +838,12 @@ def build_summary_audit(
                         add_row(
                             "NRSectorCarrier",
                             "NR Frequency Audit",
-                            f"NR nodes with N77 SSB in Pre-Retune allowed list ({allowed_pre_str}) (from NRSectorCarrier table)",
+                            f"NR nodes with N77 ARCFN in Pre-Retune allowed list ({allowed_pre_str}) (from NRSectorCarrier table)",
                             len(pre_nodes),
                             ", ".join(pre_nodes),
                         )
 
-                    # NR nodes whose ALL N77 SSBs are in Post-Retune allowed list (from NRSectorCarrier table)
+                    # NR nodes whose ALL N77 ARCFNs are in Post-Retune allowed list (from NRSectorCarrier table)
                     if allowed_n77_arfcn_post_set:
                         grouped_n77 = n77_rows.groupby(node_col)[arfcn_col]
 
@@ -853,12 +853,12 @@ def build_summary_audit(
                         add_row(
                             "NRSectorCarrier",
                             "NR Frequency Audit",
-                            f"NR nodes with N77 SSB in Post-Retune allowed list ({allowed_post_str}) (from NRSectorCarrier table)",
+                            f"NR nodes with N77 ARCFN in Post-Retune allowed list ({allowed_post_str}) (from NRSectorCarrier table)",
                             len(post_nodes),
                             ", ".join(post_nodes),
                         )
 
-                    # NR Frequency Inconsistencies: NR SSB not in pre nor post allowed lists
+                    # NR Frequency Inconsistencies: NR ARCFN not in pre nor post allowed lists
                     if allowed_n77_arfcn_pre_set or allowed_n77_arfcn_post_set:
                         allowed_union = set(allowed_n77_arfcn_pre_set) | set(allowed_n77_arfcn_post_set)
 
@@ -868,10 +868,10 @@ def build_summary_audit(
 
                         bad_rows = n77_rows.loc[n77_rows[arfcn_col].map(_is_not_in_union)]
 
-                        # Unique nodes with at least one SSB not in pre/post allowed lists
+                        # Unique nodes with at least one ARCFN not in pre/post allowed lists
                         bad_nodes = sorted(bad_rows[node_col].astype(str).unique())
 
-                        # Build a unique (NodeId, SSB) list to avoid duplicated lines in ExtraInfo
+                        # Build a unique (NodeId, ARCFN) list to avoid duplicated lines in ExtraInfo
                         unique_pairs = sorted(
                             {(str(r[node_col]).strip(), str(r[arfcn_col]).strip()) for _, r in bad_rows.iterrows()}
                         )
@@ -881,7 +881,7 @@ def build_summary_audit(
                         add_row(
                             "NRSectorCarrier",
                             "NR Frequency Inconsistencies",
-                            "NR nodes with N77 SSB not in Pre/Post Retune allowed lists (from NRSectorCarrier table)",
+                            "NR nodes with N77 ARCFN not in Pre/Post Retune allowed lists (from NRSectorCarrier table)",
                             len(bad_nodes),
                             extra,
                         )
@@ -889,7 +889,7 @@ def build_summary_audit(
                         add_row(
                             "NRSectorCarrier",
                             "NR Frequency Inconsistencies",
-                            "NR nodes with N77 SSB not in Pre/Post Retune allowed lists (no pre/post allowed lists configured) (from NRSectorCarrier table)",
+                            "NR nodes with N77 ARCFN not in Pre/Post Retune allowed lists (no pre/post allowed lists configured) (from NRSectorCarrier table)",
                             "N/A",
                         )
                 else:
@@ -1355,7 +1355,7 @@ def build_summary_audit(
                         add_row(
                             "GUtranFreqRelation",
                             "LTE Frequency Inconsistencies",
-                            f"LTE cells with mismatching params between GUtranFreqRelationId {expected_old_rel_id} and {expected_new_rel_id} (from GUtranFreqRelation table). See 'Summary LTE Param Mismatching' sheet for more details",
+                            f"LTE cells with mismatching params between GUtranFreqRelationId {expected_old_rel_id} and {expected_new_rel_id} (from GUtranFreqRelation table)",
                             len(bad_cells_params),
                             ", ".join(bad_cells_params),
                         )
