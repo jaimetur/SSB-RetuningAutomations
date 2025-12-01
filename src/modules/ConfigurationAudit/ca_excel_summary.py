@@ -761,7 +761,7 @@ def build_summary_audit(
                             add_row(
                                 "NRFreqRelation",
                                 "NR Frequency Inconsistencies",
-                                f"NR cells with mismatching params between old N77 SSB ({n77_ssb_pre}) and the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table)",
+                                f"NR cells with mismatching params between old N77 SSB ({n77_ssb_pre}) and the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table). See 'Summary NR Param Mismatching' sheet for more details",
                                 len(bad_cells_params),
                                 ", ".join(bad_cells_params),
                             )
@@ -1355,7 +1355,7 @@ def build_summary_audit(
                         add_row(
                             "GUtranFreqRelation",
                             "LTE Frequency Inconsistencies",
-                            f"LTE cells with mismatching params between GUtranFreqRelationId {expected_old_rel_id} and {expected_new_rel_id} (from GUtranFreqRelation table)",
+                            f"LTE cells with mismatching params between GUtranFreqRelationId {expected_old_rel_id} and {expected_new_rel_id} (from GUtranFreqRelation table). See 'Summary LTE Param Mismatching' sheet for more details",
                             len(bad_cells_params),
                             ", ".join(bad_cells_params),
                         )
