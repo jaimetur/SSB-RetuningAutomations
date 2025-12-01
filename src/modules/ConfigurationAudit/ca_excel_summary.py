@@ -1032,14 +1032,19 @@ def build_summary_audit(
                             elif has_mmwave and has_lowmid:
                                 mixed_nodes.append(node_str)
 
-                        # Summary rows for LTE LowMidBand / mmWave node types
+                        # LTE nodes with GUtranSyncSignalFrequency defined (from GUtranSyncSignalFrequency table)
+                        all_nodes_with_freq = sorted(
+                            work.loc[work[arfcn_col].map(has_value), node_col].astype(str).unique()
+                        )
                         add_row(
                             "GUtranSyncSignalFrequency",
                             "LTE Frequency Audit",
-                            "LTE Nodes with GUtranSyncSignalFrequency (from GUtranSyncSignalFrequency table)",
-                            len(nodes_with_lte_sync),
+                            "LTE nodes with GUtranSyncSignalFrequency defined (from GUtranSyncSignalFrequency table)",
+                            len(all_nodes_with_freq),
                             ", ".join(nodes_with_lte_sync),
                         )
+
+                        # Summary rows for LTE LowMidBand / mmWave node types
                         add_row(
                             "GUtranSyncSignalFrequency",
                             "LTE Frequency Audit",
@@ -1069,18 +1074,6 @@ def build_summary_audit(
                     # Existing logic: old/new SSB checks on LTE side
                     # ------------------------------------------------------------------
                     grouped = work.groupby(node_col)[arfcn_col]
-
-                    # LTE nodes with GUtranSyncSignalFrequency defined (from GUtranSyncSignalFrequency table)
-                    all_nodes_with_freq = sorted(
-                        work.loc[work[arfcn_col].map(has_value), node_col].astype(str).unique()
-                    )
-                    add_row(
-                        "GUtranSyncSignalFrequency",
-                        "LTE Frequency Audit",
-                        "LTE nodes with GUtranSyncSignalFrequency defined (from GUtranSyncSignalFrequency table)",
-                        len(all_nodes_with_freq),
-                        ", ".join(all_nodes_with_freq),
-                    )
 
                     # LTE Frequency Audit: LTE nodes with the old N77 SSB (from GUtranSyncSignalFrequency table)
                     old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
