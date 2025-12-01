@@ -8,7 +8,6 @@
 
 - ### TODO:
   - #### 🌟 New Features:
-    - Generate output commands to fix discrepancies
     - Create logic for Module '3. Clean-Up'
     - Generate output commands to run clean-up
 
