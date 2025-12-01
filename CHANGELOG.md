@@ -22,6 +22,7 @@
     - Fixed abnormal prefix for long paths in Windows.
     - Fixed invalid Inconsistency in mixed nodes (MidLowBand & mmWave).
     - Aligned all Audit messages.
+    - Modified the mmWave range up to 2.300.000 instead of 2.100.000.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 

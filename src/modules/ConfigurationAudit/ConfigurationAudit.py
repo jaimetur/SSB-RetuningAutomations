@@ -254,7 +254,7 @@ class ConfigurationAudit:
                     "Separator": separator_str,
                     "Encoding": encoding_str,
                     "LogFile": entry["log_file"],
-                    "LogPath": input_dir,
+                    "LogPath": pretty_path(input_dir),
                     "TablesInLog": entry["tables_in_log"],
                 }
             )
@@ -268,7 +268,7 @@ class ConfigurationAudit:
             Add LowMidBand and mmWave columns to Summary NR_CellDU pivot.
 
             Logic:
-              - Columns whose header (int) is in [2_000_000, 2_100_000] are mmWave SSBs.
+              - Columns whose header (int) is in [2_000_000, 2_300_000] are mmWave SSBs.
               - Other numeric SSB columns are LowMidBand SSBs.
               - For each NodeId we count how many cells it has for each band.
               - Columns are inserted just before 'Total'.
@@ -289,7 +289,7 @@ class ConfigurationAudit:
                 except ValueError:
                     # Non-numeric headers are ignored
                     continue
-                if 2_000_000 <= ssb_val <= 2_100_000:
+                if 2_000_000 <= ssb_val <= 2_300_000:
                     mmwave_cols.append(col)
                 else:
                     lowmid_cols.append(col)
@@ -394,7 +394,7 @@ class ConfigurationAudit:
             margins_name="Total",
         )
         pivot_gu_sync_signal_freq = apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
-        pivot_gu_sync_signal_freq = add_lowmid_mmwave_to_nr_celldu(pivot_gu_sync_signal_freq)
+        # pivot_gu_sync_signal_freq = add_lowmid_mmwave_to_nr_celldu(pivot_gu_sync_signal_freq)
 
         # Pivot GUtranFreqRelation
         df_gu_freq_rel = concat_or_empty(mo_collectors["GUtranFreqRelation"])

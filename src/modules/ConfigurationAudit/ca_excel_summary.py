@@ -474,7 +474,7 @@ def build_summary_audit(
                     if not n77_work.empty:
                         grouped = n77_work.groupby(node_col)[arfcn_col]
 
-                        # NR Frequency Audit: NR nodes with the old SSB (from NRFreqRelation table)
+                        # NR Frequency Audit: NR nodes with the old N77 SSB (from NRFreqRelation table)
                         old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                         add_row(
                             "NRFreqRelation",
@@ -484,7 +484,7 @@ def build_summary_audit(
                             ", ".join(old_nodes),
                         )
 
-                        # NR Frequency Audit: NR nodes with the new SSB (from NRFreqRelation table)
+                        # NR Frequency Audit: NR nodes with the new N77 SSB (from NRFreqRelation table)
                         new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                         add_row(
                             "NRFreqRelation",
@@ -511,7 +511,7 @@ def build_summary_audit(
                         add_row(
                             "NRFreqRelation",
                             "NR Frequency Audit",
-                            f"NR nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from NRFreqRelation table)",
+                            f"NR nodes with the old N77 SSB ({n77_ssb_pre}) but without the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table)",
                             len(nodes_old_without_new),
                             ", ".join(nodes_old_without_new),
                         )
@@ -1082,7 +1082,7 @@ def build_summary_audit(
                         ", ".join(all_nodes_with_freq),
                     )
 
-                    # LTE Frequency Audit: LTE nodes with the old SSB (from GUtranSyncSignalFrequency table)
+                    # LTE Frequency Audit: LTE nodes with the old N77 SSB (from GUtranSyncSignalFrequency table)
                     old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                     add_row(
                         "GUtranSyncSignalFrequency",
@@ -1092,7 +1092,7 @@ def build_summary_audit(
                         ", ".join(old_nodes),
                     )
 
-                    # LTE Frequency Audit: LTE nodes with the new SSB (from GUtranSyncSignalFrequency table)
+                    # LTE Frequency Audit: LTE nodes with the new N77 SSB (from GUtranSyncSignalFrequency table)
                     new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                     add_row(
                         "GUtranSyncSignalFrequency",
@@ -1168,7 +1168,7 @@ def build_summary_audit(
 
                     grouped = work.groupby(node_col)[arfcn_col]
 
-                    # LTE Frequency Audit: LTE nodes with the old SSB (from GUtranFreqRelation table)
+                    # LTE Frequency Audit: LTE nodes with the old N77 SSB (from GUtranFreqRelation table)
                     old_nodes = sorted(str(node) for node, series in grouped if any(is_old(v) for v in series))
                     add_row(
                         "GUtranFreqRelation",
@@ -1178,7 +1178,7 @@ def build_summary_audit(
                         ", ".join(old_nodes),
                     )
 
-                    # LTE Frequency Audit: LTE nodes with the new SSB (from GUtranFreqRelation table)
+                    # LTE Frequency Audit: LTE nodes with the new N77 SSB (from GUtranFreqRelation table)
                     new_nodes = sorted(str(node) for node, series in grouped if any(is_new(v) for v in series))
                     add_row(
                         "GUtranFreqRelation",
@@ -1205,7 +1205,7 @@ def build_summary_audit(
                     add_row(
                         "GUtranFreqRelation",
                         "LTE Frequency Audit",
-                        f"LTE nodes with the old SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from GUtranFreqRelation table)",
+                        f"LTE nodes with the old N77 SSB ({n77_ssb_pre}) but without the new SSB ({n77_ssb_post}) (from GUtranFreqRelation table)",
                         len(nodes_old_without_new),
                         ", ".join(nodes_old_without_new),
                     )
@@ -1563,7 +1563,7 @@ def build_summary_audit(
                     nodes_old_only = sorted(old_nodes - new_nodes)
                     nodes_both = sorted(old_nodes & new_nodes)
 
-                    # LTE nodes with the old SSB (648672) but without the new SSB (647328)
+                    # LTE nodes with the old N77 SSB (648672) but without the new SSB (647328)
                     add_row(
                         "FreqPrioNR",
                         "ENDC Audit",
