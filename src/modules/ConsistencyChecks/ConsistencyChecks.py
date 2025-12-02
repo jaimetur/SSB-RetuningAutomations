@@ -1171,12 +1171,26 @@ class ConsistencyChecks:
 
         if pre_df is None and post_df is None:
             return None
-        if pre_df is None:
+
+        # Logs “positivos” para saber qué se está usando
+        if pre_df is not None and post_df is not None:
+            print("[Consistency Checks] Using PRE/POST ConfigurationAudit SummaryAudit sheets to build 'SummaryAuditComparisson'.")
+            print(f"[Consistency Checks] PRE SummaryAudit:  '{pretty_path(pre_path)}'")
+            print(f"[Consistency Checks] POST SummaryAudit: '{pretty_path(post_path)}'")
+        elif pre_df is not None:
+            print("[Consistency Checks] Only PRE ConfigurationAudit SummaryAudit available for 'SummaryAuditComparisson'.")
+            print(f"[Consistency Checks] PRE SummaryAudit:  '{pretty_path(pre_path)}'")
+        elif post_df is not None:
+            print("[Consistency Checks] Only POST ConfigurationAudit SummaryAudit available for 'SummaryAuditComparisson'.")
+            print(f"[Consistency Checks] POST SummaryAudit: '{pretty_path(post_path)}'")
+
+        if pre_df is None and post_df is not None:
             # Only POST available: just rename its Value as Value_Post
             post_df = post_df.copy()
             post_df = post_df.rename(columns={"Value": "Value_Post"})
             return post_df
-        if post_df is None:
+
+        if post_df is None and pre_df is not None:
             # Only PRE available: just rename its Value as Value_Pre
             pre_df = pre_df.copy()
             pre_df = pre_df.rename(columns={"Value": "Value_Pre"})
@@ -1252,6 +1266,11 @@ class ConsistencyChecks:
             )
 
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
+
+            # NEW: add SummaryAuditComparisson sheet if PRE/POST ConfigurationAudit SummaryAudit are available
+            comparison_df = self.build_summaryaudit_comparison()
+            if comparison_df is not None and not comparison_df.empty:
+                comparison_df.to_excel(writer, sheet_name="SummaryAuditComparisson", index=False)
 
             # Summary_Detailed
             detailed_rows = []
