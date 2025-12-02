@@ -373,22 +373,39 @@ class ConsistencyChecks:
                 for k in pre_common.index[diffs]:
                     diff_cols_per_row[k].append(c)
 
-            # NEW: optionally exclude discrepancies for nodes that have not completed the retuning
+            # NEW: optionally exclude discrepancies for relations whose destination nodes did not complete the retuning
             if nodes_without_retune_ids and table_name in ("GUtranCellRelation", "NRCellRelation"):
                 relation_col = "GUtranCellRelationId" if table_name == "GUtranCellRelation" else "NRCellRelationId"
+
+                # Ensure the relation column exists either in PRE or POST
                 if relation_col in post_common.columns or relation_col in pre_common.columns:
+                    # Choose POST table if available (latest data), otherwise PRE
                     src_rel_df = post_common if relation_col in post_common.columns else pre_common
-                    rel_series = src_rel_df[relation_col].reindex(pre_common.index)
-                    rel_series = rel_series.astype(str).fillna("")
+
+                    # Convert the relation column to a clean string series
+                    rel_series = src_rel_df[relation_col].reindex(pre_common.index).astype(str).fillna("")
+
                     try:
-                        # Usar grupo NO capturante para evitar el warning
-                        pattern_nodes = r"\b(?:" + "|".join(re.escape(x) for x in sorted(nodes_without_retune_ids)) + r")\b"
+                        # Build a substring-matching pattern for all numeric node identifiers
+                        # Example: "2337038|2337058|2337083|..."
+                        # We intentionally avoid word boundaries (\b) because relation names include underscores.
+                        pattern_nodes = "|".join(re.escape(x) for x in sorted(nodes_without_retune_ids))
+
+                        # DEBUG: print the relation names that match the pattern and will be excluded
+                        to_skip_relations = rel_series[rel_series.str.contains(pattern_nodes, regex=True, na=False)]
+                        if not to_skip_relations.empty:
+                            print(f"{module_name} [DEBUG] Relations skipped due to destination node being in the no-retuning buffer ({table_name}):")
+                            print(sorted(to_skip_relations.unique()))
+
+                        # Build the skip mask: all rows whose relation contains a non-retuned node id
                         skip_mask = rel_series.str.contains(pattern_nodes, regex=True, na=False)
-                        # Set masks to False for rows belonging to nodes without retuning
+
+                        # Remove those rows from discrepancy masks (parameter and frequency differences)
                         any_diff_mask = any_diff_mask & ~skip_mask
                         freq_rule_mask = freq_rule_mask & ~skip_mask
+
                     except re.error:
-                        # In case of an invalid regex, keep original masks untouched
+                        # If regex construction fails (rare), do not modify any masks
                         pass
 
             combined_mask = (freq_rule_mask | any_diff_mask).reindex(pre_common.index, fill_value=False)
