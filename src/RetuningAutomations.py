@@ -546,6 +546,8 @@ def run_configuration_audit(
     allowed_n77_arfcn_pre_csv: Optional[str] = None,
     allowed_n77_ssb_post_csv: Optional[str] = None,
     allowed_n77_arfcn_post_csv: Optional[str] = None,
+    versioned_suffix: Optional[str] = None,
+    market_label: Optional[str] = None,
 ) -> Optional[str]:
     """
     Run ConfigurationAudit on a folder or recursively on all its subfolders
@@ -646,8 +648,9 @@ def run_configuration_audit(
     print(f"{module_name} Allowed N77 SSB set (Post)   = {sorted(allowed_n77_ssb_post)}")
     print(f"{module_name} Allowed N77 ARFCN set (Post) = {sorted(allowed_n77_arfcn_post)}")
 
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
+    if not versioned_suffix:
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
 
     def run_for_folder(folder: str) -> Optional[str]:
         """
@@ -662,8 +665,15 @@ def run_configuration_audit(
         # Use long-path version for filesystem operations
         folder_fs = to_long_path(folder) if folder else folder
 
+        # If market_label is provided and not GLOBAL, append it as suffix
+        suffix = ""
+        if market_label:
+            ml = str(market_label).strip()
+            if ml and ml.upper() != "GLOBAL":
+                suffix = f"_{ml}"
+
         # Create dedicated output folder for ConfigurationAudit
-        output_dir = os.path.join(folder_fs, f"ConfigurationAudit_{versioned_suffix}")
+        output_dir = os.path.join(folder_fs, f"ConfigurationAudit_{versioned_suffix}{suffix}")
         os.makedirs(output_dir, exist_ok=True)
         print(f"{module_name} Output folder: '{pretty_path(output_dir)}'")
 
@@ -842,6 +852,8 @@ def run_consistency_checks_for_market_pairs(
             allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
             allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
             allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+            versioned_suffix=versioned_suffix,
+            market_label=market_label,
         )
         print("-" * 80)
         if pre_audit_excel:
@@ -861,6 +873,8 @@ def run_consistency_checks_for_market_pairs(
             allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
             allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
             allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+            versioned_suffix=versioned_suffix,
+            market_label=market_label,
         )
         print("-" * 80)
         if post_audit_excel:
