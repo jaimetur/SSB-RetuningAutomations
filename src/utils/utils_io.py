@@ -104,129 +104,6 @@ def detect_step0_folders(entry_name: str, base_folder: str) -> Optional[Step0Run
     )
 
 
-def read_text_with_encoding(path: str) -> Tuple[List[str], Optional[str]]:
-    # <<< Ensure Windows long path compatibility >>>
-    path_long = to_long_path(path)
-
-    for enc in ENCODINGS_TRY:
-        try:
-            with open(path_long, "r", encoding=enc, errors="strict") as f:
-                return [ln.rstrip("\n") for ln in f], enc
-        except Exception:
-            continue
-    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
-        return [ln.rstrip("\n") for ln in f], None
-
-
-def read_text_lines(path: str) -> Optional[List[str]]:
-    try:
-        lines, _ = read_text_with_encoding(path)
-        return lines
-    except Exception:
-        return None
-
-
-def try_read_text_file_with_encoding(path: str) -> Tuple[List[str], Optional[str]]:
-    """
-    Robust text reader that tries several encodings and returns (lines, encoding_used).
-    If it falls back to 'replace' mode, returns (lines, None) to signal that encoding is uncertain.
-    """
-    # <<< Ensure Windows long path compatibility >>>
-    path_long = to_long_path(path)
-
-    encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
-    for enc in encodings:
-        try:
-            with open(path_long, "r", encoding=enc, errors="strict") as f:
-                return [ln.rstrip("\n") for ln in f], enc
-        except Exception:
-            continue
-    # last permissive attempt
-    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
-        return [ln.rstrip("\n") for ln in f], None
-
-
-def try_read_text_file_lines(path: str) -> Optional[List[str]]:
-    """
-    Same as above but returns only the lines (used by PrePostRelations.loaders).
-    """
-    try:
-        lines, _ = try_read_text_file_with_encoding(path)
-        return lines
-    except Exception:
-        return None
-
-
-def find_log_files(folder: str) -> List[str]:
-    """
-    Return a sorted list of *.log / *.logs / *.txt files found in 'folder'.
-    """
-    files: List[str] = []
-
-    # <<< Ensure Windows long path compatibility >>>
-    folder_long = to_long_path(folder)
-
-    for name in os.listdir(folder_long):
-        lower = name.lower()
-        if lower.endswith((".log", ".logs", ".txt")):
-            p = os.path.join(folder_long, name)
-            if os.path.isfile(p):
-                files.append(p)
-    files.sort()
-    return files
-
-def folder_has_valid_logs(folder: str) -> bool:
-    """
-    Return True if 'folder' contains at least one .log / .logs / .txt file
-    with a line starting by 'SubNetwork'.
-
-    A "valid" log file is defined as one containing at least one line
-    whose first non-BOM, non-whitespace characters start with 'SubNetwork'.
-
-    This check is used to decide whether ConfigurationAudit should run
-    inside a folder or whether the recursive search should continue.
-    """
-    try:
-        folder_fs = to_long_path(folder)
-        log_files = find_log_files(folder_fs)  # already filters .log/.logs/.txt
-    except Exception:
-        return False
-
-    for fpath in log_files:
-        try:
-            fpath_fs = to_long_path(fpath)
-            with open(fpath_fs, "r", encoding="utf-8", errors="ignore") as fh:
-                for line in fh:
-                    stripped = line.lstrip("\ufeff").lstrip()
-                    if stripped.startswith("SubNetwork"):
-                        return True
-        except Exception:
-            # If a file cannot be opened or read, skip and continue
-            continue
-
-    return False
-
-def extract_tokens_dynamic(name: str) -> List[str]:
-    """
-    Extracts ALL non-numeric tokens found in a folder name.
-    No blacklist. No assumptions.
-    Tokens are lowercase alphanumeric sequences.
-
-    Examples:
-        "Indiana"                  -> ["indiana"]
-        "Indiana_Step0_pre"        -> ["indiana", "step0", "pre"]
-        "step0_Indiana_batch_02"   -> ["step0", "indiana", "batch"]
-        "Westside_Simulated"       -> ["westside", "simulated"]
-        "233_Westside"             -> ["westside"]    (233 ignored)
-
-    Numeric-only tokens are discarded.
-    """
-    base = os.path.basename(name).lower()
-    cleaned = re.sub(r"[^a-z0-9]", " ", base)
-    tokens = [t for t in cleaned.split() if t and not t.isdigit()]
-    return tokens
-
-
 def detect_pre_post_subfolders(base_folder: str, BLACKLIST: tuple) -> Tuple[Optional[str], Optional[str], Dict[str, Tuple[str, str]]]:
     """
     Detect PRE/POST Step0 runs and, inside them, market subfolders.
@@ -363,6 +240,129 @@ def detect_pre_post_subfolders(base_folder: str, BLACKLIST: tuple) -> Tuple[Opti
         market_pairs["GLOBAL"] = (base_pre, base_post)
 
     return base_pre, base_post, market_pairs
+
+
+def read_text_with_encoding(path: str) -> Tuple[List[str], Optional[str]]:
+    # <<< Ensure Windows long path compatibility >>>
+    path_long = to_long_path(path)
+
+    for enc in ENCODINGS_TRY:
+        try:
+            with open(path_long, "r", encoding=enc, errors="strict") as f:
+                return [ln.rstrip("\n") for ln in f], enc
+        except Exception:
+            continue
+    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
+        return [ln.rstrip("\n") for ln in f], None
+
+
+def read_text_lines(path: str) -> Optional[List[str]]:
+    try:
+        lines, _ = read_text_with_encoding(path)
+        return lines
+    except Exception:
+        return None
+
+
+def try_read_text_file_with_encoding(path: str) -> Tuple[List[str], Optional[str]]:
+    """
+    Robust text reader that tries several encodings and returns (lines, encoding_used).
+    If it falls back to 'replace' mode, returns (lines, None) to signal that encoding is uncertain.
+    """
+    # <<< Ensure Windows long path compatibility >>>
+    path_long = to_long_path(path)
+
+    encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
+    for enc in encodings:
+        try:
+            with open(path_long, "r", encoding=enc, errors="strict") as f:
+                return [ln.rstrip("\n") for ln in f], enc
+        except Exception:
+            continue
+    # last permissive attempt
+    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
+        return [ln.rstrip("\n") for ln in f], None
+
+
+def try_read_text_file_lines(path: str) -> Optional[List[str]]:
+    """
+    Same as above but returns only the lines (used by PrePostRelations.loaders).
+    """
+    try:
+        lines, _ = try_read_text_file_with_encoding(path)
+        return lines
+    except Exception:
+        return None
+
+
+def find_log_files(folder: str) -> List[str]:
+    """
+    Return a sorted list of *.log / *.logs / *.txt files found in 'folder'.
+    """
+    files: List[str] = []
+
+    # <<< Ensure Windows long path compatibility >>>
+    folder_long = to_long_path(folder)
+
+    for name in os.listdir(folder_long):
+        lower = name.lower()
+        if lower.endswith((".log", ".logs", ".txt")):
+            p = os.path.join(folder_long, name)
+            if os.path.isfile(p):
+                files.append(p)
+    files.sort()
+    return files
+
+def folder_has_valid_logs(folder: str) -> bool:
+    """
+    Return True if 'folder' contains at least one .log / .logs / .txt file
+    with a line starting by 'SubNetwork'.
+
+    A "valid" log file is defined as one containing at least one line
+    whose first non-BOM, non-whitespace characters start with 'SubNetwork'.
+
+    This check is used to decide whether ConfigurationAudit should run
+    inside a folder or whether the recursive search should continue.
+    """
+    try:
+        folder_fs = to_long_path(folder)
+        log_files = find_log_files(folder_fs)  # already filters .log/.logs/.txt
+    except Exception:
+        return False
+
+    for fpath in log_files:
+        try:
+            fpath_fs = to_long_path(fpath)
+            with open(fpath_fs, "r", encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    stripped = line.lstrip("\ufeff").lstrip()
+                    if stripped.startswith("SubNetwork"):
+                        return True
+        except Exception:
+            # If a file cannot be opened or read, skip and continue
+            continue
+
+    return False
+
+def extract_tokens_dynamic(name: str) -> List[str]:
+    """
+    Extracts ALL non-numeric tokens found in a folder name.
+    No blacklist. No assumptions.
+    Tokens are lowercase alphanumeric sequences.
+
+    Examples:
+        "Indiana"                  -> ["indiana"]
+        "Indiana_Step0_pre"        -> ["indiana", "step0", "pre"]
+        "step0_Indiana_batch_02"   -> ["step0", "indiana", "batch"]
+        "Westside_Simulated"       -> ["westside", "simulated"]
+        "233_Westside"             -> ["westside"]    (233 ignored)
+
+    Numeric-only tokens are discarded.
+    """
+    base = os.path.basename(name).lower()
+    cleaned = re.sub(r"[^a-z0-9]", " ", base)
+    tokens = [t for t in cleaned.split() if t and not t.isdigit()]
+    return tokens
 
 
 def read_text_file(path: str) -> Tuple[List[str], Optional[str]]:
