@@ -211,48 +211,16 @@ def gui_config_dialog(
     root.title(f"🛠️ {TOOL_NAME_VERSION} -- 1️⃣ Select Module. 2️⃣ Configure Paths & Freqs. 3️⃣ Press Run to execute...")
     root.resizable(False, False)
 
-    # Center window
+    # --- Center window ONCE with fixed size ---
     try:
         root.update_idletasks()
-        w, h = 760, 720
+        w, h = 760, 720  # tamaño objetivo del launcher
         sw = root.winfo_screenwidth()
         sh = root.winfo_screenheight()
-        x = (sw // 2) - (w // 2)
-        y = (sh // 3) - (h // 2)
+        x = (sw - w) // 2
+        y = (sh - h) // 2  # CENTRADO real en vertical
         root.geometry(f"{w}x{h}+{x}+{y}")
     except Exception:
-        pass
-
-    # --- Always center the window on screen ---
-    try:
-        root.update_idletasks()  # ensures geometry is updated
-
-        w = root.winfo_width()
-        h = root.winfo_height()
-
-        # Fallback in case Tk returns tiny numbers (happens in some systems)
-        if w < 100 or h < 100:
-            w, h = 760, 720  # your target size
-
-        sw = root.winfo_screenwidth()
-        sh = root.winfo_screenheight()
-
-        x = (sw // 2) - (w // 2)
-        y = (sh // 2) - (h // 2)
-
-        root.geometry(f"{w}x{h}+{x}+{y}")
-    except Exception:
-        pass
-
-    # Try to bring the launcher window to the front
-    try:
-        root.lift()
-        root.attributes("-topmost", True)
-        # Disable "always on top" after a short delay so it behaves normally
-        root.after(200, lambda: root.attributes("-topmost", False))
-        root.focus_force()
-    except Exception:
-        # If anything fails here, do not break the GUI
         pass
 
     # Vars
@@ -508,6 +476,22 @@ def gui_config_dialog(
     ttk.Button(btns, text="Run", command=on_run).pack(side="right")
     root.bind("<Return>", lambda e: on_run())
     root.bind("<Escape>", lambda e: on_cancel())
+
+    def center_and_raise():
+        """Bring launcher to the foreground, respecting current geometry."""
+        try:
+            root.update_idletasks()
+            root.lift()
+            try:
+                root.attributes("-topmost", True)
+                root.after(200, lambda: root.attributes("-topmost", False))
+            except Exception:
+                pass
+            root.focus_force()
+        except Exception:
+            pass
+
+    root.after(0, center_and_raise)
     root.mainloop()
     return result
 
