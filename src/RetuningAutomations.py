@@ -819,7 +819,9 @@ def run_consistency_checks_for_market_pairs(
 
     for market_label, (pre_dir, post_dir) in sorted(market_pairs.items()):
         market_tag = f"[Market: {market_label}]" if market_label != "GLOBAL" else ""
-        print(f"\n{module_name} {market_tag} Processing PRE/POST pair:")
+        print(f"\n{module_name} Processing Market: {market_label}")
+        print("=" * 80)
+        print(f"{module_name} {market_tag} Processing PRE/POST pair:")
         print(f"{module_name} {market_tag} PRE folder:  '{pretty_path(pre_dir)}'")
         print(f"{module_name} {market_tag} POST folder: '{pretty_path(post_dir)}'")
 
