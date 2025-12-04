@@ -23,7 +23,9 @@
           - 20251202_0730_step0 --> This is selected as Pre folder since is the latest folder for the latest day previous to the Post folder day 
           - 20251203_0530_step0
           - 20251203_0730_step0 --> This is selected as Post folder since is the latest folder for the latest day
-  - New module called `3. Consistency Check (Bulk mode Pre/Post auto-detection)`. When this module is selected, the tool will automatically run an Smart Consistency Check in all markets detected in the input folder, selecting the most suitable folder for Pre and Post for each market.
+    - Added a Blacklist of words to discard any step0 subfolders from auto-detection function. By default the tool will not consideer as Pre/Post candidates any folder with any of the following words in its name: "ignore", "old", "discard", "bad".
+    - Added a Blacklist of words to discard any input subfolders from auto-detection function. By default the tool will not consideer as input folder candidates for Audits any folder with any of the following words in its name: "ignore", "old", "discard", "bad".
+    - New module called `3. Consistency Check (Bulk mode Pre/Post auto-detection)`. When this module is selected, the tool will automatically run an Smart Consistency Check in all markets detected in the input folder, selecting the most suitable folder for Pre and Post for each market.
 
   - #### 🚀 Enhancements:
     - Added column `GNBCUCPFunction` to NR tables in `ConcistencyCheck` module to be able to filter those relations of interest.

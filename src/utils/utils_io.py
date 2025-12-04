@@ -225,7 +225,7 @@ def extract_tokens_dynamic(name: str) -> List[str]:
     return tokens
 
 
-def detect_pre_post_subfolders(base_folder: str) -> Tuple[Optional[str], Optional[str], Dict[str, Tuple[str, str]]]:
+def detect_pre_post_subfolders(base_folder: str, BLACKLIST: tuple) -> Tuple[Optional[str], Optional[str], Dict[str, Tuple[str, str]]]:
     """
     Detect PRE/POST Step0 runs and, inside them, market subfolders.
 
@@ -294,7 +294,11 @@ def detect_pre_post_subfolders(base_folder: str) -> Tuple[Optional[str], Optiona
 
         # ---------------- STEP0 RUN DETECTION ---------------- #
     runs: List[Step0RunInfo] = []
+    # Skip Step0 candidate folders whose name contains blacklist tokens
     for entry in entries:
+        name_low = entry.name.lower()
+        if any(tok in name_low for tok in BLACKLIST):
+            continue
         parsed = parse_step0_run(entry.name, base_folder)
         if parsed:
             runs.append(parsed)

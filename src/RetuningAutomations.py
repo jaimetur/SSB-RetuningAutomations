@@ -52,6 +52,9 @@ Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retu
 """)
 
 # ================================ DEFAULTS ================================= #
+# List of words to find in a folder name to be discarted from Bulk Configuration Audit module or from Bulk Consistency Check module.
+BLACKLIST = ("ignore", "old", "discard", "bad")  # case-insensitive blacklist for folder names
+
 # Input Folder(s)
 INPUT_FOLDER = ""        # single-input default if not defined
 INPUT_FOLDER_PRE = ""    # default Pre folder for dual-input GUI
@@ -758,6 +761,9 @@ def run_configuration_audit(
     for dirpath, dirnames, filenames in os.walk(base_dir_fs):
         if dirpath == base_dir_fs:
             continue
+        folder_name_low = os.path.basename(dirpath).lower()
+        if any(tok in folder_name_low for tok in BLACKLIST):
+            continue
         try:
             if folder_has_valid_logs(dirpath):
                 candidate_dirs.append(dirpath)
@@ -1058,7 +1064,7 @@ def run_consistency_checks_bulk(
         return
 
     # Auto-detect PRE/POST base runs and markets
-    base_pre, base_post, detected_market_pairs = detect_pre_post_subfolders(base_dir_fs)
+    base_pre, base_post, detected_market_pairs = detect_pre_post_subfolders(base_dir_fs, BLACKLIST=BLACKLIST)
     market_pairs: Dict[str, Tuple[str, str]] = detected_market_pairs or {}
 
     if not base_pre or not base_post:
