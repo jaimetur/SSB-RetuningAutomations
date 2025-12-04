@@ -16,7 +16,7 @@ from typing import Dict, Optional
 
 import pandas as pd
 
-from src.utils.utils_dataframe import ensure_column_after, drop_columns
+from src.utils.utils_dataframe import ensure_column_after
 from src.utils.utils_io import to_long_path, pretty_path
 
 
@@ -137,65 +137,92 @@ def build_gu_new(df: pd.DataFrame, relations_df: Optional[pd.DataFrame]) -> pd.D
     """
     if df is None or df.empty:
         df = df.copy() if df is not None else pd.DataFrame()
-        df["Correction_Cmd"] = ""
+        # Ensure basic columns exist
+        for col in ("NodeId", "EUtranCellFDDId", "GUtranFreqRelationId", "GUtranCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
         # NEW: ensure Freq_Pre / Freq_Post exist in _new (Pre empty)
-        df["Freq_Pre"] = ""
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""
         if "Freq_Post" not in df.columns:
             df["Freq_Post"] = ""
-        return df
+        # Extra audit columns requested for GU_new
+        for col in ("createdBy", "timeOfCreation"):
+            if col not in df.columns:
+                df[col] = ""
+        df["Correction_Cmd"] = ""
+    else:
+        df = df.copy()
 
-    df = df.copy()
+        # Ensure key columns exist
+        for col in ("NodeId", "EUtranCellFDDId", "GUtranFreqRelationId", "GUtranCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
 
-    relations_lookup = _build_lookup(relations_df, ["EUtranCellFDDId", "GUtranCellRelationId"])
+        # NEW: ensure Freq_Pre / Freq_Post also exist in GU_new
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""  # in _new tables Pre must be empty
+        if "Freq_Post" not in df.columns:
+            df["Freq_Post"] = ""
 
-    for col in ("NodeId", "EUtranCellFDDId", "GUtranCellRelationId", "GUtranFreqRelationId"):
-        if col not in df.columns:
-            df[col] = ""
+        # Extra audit columns requested for GU_new
+        if "createdBy" not in df.columns:
+            df["createdBy"] = ""
+        if "timeOfCreation" not in df.columns:
+            df["timeOfCreation"] = ""
 
-    # NEW: ensure Freq_Pre / Freq_Post also exist in GU_new
-    df["Freq_Pre"] = ""  # in _new tables Pre must be empty
-    if "Freq_Post" not in df.columns:
-        df["Freq_Post"] = ""
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["EUtranCellFDDId"] = df["EUtranCellFDDId"].astype(str).str.strip()
+        df["GUtranCellRelationId"] = df["GUtranCellRelationId"].astype(str).str.strip()
 
-    df["NodeId"] = df["NodeId"].astype(str).str.strip()
-    df["EUtranCellFDDId"] = df["EUtranCellFDDId"].astype(str).str.strip()
-    df["GUtranCellRelationId"] = df["GUtranCellRelationId"].astype(str).str.strip()
+        relations_lookup = _build_lookup(relations_df, ["EUtranCellFDDId", "GUtranCellRelationId"])
 
-    def build_command(row: pd.Series) -> str:
-        key = (
-            str(row.get("EUtranCellFDDId", "")).strip(),
-            str(row.get("GUtranCellRelationId", "")).strip(),
-        )
-        rel_row = relations_lookup.get(key)
-        src = rel_row if rel_row is not None else row
+        def _from_rel(row: pd.Series, field: str) -> str:
+            key = (
+                str(row.get("EUtranCellFDDId", "")).strip(),
+                str(row.get("GUtranCellRelationId", "")).strip(),
+            )
+            rel_row = relations_lookup.get(key)
+            return _pick_value(rel_row, row, field)
 
-        eu_cell = str(src.get("EUtranCellFDDId") or "").strip()
-        freq_rel = str(src.get("GUtranFreqRelationId") or "").strip()
-        cell_rel = str(src.get("GUtranCellRelationId") or "").strip()
+        # Make sure GUtranFreqRelationId, createdBy and timeOfCreation are taken from relations_df
+        df["GUtranFreqRelationId"] = df.apply(lambda r: _from_rel(r, "GUtranFreqRelationId"), axis=1)
+        df["createdBy"] = df.apply(lambda r: _from_rel(r, "createdBy"), axis=1)
+        df["timeOfCreation"] = df.apply(lambda r: _from_rel(r, "timeOfCreation"), axis=1)
 
-        if not (eu_cell and freq_rel and cell_rel):
-            return ""
+        def build_command(row: pd.Series) -> str:
+            key = (
+                str(row.get("EUtranCellFDDId", "")).strip(),
+                str(row.get("GUtranCellRelationId", "")).strip(),
+            )
+            rel_row = relations_lookup.get(key)
+            src = rel_row if rel_row is not None else row
 
-        return f"del EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}"
+            eu_cell = str(src.get("EUtranCellFDDId") or "").strip()
+            freq_rel = str(src.get("GUtranFreqRelationId") or "").strip()
+            cell_rel = str(src.get("GUtranCellRelationId") or "").strip()
 
-    df["Correction_Cmd"] = df.apply(build_command, axis=1)
+            if not (eu_cell and freq_rel and cell_rel):
+                return ""
 
-    unwanted = [
-        "ENodeBFunctionId",
-        "coverageIndicator",
-        "essCellScPairs",
-        "essEnabled",
-        "gUtranCellRelationId",
-        "isEndcAllowed",
-        "isHoAllowed",
-        "isRemoveAllowed",
-        "isVoiceHoAllowed",
-        "mobilityStatusNR",
-        "neighborCellRef",
-        "reservedBy",
-        "userLabel",
+            return f"del EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}"
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+
+    # Final column set: keep only relevant columns and force Correction_Cmd to be last
+    desired_cols = [
+        "NodeId",
+        "EUtranCellFDDId",
+        "GUtranFreqRelationId",
+        "GUtranCellRelationId",
+        "Freq_Pre",
+        "Freq_Post",
+        "createdBy",
+        "timeOfCreation",
+        "Correction_Cmd",
     ]
-    df = drop_columns(df, unwanted)
+    cols = [c for c in desired_cols if c in df.columns]
+    df = df[cols]
     return df
 
 
@@ -215,36 +242,58 @@ def build_gu_missing(
     using (EUtranCellFDDId, GUtranCellRelationId) as lookup key.
     """
     if df is None or df.empty:
-        df = df.copy()
+        df = df.copy() if df is not None else pd.DataFrame()
+        # Ensure minimal columns to keep Excel structure stable
+        for col in ("NodeId", "EUtranCellFDDId", "GUtranFreqRelationId", "GUtranCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""
+        if "Freq_Post" not in df.columns:
+            df["Freq_Post"] = ""
         df["Correction_Cmd"] = ""
-        return df
+        # Final projection
+        desired_cols = [
+            "NodeId",
+            "EUtranCellFDDId",
+            "GUtranFreqRelationId",
+            "GUtranCellRelationId",
+            "Freq_Pre",
+            "Freq_Post",
+            "Correction_Cmd",
+        ]
+        cols = [c for c in desired_cols if c in df.columns]
+        return df[cols]
 
     df = df.copy()
 
-    relations_lookup = _build_lookup(relations_df, ["EUtranCellFDDId", "GUtranCellRelationId"])
-
     # Ensure key columns exist in df (aunque luego algunas se eliminen de la tabla final)
-    needed_cols = [
-        "NodeId",
-        "ENodeBFunctionId",
-        "EUtranCellFDDId",
-        "GUtranFreqRelationId",
-        "GUtranCellRelationId",
-        "neighborCellRef",
-        "isEndcAllowed",
-        "isHoAllowed",
-        "isRemoveAllowed",
-        "isVoiceHoAllowed",
-        "userLabel",
-        "coverageIndicator",
-    ]
-    for col in needed_cols:
+    for col in ("NodeId", "EUtranCellFDDId", "GUtranFreqRelationId", "GUtranCellRelationId"):
         if col not in df.columns:
             df[col] = ""
+
+    # Freq_Pre / Freq_Post may come already from comparison; ensure they exist
+    if "Freq_Pre" not in df.columns:
+        df["Freq_Pre"] = ""
+    if "Freq_Post" not in df.columns:
+        df["Freq_Post"] = ""
 
     df["NodeId"] = df["NodeId"].astype(str).str.strip()
     df["EUtranCellFDDId"] = df["EUtranCellFDDId"].astype(str).str.strip()
     df["GUtranCellRelationId"] = df["GUtranCellRelationId"].astype(str).str.strip()
+
+    relations_lookup = _build_lookup(relations_df, ["EUtranCellFDDId", "GUtranCellRelationId"])
+
+    def from_rel(row: pd.Series, field: str) -> str:
+        key = (
+            str(row.get("EUtranCellFDDId", "")).strip(),
+            str(row.get("GUtranCellRelationId", "")).strip(),
+        )
+        rel_row = relations_lookup.get(key)
+        return _pick_value(rel_row, row, field)
+
+    # Make sure GUtranFreqRelationId is taken from relations_df
+    df["GUtranFreqRelationId"] = df.apply(lambda r: from_rel(r, "GUtranFreqRelationId"), axis=1)
 
     def build_command(row: pd.Series) -> str:
         key = (
@@ -296,31 +345,24 @@ def build_gu_missing(
                 else f"set EUtranCellFDD={eu_cell},GUtranFreqRelation={freq_rel},GUtranCellRelation={cell_rel}"
             ),
         ]
-    # keep non-empty
+        # keep non-empty
         lines = [p for p in parts if p]
         return "\n".join(lines)
 
     df["Correction_Cmd"] = df.apply(build_command, axis=1)
 
-    # Eliminar columnas que has indicado que sobran
-    unwanted = [
-        "ENodeBFunctionId",
-        "coverageIndicator",
-        "createdBy",
-        "essCellScPairs",
-        "essEnabled",
-        "gUtranCellRelationId",
-        "isEndcAllowed",
-        "isHoAllowed",
-        "isRemoveAllowed",
-        "isVoiceHoAllowed",
-        "mobilityStatusNR",
-        "neighborCellRef",
-        "reservedBy",
-        "timeOfCreation",
-        "userLabel",
+    # Final column set: keep only relevant columns and force Correction_Cmd to be last
+    desired_cols = [
+        "NodeId",
+        "EUtranCellFDDId",
+        "GUtranFreqRelationId",
+        "GUtranCellRelationId",
+        "Freq_Pre",
+        "Freq_Post",
+        "Correction_Cmd",
     ]
-    df = drop_columns(df, unwanted)
+    cols = [c for c in desired_cols if c in df.columns]
+    df = df[cols]
     return df
 
 
@@ -359,6 +401,7 @@ def build_gu_disc(
         return del_cmd or create_cmd
 
     work["Correction_Cmd"] = [combine_cmds(d, c) for d, c in zip(del_cmds, create_cmds)]
+    # For _disc we keep all original discrepancy columns + Correction_Cmd
     return work
 
 
@@ -372,57 +415,106 @@ def build_nr_new(df: pd.DataFrame, relations_df: Optional[pd.DataFrame]) -> pd.D
     Format example:
       del NRCellCU=<NRCellCUId>,NRCellRelation=<NRCellRelationId>
     """
+    # -----------------------------
+    # Edge case: empty / None df
+    # -----------------------------
     if df is None or df.empty:
         df = df.copy() if df is not None else pd.DataFrame()
-        df["Correction_Cmd"] = ""
-        if "NRCellRelationId" not in df.columns:
-            df["NRCellRelationId"] = ""
+
+        # Ensure key columns exist
+        for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
+
+        # Helper / frequency columns
         if "GNBCUCPFunctionId" not in df.columns:
             df["GNBCUCPFunctionId"] = ""
-        # NEW: ensure Freq_Pre / Freq_Post exist in _new (Pre empty, Post can be used)
-        df["Freq_Pre"] = ""
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""
         if "Freq_Post" not in df.columns:
             df["Freq_Post"] = ""
-        df = ensure_column_after(df, "GNBCUCPFunctionId", "NRCellRelationId")
-        return df
 
-    df = df.copy()
+        # Correction_Cmd column (empty)
+        df["Correction_Cmd"] = ""
 
-    relations_lookup = _build_lookup(relations_df, ["NodeId", "NRCellCUId", "NRCellRelationId"])
+    else:
+        # -----------------------------
+        # Normal case
+        # -----------------------------
+        df = df.copy()
 
-    for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
-        if col not in df.columns:
-            df[col] = ""
-    if "GNBCUCPFunctionId" not in df.columns:
-        df["GNBCUCPFunctionId"] = ""
+        # Ensure key columns exist
+        for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
 
-    # NEW: ensure Freq_Pre / Freq_Post also exist in NR_new
-    df["Freq_Pre"] = ""  # in _new tables Pre must be empty
-    if "Freq_Post" not in df.columns:
-        df["Freq_Post"] = ""
+        # Ensure helper / frequency columns exist
+        if "GNBCUCPFunctionId" not in df.columns:
+            df["GNBCUCPFunctionId"] = ""
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""   # in _new tables Pre must be empty
+        if "Freq_Post" not in df.columns:
+            df["Freq_Post"] = ""
 
-    df["NodeId"] = df["NodeId"].astype(str).str.strip()
-    df["NRCellCUId"] = df["NRCellCUId"].astype(str).str.strip()
-    df["NRCellRelationId"] = df["NRCellRelationId"].astype(str).str.strip()
+        # Normalize key columns
+        df["NodeId"] = df["NodeId"].astype(str).str.strip()
+        df["NRCellCUId"] = df["NRCellCUId"].astype(str).str.strip()
+        df["NRCellRelationId"] = df["NRCellRelationId"].astype(str).str.strip()
 
-    def build_command(row: pd.Series) -> str:
-        key = (
-            str(row.get("NodeId", "")).strip(),
-            str(row.get("NRCellCUId", "")).strip(),
-            str(row.get("NRCellRelationId", "")).strip(),
+        # Lookup that also carries nRCellRef to be able to extract GNBCUCPFunction segment
+        relations_lookup = _build_lookup(
+            relations_df,
+            ["NodeId", "NRCellCUId", "NRCellRelationId"],
+            extra_strip_cols=["nRCellRef"],
         )
-        rel_row = relations_lookup.get(key)
-        src = rel_row if rel_row is not None else row
 
-        nr_cell_cu = str(src.get("NRCellCUId") or "").strip()
-        nr_cell_rel = str(src.get("NRCellRelationId") or "").strip()
-        if not (nr_cell_cu and nr_cell_rel):
-            return ""
+        # -----------------------------
+        # Build delete commands
+        # -----------------------------
+        def build_command(row: pd.Series) -> str:
+            key = (
+                str(row.get("NodeId", "")).strip(),
+                str(row.get("NRCellCUId", "")).strip(),
+                str(row.get("NRCellRelationId", "")).strip(),
+            )
+            rel_row = relations_lookup.get(key)
+            src = rel_row if rel_row is not None else row
 
-        return f"del NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel}"
+            nr_cell_cu = str(src.get("NRCellCUId") or "").strip()
+            nr_cell_rel = str(src.get("NRCellRelationId") or "").strip()
+            if not (nr_cell_cu and nr_cell_rel):
+                return ""
 
-    df["Correction_Cmd"] = df.apply(build_command, axis=1)
+            return f"del NRCellCU={nr_cell_cu},NRCellRelation={nr_cell_rel}"
+
+        df["Correction_Cmd"] = df.apply(build_command, axis=1)
+
+        # -----------------------------
+        # Fill GNBCUCPFunctionId from nRCellRef (same logic style as missing/disc)
+        # -----------------------------
+        df["GNBCUCPFunctionId"] = df.apply(
+            lambda r: _extract_gnbcucp_segment(_resolve_nrcell_ref(r, relations_lookup)),
+            axis=1,
+        )
+
+    # Place GNBCUCPFunctionId after NRCellRelationId
     df = ensure_column_after(df, "GNBCUCPFunctionId", "NRCellRelationId")
+
+    # -----------------------------
+    # Final column set for NR_new:
+    # keep only relevant columns and force Correction_Cmd to be last
+    # -----------------------------
+    desired_cols = [
+        "NodeId",
+        "NRCellCUId",
+        "NRCellRelationId",
+        "GNBCUCPFunctionId",
+        "Freq_Pre",
+        "Freq_Post",
+        "Correction_Cmd",
+    ]
+    cols = [c for c in desired_cols if c in df.columns]
+    df = df[cols]
     return df
 
 
@@ -440,34 +532,43 @@ def build_nr_missing(
     """
     if df is None or df.empty:
         df = df.copy() if df is not None else pd.DataFrame()
-        df["Correction_Cmd"] = ""
-        if "NRCellRelationId" not in df.columns:
-            df["NRCellRelationId"] = ""
+        # Minimal columns to keep sheet structure stable
+        for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
+            if col not in df.columns:
+                df[col] = ""
         if "GNBCUCPFunctionId" not in df.columns:
             df["GNBCUCPFunctionId"] = ""
+        if "Freq_Pre" not in df.columns:
+            df["Freq_Pre"] = ""
+        if "Freq_Post" not in df.columns:
+            df["Freq_Post"] = ""
+        df["Correction_Cmd"] = ""
         df = ensure_column_after(df, "GNBCUCPFunctionId", "NRCellRelationId")
-        return df
+
+        desired_cols = [
+            "NodeId",
+            "NRCellCUId",
+            "NRCellRelationId",
+            "GNBCUCPFunctionId",
+            "Freq_Pre",
+            "Freq_Post",
+            "Correction_Cmd",
+        ]
+        cols = [c for c in desired_cols if c in df.columns]
+        return df[cols]
 
     df = df.copy()
 
-    relations_lookup = _build_lookup(
-        relations_df, ["NodeId", "NRCellCUId", "NRCellRelationId"], extra_strip_cols=["nRCellRef"]
-    )
-
-    needed_cols = [
-        "NodeId",
-        "NRCellCUId",
-        "NRCellRelationId",
-        "coverageIndicator",
-        "isHoAllowed",
-        "isRemoveAllowed",
-        "sCellCandidate",
-        "nRCellRef",
-        "nRFreqRelationRef",
-    ]
-    for col in needed_cols:
+    # Ensure key columns exist
+    for col in ("NodeId", "NRCellCUId", "NRCellRelationId"):
         if col not in df.columns:
             df[col] = ""
+
+    # Freq_Pre / Freq_Post may come from comparison; ensure they exist
+    if "Freq_Pre" not in df.columns:
+        df["Freq_Pre"] = ""
+    if "Freq_Post" not in df.columns:
+        df["Freq_Post"] = ""
 
     if "GNBCUCPFunctionId" not in df.columns:
         df["GNBCUCPFunctionId"] = ""
@@ -475,6 +576,10 @@ def build_nr_missing(
     df["NodeId"] = df["NodeId"].astype(str).str.strip()
     df["NRCellCUId"] = df["NRCellCUId"].astype(str).str.strip()
     df["NRCellRelationId"] = df["NRCellRelationId"].astype(str).str.strip()
+
+    relations_lookup = _build_lookup(
+        relations_df, ["NodeId", "NRCellCUId", "NRCellRelationId"], extra_strip_cols=["nRCellRef"]
+    )
 
     def build_command(row: pd.Series) -> str:
         key = (
@@ -543,30 +648,26 @@ def build_nr_missing(
 
     df["Correction_Cmd"] = df.apply(build_command, axis=1)
 
-    # GNBCUCPFunctionId se rellena desde nRCellRef
-    if "nRCellRef" in df.columns:
-        df["GNBCUCPFunctionId"] = df["nRCellRef"].astype(str).apply(_extract_gnbcucp_segment)
+    # GNBCUCPFunctionId se rellena desde nRCellRef usando la tabla de relaciones
+    df["GNBCUCPFunctionId"] = df.apply(
+        lambda r: _extract_gnbcucp_segment(_resolve_nrcell_ref(r, relations_lookup)),
+        axis=1,
+    )
 
     df = ensure_column_after(df, "GNBCUCPFunctionId", "NRCellRelationId")
 
-    unwanted = [
-        "acaMode",
-        "caStatusActive",
-        "caStatusInfo",
-        "cellIndividualOffsetNR",
-        "colocationIndicator",
-        "coordinationType",
-        "coverageIndicator",
-        "epLoadMonitoringEnabled",
-        "isHoAllowed",
-        "isRemoveAllowed",
-        "nRCellRef",
-        "nRCellRelationId",
-        "nRFreqRelationRef",
-        "preferredCellManual",
-        "sCellCandidate",
+    # Final column set: keep only relevant columns and force Correction_Cmd to be last
+    desired_cols = [
+        "NodeId",
+        "NRCellCUId",
+        "NRCellRelationId",
+        "GNBCUCPFunctionId",
+        "Freq_Pre",
+        "Freq_Post",
+        "Correction_Cmd",
     ]
-    df = drop_columns(df, unwanted)
+    cols = [c for c in desired_cols if c in df.columns]
+    df = df[cols]
     return df
 
 
@@ -628,6 +729,14 @@ def build_nr_disc(
 
     work["Correction_Cmd"] = [combine_cmds(d, c) for d, c in zip(del_cmds, create_cmds)]
     work = ensure_column_after(work, "GNBCUCPFunctionId", "NRCellRelationId")
+
+    # Remove raw nRCellRef / nrCellRef column if it is completely empty
+    for col_name in ("nRCellRef", "nrCellRef"):
+        if col_name in work.columns:
+            if work[col_name].astype(str).str.strip().eq("").all():
+                work = work.drop(columns=[col_name])
+
+    # For _disc we keep all original discrepancy columns + GNBCUCPFunctionId + Correction_Cmd
     return work
 
 

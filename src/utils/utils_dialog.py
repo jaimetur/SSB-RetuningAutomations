@@ -10,20 +10,33 @@ except Exception:
     messagebox = None
 
 def ask_reopen_launcher() -> bool:
-    """Ask the user if the launcher should reopen after a module finishes."""
-    if messagebox is None:
-        return False
+    """
+    Ask the user if the launcher should reopen after a module finishes.
+
+    - If Tkinter/messagebox are available, create a *temporary* hidden root
+      just for this dialog and destroy it afterwards.
+    - Otherwise, fall back to console.
+    """
+    title = "Finished"
+    message = "The selected task has finished.\nDo you want to open the launcher again?"
+
+    # Sin GUI → consola
+    if tk is None or messagebox is None:
+        return ask_yes_no_dialog(title, message, default=False)
+
     try:
-        # Ensure there is a Tk root before showing the dialog (optional, if you need it)
-        if tk is not None and tk._default_root is None:
-            root = tk.Tk()
-            root.withdraw()
-        return bool(messagebox.askyesno(
-            "Finished",
-            "The selected task has finished.\nDo you want to open the launcher again?"
-        ))
+        # Crear root temporal para este diálogo
+        root = tk.Tk()
+        root.withdraw()
+        try:
+            answer = messagebox.askyesno(title, message, parent=root)
+            return bool(answer)
+        finally:
+            # MUY IMPORTANTE: destruir el root temporal
+            root.destroy()
     except Exception:
-        return False
+        # Cualquier problema con Tk → fallback a consola
+        return ask_yes_no_dialog(title, message, default=False)
 
 
 def ask_yes_no_dialog(title: str, message: str, default: bool = False) -> bool:

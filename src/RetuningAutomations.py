@@ -223,6 +223,38 @@ def gui_config_dialog(
     except Exception:
         pass
 
+    # --- Always center the window on screen ---
+    try:
+        root.update_idletasks()  # ensures geometry is updated
+
+        w = root.winfo_width()
+        h = root.winfo_height()
+
+        # Fallback in case Tk returns tiny numbers (happens in some systems)
+        if w < 100 or h < 100:
+            w, h = 760, 720  # your target size
+
+        sw = root.winfo_screenwidth()
+        sh = root.winfo_screenheight()
+
+        x = (sw // 2) - (w // 2)
+        y = (sh // 2) - (h // 2)
+
+        root.geometry(f"{w}x{h}+{x}+{y}")
+    except Exception:
+        pass
+
+    # Try to bring the launcher window to the front
+    try:
+        root.lift()
+        root.attributes("-topmost", True)
+        # Disable "always on top" after a short delay so it behaves normally
+        root.after(200, lambda: root.attributes("-topmost", False))
+        root.focus_force()
+    except Exception:
+        # If anything fails here, do not break the GUI
+        pass
+
     # Vars
     module_var = tk.StringVar(value=MODULE_NAMES[0])
     input_var = tk.StringVar(value=module_single_defaults.get(MODULE_NAMES[0], default_input or ""))
@@ -1368,8 +1400,12 @@ def main():
         while True:
             sel = gui_config_dialog(
                 default_input=default_input,
+                default_input_audit=default_input_audit,
                 default_input_cc_pre=default_input_cc_pre,
                 default_input_cc_post=default_input_cc_post,
+                default_input_cc_bulk=default_input_cc_bulk,
+                default_input_initial_cleanup=default_input_initial_cleanup,
+                default_input_final_cleanup=default_input_final_cleanup,
                 default_n77_ssb_pre=default_n77_ssb_pre,
                 default_n77_ssb_post=default_n77_ssb_post,
                 default_n77b_ssb=default_n77b_ssb,
@@ -1378,10 +1414,6 @@ def main():
                 default_allowed_n77_arfcn_csv=default_allowed_n77_arfcn_pre_csv,
                 default_allowed_n77_ssb_post_csv=default_allowed_n77_ssb_post_csv,
                 default_allowed_n77_arfcn_post_csv=default_allowed_n77_arfcn_post_csv,
-                default_input_audit=default_input_audit,
-                default_input_cc_bulk=default_input_cc_bulk,
-                default_input_initial_cleanup=default_input_initial_cleanup,
-                default_input_final_cleanup=default_input_final_cleanup,
             )
             if sel is None:
                 raise SystemExit("Cancelled.")

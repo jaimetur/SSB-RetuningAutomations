@@ -24,6 +24,28 @@ class ConsistencyChecks:
     DATE_RE = re.compile(r"(?P<date>(19|20)\d{6})")  # yyyymmdd
     SUMMARY_RE = re.compile(r"^\s*\d+\s+instance\(s\)\s*$", re.IGNORECASE)
 
+
+    # ------------------------------------------------------------------
+    #  CONSTRUCTOR
+    # ------------------------------------------------------------------
+    def __init__(self, n77_ssb_pre: Optional[str] = None, n77_ssb_post: Optional[str] = None) -> None:
+        # NEW: store N77 SSB frequencies for Pre and Post
+        self.n77_ssb_pre: Optional[str] = n77_ssb_pre
+        self.n77_ssb_post: Optional[str] = n77_ssb_post
+
+        self.tables: Dict[str, pd.DataFrame] = {}
+        # NEW: flags to signal whether at least one Pre/Post folder was found
+        self.pre_folder_found: bool = False
+        self.post_folder_found: bool = False
+        # NEW: keep only per-table/per-side source file paths to be used exclusively in Summary (do not store them in DataFrames)
+        self._source_paths: Dict[str, Dict[str, List[tuple]]] = {
+            "GUtranCellRelation": {"Pre": [], "Post": []},
+            "NRCellRelation": {"Pre": [], "Post": []},
+        }
+        # NEW: keep paths to PRE/POST ConfigurationAudit Excel files
+        self.audit_pre_excel: Optional[str] = None
+        self.audit_post_excel: Optional[str] = None
+
     # ------------------------------------------------------------------
     #  SHARED SMALL HELPERS (para reducir líneas en funciones repetidas)
     # ------------------------------------------------------------------
@@ -145,30 +167,9 @@ class ConsistencyChecks:
             return s
         return ""
 
-    # ------------------------------------------------------------------
-    #  CTOR
-    # ------------------------------------------------------------------
-    def __init__(self, n77_ssb_pre: Optional[str] = None, n77_ssb_post: Optional[str] = None) -> None:
-        # NEW: store N77 SSB frequencies for Pre and Post
-        self.n77_ssb_pre: Optional[str] = n77_ssb_pre
-        self.n77_ssb_post: Optional[str] = n77_ssb_post
-
-        self.tables: Dict[str, pd.DataFrame] = {}
-        # NEW: flags to signal whether at least one Pre/Post folder was found
-        self.pre_folder_found: bool = False
-        self.post_folder_found: bool = False
-        # NEW: keep only per-table/per-side source file paths to be used exclusively in Summary (do not store them in DataFrames)
-        self._source_paths: Dict[str, Dict[str, List[tuple]]] = {
-            "GUtranCellRelation": {"Pre": [], "Post": []},
-            "NRCellRelation": {"Pre": [], "Post": []},
-        }
-        # NEW: keep paths to PRE/POST ConfigurationAudit Excel files
-        self.audit_pre_excel: Optional[str] = None
-        self.audit_post_excel: Optional[str] = None
-
     # --------- folder helpers ---------
     @staticmethod
-    def detect_prepost(folder_name: str) -> Optional[str]:
+    def _detect_prepost(folder_name: str) -> Optional[str]:
         name = folder_name.lower()
         if any(tok in name for tok in ConsistencyChecks.PRE_TOKENS):
             return "Pre"
@@ -177,18 +178,18 @@ class ConsistencyChecks:
         return None
 
     @staticmethod
-    def insert_front_columns(df: pd.DataFrame, prepost: str, date_str: Optional[str]) -> pd.DataFrame:
+    def _insert_front_columns(df: pd.DataFrame, prepost: str, date_str: Optional[str]) -> pd.DataFrame:
         df = df.copy()
         df.insert(0, "Pre/Post", prepost)
         df.insert(1, "Date", date_str if date_str else "")
         return df
 
     @staticmethod
-    def table_key_name(table_base: str) -> str:
+    def _table_key_name(table_base: str) -> str:
         return table_base.strip()
 
     # ----------------------------- LOADING ----------------------------- #
-    def _collect_from_dir(self, dir_path: str, prepost: str, collected: Dict[str, List[pd.DataFrame]]) -> None:
+    def collect_from_dir(self, dir_path: str, prepost: str, collected: Dict[str, List[pd.DataFrame]]) -> None:
         """
         Small helper used in both legacy and dual-input modes to avoid duplication.
         """
@@ -220,7 +221,7 @@ class ConsistencyChecks:
                 if df is None or df.empty:
                     continue
 
-                df = self.insert_front_columns(df, prepost, date_str)
+                df = self._insert_front_columns(df, prepost, date_str)
                 # NEW: store file path only for Summary; do not persist it inside DataFrames
                 self._source_paths.setdefault(mo, {}).setdefault(prepost, []).append((date_str or "", fpath))
                 collected[mo].append(df)
@@ -246,14 +247,14 @@ class ConsistencyChecks:
             for entry in os.scandir(input_dir):
                 if not entry.is_dir():
                     continue
-                prepost = self.detect_prepost(entry.name)
+                prepost = self._detect_prepost(entry.name)
                 if not prepost:
                     continue
                 if prepost == "Pre":
                     self.pre_folder_found = True
                 elif prepost == "Post":
                     self.post_folder_found = True
-                self._collect_from_dir(entry.path, prepost, collected)
+                self.collect_from_dir(entry.path, prepost, collected)
 
             if not self.pre_folder_found:
                 print(f"[INFO] 'Pre' folder not found under: {input_dir}. Returning to GUI.")
@@ -271,14 +272,14 @@ class ConsistencyChecks:
 
             self.pre_folder_found = True
             self.post_folder_found = True
-            self._collect_from_dir(pre_dir, "Pre", collected)
-            self._collect_from_dir(post_dir, "Post", collected)
+            self.collect_from_dir(pre_dir, "Pre", collected)
+            self.collect_from_dir(post_dir, "Post", collected)
 
             if not any(collected.values()):
                 print(f"[WARNING] No GU/NR tables were loaded from: {pre_dir} and {post_dir}.")
 
         self.tables = {
-            self.table_key_name(base): pd.concat(chunks, ignore_index=True)
+            self._table_key_name(base): pd.concat(chunks, ignore_index=True)
             for base, chunks in collected.items() if chunks
         }
         return self.tables
@@ -424,7 +425,7 @@ class ConsistencyChecks:
                 continue
 
             # Pick representative source file for Summary from internal paths (no DF column)
-            def _pick_src(tbl: str, side: str, target_date: str) -> str:
+            def pick_src(tbl: str, side: str, target_date: str) -> str:
                 pool = self._source_paths.get(tbl, {}).get(side, [])
                 # Prefer exact date match (latest set), else first available
                 for d, p in pool:
@@ -434,8 +435,8 @@ class ConsistencyChecks:
 
             pre_date = pre_df_full["Date"].max() if not pre_df_full.empty and "Date" in pre_df_full.columns else ""
             post_date = post_df_full["Date"].max() if not post_df_full.empty and "Date" in post_df_full.columns else ""
-            pre_source_file = _pick_src(table_name, "Pre", pre_date)
-            post_source_file = _pick_src(table_name, "Post", post_date)
+            pre_source_file = pick_src(table_name, "Pre", pre_date)
+            post_source_file = pick_src(table_name, "Post", post_date)
 
             pre_norm = normalize_df(pre_df_full)
             post_norm = normalize_df(post_df_full)
@@ -575,26 +576,38 @@ class ConsistencyChecks:
                 for col in missing_in_post.columns:
                     missing_in_post[col] = missing_in_post[col].astype(str)
 
-            # --- minimal replacement for new/missing frequency pairing ---
+            # --- light construction for new/missing tables (only keys + Freq_Pre/Freq_Post) ---
             def with_freq_pair(df_src: pd.DataFrame, tbl: str, kind: str) -> pd.DataFrame:
                 """
-                Build a light table for pair counting:
-                  - Compute base frequency from freq_col
-                  - For 'new': set Freq_Pre="" and Freq_Post=base
-                  - For 'missing': set Freq_Pre=base and Freq_Post=""
-                  - Drop only meta columns ('Pre/Post', 'Date'); keep freq_col if present
+                Build a light table for _new / _missing:
+                  - Use only key columns (plus NodeId if present).
+                  - Compute base frequency from freq_col.
+                  - For 'new':   Freq_Pre = ""        , Freq_Post = base
+                  - For 'missing': Freq_Pre = base    , Freq_Post = ""
+                  - Do not drag all relation columns; keep them only in all_relations.
                 """
                 if df_src is None or df_src.empty:
                     return df_src
 
-                df_tmp = df_src.copy()
-                for col in df_tmp.columns:
-                    df_tmp[col] = df_tmp[col].astype(str)
+                df_src = df_src.copy()
+                for col in df_src.columns:
+                    df_src[col] = df_src[col].astype(str)
 
+                # Base frequency from main freq_col
                 if tbl == "NRCellRelation":
-                    base = extract_nr_freq_base(df_tmp.get(freq_col, pd.Series("", index=df_tmp.index)))
+                    base = extract_nr_freq_base(df_src.get(freq_col, pd.Series("", index=df_src.index)))
                 else:
-                    base = extract_gu_freq_base(df_tmp.get(freq_col, pd.Series("", index=df_tmp.index)))
+                    base = extract_gu_freq_base(df_src.get(freq_col, pd.Series("", index=df_src.index)))
+
+                # Keep only key columns (and NodeId if not already included)
+                keep_cols: List[str] = []
+                if "NodeId" in df_src.columns:
+                    keep_cols.append("NodeId")
+                for c in key_cols:
+                    if c in df_src.columns and c not in keep_cols:
+                        keep_cols.append(c)
+
+                df_tmp = df_src[keep_cols].copy()
 
                 if kind == "new":
                     df_tmp["Freq_Pre"] = ""
@@ -606,7 +619,7 @@ class ConsistencyChecks:
                     df_tmp["Freq_Pre"] = ""
                     df_tmp["Freq_Post"] = ""
 
-                return df_tmp.drop(columns=[c for c in ["Pre/Post", "Date"] if c in df_tmp.columns], errors="ignore")
+                return df_tmp
 
             new_in_post_clean = with_freq_pair(new_in_post, table_name, kind="new")
             missing_in_post_clean = with_freq_pair(missing_in_post, table_name, kind="missing")
