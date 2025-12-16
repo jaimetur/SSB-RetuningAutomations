@@ -1603,14 +1603,14 @@ def build_summary_audit(
                         add_row(
                             "ExternalGUtranCell",
                             "LTE Frequency Audit",
-                            f"External cells to old N77 SSB ({old_ssb}) serviceStatus OUT_OF_SERVICE (from ExternalGUtranCell)",
+                            f"External cells to old N77 SSB ({old_ssb}) with serviceStatus=OUT_OF_SERVICE (from ExternalGUtranCell)",
                             count_old_oos,
                             "",  # keep ExtraInfo empty to avoid huge lists
                         )
                         add_row(
                             "ExternalGUtranCell",
                             "LTE Frequency Audit",
-                            f"External cells to new N77 SSB ({new_ssb}) serviceStatus OUT_OF_SERVICE (from ExternalGUtranCell)",
+                            f"External cells to new N77 SSB ({new_ssb}) with serviceStatus=OUT_OF_SERVICE (from ExternalGUtranCell)",
                             count_new_oos,
                             "",  # keep ExtraInfo empty to avoid huge lists
                         )
@@ -1676,13 +1676,13 @@ def build_summary_audit(
                     add_row(
                         "TermPointToGNodeB",
                         "NR Termpoint Audit",
-                        "NR to NR TermPoint administrativeState LOCKED (from TermPointToGNodeB)",
+                        "NR to NR TermPoints with administrativeState=LOCKED (from TermPointToGNodeB)",
                         count_admin_locked,
                     )
                     add_row(
                         "TermPointToGNodeB",
                         "NR Termpoint Audit",
-                        "NR to NR TermPoint operationalState DISABLED (from TermPointToGNodeB)",
+                        "NR to NR TermPoints with operationalState=DISABLED (from TermPointToGNodeB)",
                         count_oper_disabled,
                     )
                 else:
