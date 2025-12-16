@@ -12,7 +12,7 @@
   - #### 🚨 Breaking Changes:
   
   - #### 🌟 New Features:
-    - New metrics to `ConfigurationAudit` module to count:
+    - New metrics added to `ConfigurationAudit` module to count:
       - Table/Category: `ExternalNRCellCU`
         - ExternalNRCellCU to old N77 SSB (from ExternalNRCellCU)
         - ExternalNRCellCU to new N77 SSB (from ExternalNRCellCU)
