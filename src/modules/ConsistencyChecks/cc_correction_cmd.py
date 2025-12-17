@@ -670,14 +670,24 @@ def export_external_and_termpoint_commands(
     ) -> Optional[str]:
         """
         Internal helper to export commands from a Configuration Audit Excel sheet.
+        Sheet name matching is case-insensitive for robustness.
         """
         if not audit_excel or not os.path.isfile(audit_excel):
             return None
 
         try:
-            df = pd.read_excel(audit_excel, sheet_name=sheet_name)
+            xl = pd.ExcelFile(audit_excel)
+            sheet_map = {s.lower(): s for s in xl.sheet_names}
+            real_sheet = sheet_map.get(sheet_name.lower())
+            if not real_sheet:
+                return None
+            df = xl.parse(real_sheet)
         except Exception:
             return None
+
+        # Allow backward compatibility with old column name
+        if command_column not in df.columns and "Correction Command" in df.columns:
+            command_column = "Correction Command"
 
         if command_column not in df.columns:
             return None

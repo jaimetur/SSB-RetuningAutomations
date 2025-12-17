@@ -16,7 +16,8 @@
   - #### 🚀 Enhancements:
   
   - #### 🐛 Bug fixes:
-    - Fixed `ERROR: 'str' object has no attribute 'astype'` on `ConfigurationAudit` module when `availabilityStatus`column is not found.
+    - Fixed `ERROR: 'str' object has no attribute 'astype'` on `ConfigurationAudit` module when `availabilityStatus` column is not found.
+    - Fixed Error when any MO has the same name as the expected table but with some letter in upper/lower capital.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
