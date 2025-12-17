@@ -14,6 +14,8 @@ from src.utils.utils_frequency import detect_freq_column, detect_key_columns, ex
 from src.utils.utils_io import read_text_lines, to_long_path, pretty_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 from src.modules.Common.Common_Functions import load_nodes_names_and_id_from_summary_audit
+from src.modules.ConsistencyChecks.cc_correction_cmd import export_external_and_termpoint_commands
+
 
 
 class ConsistencyChecks:
@@ -924,10 +926,13 @@ class ConsistencyChecks:
                 empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
 
-            # Export text files (outside GU/NR blocks, como ya tenías)
+            # Export text files (outside GU/NR blocks)
             if correction_cmd_sources:
                 cmd_files = export_correction_cmd_texts(output_dir, correction_cmd_sources)
 
+            # Export Correction Commands for Externals and Termpoints in txt
+            if self.audit_post_excel:
+                export_external_and_termpoint_commands(self.audit_post_excel, output_dir)
 
             # -------------------------------------------------------------------
             #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
@@ -943,4 +948,3 @@ class ConsistencyChecks:
             if ws_comp is not None:
                 # Use default parameters: Category header name and default colors
                 apply_alternating_category_row_fills(ws_comp)
-

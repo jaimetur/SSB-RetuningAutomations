@@ -641,6 +641,86 @@ def build_nr_disc(
     # For _disc we keep all original discrepancy columns + GNBCUCPFunctionId + Correction_Cmd
     return work
 
+# ----------------------------- EXTERNAL/TERMPOINTS COMMANDS ----------------------------- #
+def export_external_and_termpoint_commands(
+    audit_post_excel: str,
+    output_dir: str,
+) -> int:
+    """
+    Export correction commands coming from POST Configuration Audit Excel:
+      - ExternalNRCellCU (SSB-Post)
+      - ExternalNRCellCU (N/A)
+      - TermPointToGNodeB
+
+    Files are written under:
+      <output_dir>/Correction_Cmd/Externals
+      <output_dir>/Correction_Cmd/Termpoints
+
+    Returns the number of generated files.
+    """
+    if not audit_post_excel or not os.path.isfile(audit_post_excel):
+        return 0
+
+    base_dir = os.path.join(output_dir, "Correction_Cmd")
+    external_dir = os.path.join(base_dir, "Externals")
+    termpoints_dir = os.path.join(base_dir, "Termpoints")
+
+    os.makedirs(external_dir, exist_ok=True)
+    os.makedirs(termpoints_dir, exist_ok=True)
+
+    generated = 0
+
+    # -----------------------------
+    # ExternalNRCellCU - SSB-Post
+    # -----------------------------
+    out = export_externals_and_termpoints_commands(
+        audit_excel=audit_post_excel,
+        output_dir=external_dir,
+        sheet_name="ExternalNRCellCU",
+        command_column="Correction Command",
+        filter_column="GNodeB_SSB_Target",
+        filter_value="SSB-Post",
+        output_filename="ExternalNRCellCU_SSB-Post.txt",
+    )
+    if out:
+        generated += 1
+
+    # -----------------------------
+    # ExternalNRCellCU - Others (N/A)
+    # -----------------------------
+    out = export_externals_and_termpoints_commands(
+        audit_excel=audit_post_excel,
+        output_dir=external_dir,
+        sheet_name="ExternalNRCellCU",
+        command_column="Correction Command",
+        filter_column="GNodeB_SSB_Target",
+        filter_value="N/A",
+        output_filename="ExternalNRCellCU_SSB-Others.txt",
+    )
+    if out:
+        generated += 1
+
+    # -----------------------------
+    # TermPointToGNodeB
+    # -----------------------------
+    out = export_externals_and_termpoints_commands(
+        audit_excel=audit_post_excel,
+        output_dir=termpoints_dir,
+        sheet_name="TermPointToGNodeB",
+        command_column="Correction Command",
+        output_filename="TermPointToGNodeB.txt",
+    )
+    if out:
+        generated += 1
+
+    if generated:
+        print(
+            f"[Consistency Checks] Generated {generated} extra Correction_Cmd files "
+            f"from POST Configuration Audit in: '{pretty_path(base_dir)}'"
+        )
+
+    return generated
+
 
 # ----------------------------------------------------------------------
 #  EXPORT TEXT FILES
@@ -658,9 +738,13 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
     new_dir = os.path.join(base_dir, "New Relations")
     missing_dir = os.path.join(base_dir, "Missing Relations")
     discrepancies_dir = os.path.join(base_dir, "Discrepancies")
+    external_dir = os.path.join(base_dir, "Externals")
+    termpoints_dir = os.path.join(base_dir, "Termpoints")
     os.makedirs(new_dir, exist_ok=True)
     os.makedirs(missing_dir, exist_ok=True)
     os.makedirs(discrepancies_dir, exist_ok=True)
+    os.makedirs(external_dir, exist_ok=True)
+    os.makedirs(termpoints_dir, exist_ok=True)
 
     total_files = 0
 

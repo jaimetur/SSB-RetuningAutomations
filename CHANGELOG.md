@@ -43,6 +43,7 @@
       - `TermpointConsolidatedStatus`: Contains the current status of the termpoint in a consolidated way.
       - `SSB needs update`: Indicates those termpoints whose termpoint id has been found in `ExternalNRCellCU` with "SSB-Pre" and with `GNodeB_SSB_Target` different to "SSB-Pre".
       - `Correction Command`: Contains the correction command to fix the termpoint.
+    - Added Correction Commands for External Cells and Termpoints.
 
   - #### 🚀 Enhancements:
     - Excel columns Autofit now is limited to a maximum column width of 100.
