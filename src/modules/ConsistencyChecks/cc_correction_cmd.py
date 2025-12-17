@@ -649,7 +649,7 @@ def export_external_and_termpoint_commands(
     """
     Export correction commands coming from POST Configuration Audit Excel:
       - ExternalNRCellCU (SSB-Post)
-      - ExternalNRCellCU (N/A)
+      - ExternalNRCellCU (Other)
       - TermPointToGNodeB
 
     Files are written under:
@@ -733,7 +733,7 @@ def export_external_and_termpoint_commands(
         generated += 1
 
     # -----------------------------
-    # ExternalNRCellCU - Others (N/A)
+    # ExternalNRCellCU - Others (Other)
     # -----------------------------
     out = _export_commands_from_audit_sheet(
         audit_excel=audit_post_excel,
@@ -741,7 +741,7 @@ def export_external_and_termpoint_commands(
         sheet_name="ExternalNRCellCU",
         command_column="Correction Command",
         filter_column="GNodeB_SSB_Target",
-        filter_value="N/A",
+        filter_value="Other",
         output_filename="ExternalNRCellCU_SSB-Others.txt",
     )
     if out:

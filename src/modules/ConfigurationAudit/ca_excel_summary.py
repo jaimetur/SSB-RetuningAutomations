@@ -1222,7 +1222,7 @@ def build_summary_audit(
                                 return "SSB-Pre"
                             if any(n in val for n in nodes_with_retune_ids):
                                 return "SSB-Post"
-                            return "N/A"
+                            return "Other"
 
                         work["GNodeB_SSB_Target"] = work[ext_gnb_col].map(_detect_gnodeb_target)
 
