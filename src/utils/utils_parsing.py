@@ -347,3 +347,121 @@ def parse_arfcn_csv_to_set(
         return set(default_values)
 
     return set(values)
+
+
+def merge_command_blocks_for_node(blocks: List[str]) -> str:
+    """
+    Merge multiple multi-line command blocks into a single optimized script for a node.
+
+    Strategy:
+      1) Compute a common prefix (identical leading lines across all blocks) and hoist it once.
+      2) Compute a common suffix (identical trailing lines across all blocks) and hoist it once.
+      3) Inside the remaining per-block body, split by 'wait <n>' lines.
+         If all blocks share the same wait sequence, merge by phases:
+           phase0(all blocks) + wait1 + phase1(all blocks) + wait2 + phase2(all blocks) + ...
+      4) If wait sequences are not consistent, fallback to concatenating bodies sequentially.
+
+    Returns a single string with normalized newlines. Empty result means nothing to write.
+    """
+    if not blocks:
+        return ""
+
+    normalized_blocks = []
+    for b in blocks:
+        if b is None:
+            continue
+        text = str(b).replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+        if not text.strip():
+            continue
+        lines = [ln.rstrip() for ln in text.split("\n") if ln.strip() != ""]
+        if lines:
+            normalized_blocks.append(lines)
+
+    if not normalized_blocks:
+        return ""
+
+    # -----------------------------
+    # Common prefix
+    # -----------------------------
+    min_len = min(len(x) for x in normalized_blocks)
+    prefix_len = 0
+    for i in range(min_len):
+        candidate = normalized_blocks[0][i].strip()
+        if all(x[i].strip() == candidate for x in normalized_blocks[1:]):
+            prefix_len += 1
+        else:
+            break
+    common_prefix = normalized_blocks[0][:prefix_len] if prefix_len > 0 else []
+
+    # -----------------------------
+    # Common suffix
+    # -----------------------------
+    trimmed_for_suffix = [x[prefix_len:] for x in normalized_blocks]
+    min_len_suffix = min(len(x) for x in trimmed_for_suffix)
+    suffix_len = 0
+    for i in range(1, min_len_suffix + 1):
+        candidate = trimmed_for_suffix[0][-i].strip()
+        if all(x[-i].strip() == candidate for x in trimmed_for_suffix[1:]):
+            suffix_len += 1
+        else:
+            break
+    common_suffix = trimmed_for_suffix[0][-suffix_len:] if suffix_len > 0 else []
+
+    # -----------------------------
+    # Remove prefix/suffix from each block body
+    # -----------------------------
+    bodies = []
+    for lines in normalized_blocks:
+        body = lines[prefix_len:]
+        if suffix_len > 0:
+            body = body[:-suffix_len]
+        body = [ln.strip() for ln in body if ln.strip() != ""]
+        bodies.append(body)
+
+    # -----------------------------
+    # Split each body by wait lines
+    # -----------------------------
+    def _split_by_wait(lines: List[str]) -> Tuple[List[List[str]], List[str]]:
+        segments: List[List[str]] = [[]]
+        waits: List[str] = []
+        for ln in lines:
+            m = re.match(r"^\s*wait\s+(\d+)\s*$", ln, flags=re.IGNORECASE)
+            if m:
+                waits.append(f"wait {m.group(1)}")
+                segments.append([])
+            else:
+                segments[-1].append(ln)
+        return segments, waits
+
+    split_data = [_split_by_wait(b) for b in bodies]
+    waits_lists = [w for _, w in split_data]
+
+    # -----------------------------
+    # Merge by phases if waits are consistent
+    # -----------------------------
+    waits_reference = waits_lists[0]
+    waits_consistent = all(w == waits_reference for w in waits_lists[1:])
+
+    merged_lines: List[str] = []
+    merged_lines.extend(common_prefix)
+
+    if waits_consistent and waits_reference:
+        phases_per_block = [segs for segs, _ in split_data]
+        phases_count = len(phases_per_block[0])
+
+        for phase_idx in range(phases_count):
+            for segs in phases_per_block:
+                if phase_idx < len(segs):
+                    merged_lines.extend([ln for ln in segs[phase_idx] if ln.strip() != ""])
+            if phase_idx < len(waits_reference):
+                merged_lines.append(waits_reference[phase_idx])
+    else:
+        # Fallback: concatenate bodies sequentially without repeating prefix/suffix
+        for body in bodies:
+            merged_lines.extend(body)
+
+    merged_lines.extend(common_suffix)
+
+    # Final cleanup: remove accidental empty lines and normalize
+    out_lines = [ln.rstrip() for ln in merged_lines if ln.strip() != ""]
+    return "\n".join(out_lines).strip()

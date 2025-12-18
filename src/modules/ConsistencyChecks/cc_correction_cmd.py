@@ -17,7 +17,8 @@ from typing import Dict, Optional
 
 from src.utils.utils_dataframe import ensure_column_after, build_row_lookup, pick_non_empty_value
 from src.utils.utils_io import to_long_path, pretty_path
-from src.utils.utils_parsing import extract_gnbcucp_segment, resolve_nrcell_ref
+from src.utils.utils_parsing import extract_gnbcucp_segment, resolve_nrcell_ref, merge_command_blocks_for_node
+
 
 
 # ----------------------------------------------------------------------
@@ -749,8 +750,12 @@ def export_external_and_termpoint_commands(
             out_path = os.path.join(output_dir, file_name)
             out_path_long = to_long_path(out_path)
 
+            merged_script = merge_command_blocks_for_node(cmds)
+            if not merged_script.strip():
+                continue
+
             with open(out_path_long, "w", encoding="utf-8") as f:
-                f.write("\n\n".join(cmds))
+                f.write(merged_script)
 
             generated_files += 1
 
