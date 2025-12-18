@@ -229,14 +229,14 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
 
             if node_col and ref_col:
                 work[node_col] = work[node_col].astype(str).str.strip()
-                work["_ssb_int_"] = work[ref_col].map(_extract_ssb_from_gutran_sync_ref)
+                work["GNodeB_SSB_Target"] = work[ref_col].map(_extract_ssb_from_gutran_sync_ref)
 
                 old_ssb = n77_ssb_pre
                 new_ssb = n77_ssb_post
 
                 # Same logic as GUtranCellRelation: counts of relations/rows pointing to old/new
-                count_old = int((work["_ssb_int_"] == old_ssb).sum())
-                count_new = int((work["_ssb_int_"] == new_ssb).sum())
+                count_old = int((work["GNodeB_SSB_Source"] == old_ssb).sum())
+                count_new = int((work["GNodeB_SSB_Source"] == new_ssb).sum())
 
                 add_row(
                     "ExternalGUtranCell",
@@ -257,8 +257,8 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
                     mask_oos = work["_status_norm_"] == "OUT_OF_SERVICE"
 
                     # Count ROWS (not nodes) and don't dump lists in ExtraInfo
-                    count_old_oos = int(((work["_ssb_int_"] == old_ssb) & mask_oos).sum())
-                    count_new_oos = int(((work["_ssb_int_"] == new_ssb) & mask_oos).sum())
+                    count_old_oos = int(((work["GNodeB_SSB_Source"] == old_ssb) & mask_oos).sum())
+                    count_new_oos = int(((work["GNodeB_SSB_Source"] == new_ssb) & mask_oos).sum())
 
                     add_row(
                         "ExternalGUtranCell",
@@ -341,6 +341,11 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
                     work["TermpointConsolidatedStatus"] = work["Termpoint"].map(tp_map["TermpointConsolidatedStatus"])
 
         # -------------------------------------------------
+        # Place GNodeB_SSB_Source right after TermpointConsolidatedStatus
+        # -------------------------------------------------
+        work = ensure_column_after(work, "GNodeB_SSB_Target", "TermpointConsolidatedStatus")
+
+        # -------------------------------------------------
         # GNodeB_SSB_Target
         # -------------------------------------------------
         nodes_pre = set(load_nodes_names_and_id_from_summary_audit(rows, stage="Pre", module_name=module_name) or [])
@@ -363,7 +368,7 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
         if "Correction_Cmd" not in work.columns:
             work["Correction_Cmd"] = ""
 
-        mask_pre = work["_ssb_int_"] == n77_ssb_pre
+        mask_pre = work["GNodeB_SSB_Source"] == n77_ssb_pre
         mask_target = work["GNodeB_SSB_Target"] != "SSB-Pre"
 
         work.loc[mask_pre & mask_target, "Correction_Cmd"] = work.loc[mask_pre & mask_target].apply(
@@ -372,7 +377,7 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
             "gs+\n"
             "lt all\n"
             "alt\n"
-            f"set ExternalGNodeBFunction={r[ext_gnb_col]},ExternalGUtranCell={r.get('ExternalGUtranCellId', '')} "
+            f"set ENodeBFunction={r[ext_gnb_col]},ExternalGUtranCell={r.get('ExternalGUtranCellId', '')} "
             f"gUtranSyncSignalFrequencyRef GUtraNetwork=1,GUtranSyncSignalFrequency={n77_ssb_post}-30\n"
             "alt",
             axis=1,
