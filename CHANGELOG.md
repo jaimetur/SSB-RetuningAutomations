@@ -14,7 +14,7 @@
   - #### 🌟 New Features:
 
   - #### 🚀 Enhancements:
-    - Optimized TXT Commands file to group all commands within the same nodes and avoid duplicate lines with `confb+, lt all, alt o wait` commands.
+    - Optimized TXT Commands file to group all commands within the same nodes and avoid duplicate lines with `confb+, lt all, alt, wait` commands.
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
