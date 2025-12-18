@@ -110,6 +110,7 @@ def build_summary_audit(
         "NewValue",
     ]
 
+    # -------------------------------------  HELPERS (Embedded, minimal impact) -------------------------------------
     def is_not_old_not_new(v: object) -> bool:
         freq = parse_int_frequency(v)
         return freq not in (n77_ssb_pre, n77_ssb_post)
@@ -174,8 +175,7 @@ def build_summary_audit(
             }
         )
 
-    # ------------------------------------- NEW HELPERS (Embedded, minimal impact) -------------------------------------
-    def _extract_freq_from_nrfrequencyref(value: object) -> int | None:
+    def extract_freq_from_nrfrequencyref(value: object) -> int | None:
         """Extract NRFrequency integer from reference string like '...NRFrequency=648672'."""
         if value is None:
             return None
@@ -200,7 +200,7 @@ def build_summary_audit(
             return None
 
     # Helper embedded inside the main function
-    def _extract_freq_from_nrfreqrelationref(value: object) -> int | None:
+    def extract_freq_from_nrfreqrelationref(value: object) -> int | None:
         """Extract NRFreqRelation integer from NRCellRelation-like reference string."""
         if value is None:
             return None
@@ -223,7 +223,7 @@ def build_summary_audit(
         except Exception:
             return None
 
-    def _extract_ssb_from_gutran_sync_ref(value: object) -> int | None:
+    def extract_ssb_from_gutran_sync_ref(value: object) -> int | None:
         """
         Extract SSB integer from references containing:
           GUtranSyncSignalFrequency=647328-30
@@ -250,7 +250,7 @@ def build_summary_audit(
         except Exception:
             return None
 
-    def _extract_nrnetwork_tail(value: object) -> str:
+    def extract_nr_network_tail(value: object) -> str:
         """Return substring starting from 'NRNetwork='."""
         if value is None:
             return ""
@@ -258,13 +258,13 @@ def build_summary_audit(
         idx = s.find("NRNetwork=")
         return s[idx:] if idx != -1 else ""
 
-    def _normalize_state(value: object) -> str:
+    def normalize_state(value: object) -> str:
         """Normalize state values for robust comparisons."""
         if value is None or (isinstance(value, float) and pd.isna(value)):
             return ""
         return str(value).strip().upper()
 
-    def _normalize_ip(value: object) -> str:
+    def normalize_ip(value: object) -> str:
         """Normalize usedIpAddress values for robust comparisons."""
         if value is None or (isinstance(value, float) and pd.isna(value)):
             return ""
@@ -273,141 +273,139 @@ def build_summary_audit(
     # =======================================================================
     # ============================ MAIN CODE ================================
     # =======================================================================
-    def main() -> tuple[DataFrame, DataFrame, DataFrame]:
 
-        process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
-        process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr)
-        process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post)
-        process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set)
-        process_nr_cell_relation(df_nr_cell_rel, _extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row)
+    # NR Tables
+    process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
+    process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr)
+    process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post)
+    process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set)
+    process_nr_cell_relation(df_nr_cell_rel, extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row)
 
-        # NEW audits requested
-        process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, _extract_freq_from_nrfrequencyref, _extract_nrnetwork_tail)
-        process_term_point_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre)
+    # LTE Tables
+    process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
+    process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu)
+    process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row)
 
-        process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
-        process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu)
-        process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row)
+    # Externals & Termpoints tables
+    process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, extract_freq_from_nrfrequencyref, extract_nr_network_tail)
+    process_external_gutran_cell(df_external_gutran_cell, extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, normalize_state, df_term_point_to_gnb, rows, module_name)
+    process_term_point_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre)
+    process_term_point_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre)
+    process_term_point_to_enodeb(df_term_point_to_enodeb, normalize_state, add_row)
 
-        # NEW audits requested
-        process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, _normalize_state, df_term_point_to_gnb, rows, module_name)
-        process_term_point_to_gnb(df_term_point_to_gnb, _normalize_state, _normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre)
-        process_term_point_to_enodeb(df_term_point_to_enodeb, _normalize_state, add_row)
+    # Other Tables
+    process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row)
+    process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row)
+    process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel)
 
-        process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row)
-        process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row)
+    # If nothing was added, return at least an informational row
+    if not rows:
+        rows.append({
+            "Category": "Info",
+            "SubCategory": "Info",
+            "Metric": "SummaryAudit",
+            "Value": "No data available",
+            "ExtraInfo": "",
+        })
 
-        process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel)
+    # Build final DataFrame
+    df = pd.DataFrame(rows)
 
-        # If nothing was added, return at least an informational row
-        if not rows:
-            rows.append({
-                "Category": "Info",
-                "SubCategory": "Info",
-                "Metric": "SummaryAudit",
-                "Value": "No data available",
-                "ExtraInfo": "",
-            })
+    # Custom logical ordering for SummaryAudit (also drives PPT order)
+    if not df.empty and all(col in df.columns for col in ["Category", "SubCategory", "Metric"]):
+        # We now order only by (Category, SubCategory).
+        # Inside each group, rows keep the insertion order.
+        desired_order = [
+            # NR Frequency NRCellDU
+            ("NRCellDU", "NR Frequency Audit"),
+            ("NRCellDU", "NR Frequency Inconsistencies"),
 
-        # Build final DataFrame
-        df = pd.DataFrame(rows)
+            # NR Frequency NRFrequency
+            ("NRFrequency", "NR Frequency Audit"),
+            ("NRFrequency", "NR Frequency Inconsistencies"),
 
-        # Custom logical ordering for SummaryAudit (also drives PPT order)
-        if not df.empty and all(col in df.columns for col in ["Category", "SubCategory", "Metric"]):
-            # We now order only by (Category, SubCategory).
-            # Inside each group, rows keep the insertion order.
-            desired_order = [
-                # NR Frequency NRCellDU
-                ("NRCellDU", "NR Frequency Audit"),
-                ("NRCellDU", "NR Frequency Inconsistencies"),
+            # NR Frequency NRFreqRelation
+            ("NRFreqRelation", "NR Frequency Audit"),
+            ("NRFreqRelation", "NR Frequency Inconsistencies"),
 
-                # NR Frequency NRFrequency
-                ("NRFrequency", "NR Frequency Audit"),
-                ("NRFrequency", "NR Frequency Inconsistencies"),
+            # NR Frequency NRCellRelation
+            ("NRCellRelation", "NR Frequency Audit"),
+            ("NRCellRelation", "NR Frequency Inconsistencies"),
 
-                # NR Frequency NRFreqRelation
-                ("NRFreqRelation", "NR Frequency Audit"),
-                ("NRFreqRelation", "NR Frequency Inconsistencies"),
+            # NEW: ExternalNRCellCU
+            ("ExternalNRCellCU", "NR Frequency Audit"),
+            ("ExternalNRCellCU", "NR Frequency Inconsistencies"),
 
-                # NR Frequency NRCellRelation
-                ("NRCellRelation", "NR Frequency Audit"),
-                ("NRCellRelation", "NR Frequency Inconsistencies"),
+            # NEW: TermPointToGNodeB
+            ("TermPointToGNodeB", "NR Termpoint Audit"),
 
-                # NEW: ExternalNRCellCU
-                ("ExternalNRCellCU", "NR Frequency Audit"),
-                ("ExternalNRCellCU", "NR Frequency Inconsistencies"),
+            # NR Frequency NRSectorCarrier
+            ("NRSectorCarrier", "NR Frequency Audit"),
+            ("NRSectorCarrier", "NR Frequency Inconsistencies"),
 
-                # NEW: TermPointToGNodeB
-                ("TermPointToGNodeB", "NR Termpoint Audit"),
+            # LTE Frequency GUtranSyncSignalFrequency
+            ("GUtranSyncSignalFrequency", "LTE Frequency Audit"),
+            ("GUtranSyncSignalFrequency", "LTE Frequency Inconsistencies"),
 
-                # NR Frequency NRSectorCarrier
-                ("NRSectorCarrier", "NR Frequency Audit"),
-                ("NRSectorCarrier", "NR Frequency Inconsistencies"),
+            # LTE Frequency GUtranSyncSignalFrequency
+            ("GUtranFreqRelation", "LTE Frequency Audit"),
+            ("GUtranFreqRelation", "LTE Frequency Inconsistencies"),
 
-                # LTE Frequency GUtranSyncSignalFrequency
-                ("GUtranSyncSignalFrequency", "LTE Frequency Audit"),
-                ("GUtranSyncSignalFrequency", "LTE Frequency Inconsistencies"),
+            # LTE Frequency GUtranCellRelation
+            ("GUtranCellRelation", "LTE Frequency Audit"),
+            ("GUtranCellRelation", "LTE Frequency Inconsistencies"),
 
-                # LTE Frequency GUtranSyncSignalFrequency
-                ("GUtranFreqRelation", "LTE Frequency Audit"),
-                ("GUtranFreqRelation", "LTE Frequency Inconsistencies"),
+            # NEW: ExternalGUtranCell
+            ("ExternalGUtranCell", "LTE Frequency Audit"),
+            ("ExternalGUtranCell", "LTE Frequency Inconsistencies"),
 
-                # LTE Frequency GUtranCellRelation
-                ("GUtranCellRelation", "LTE Frequency Audit"),
-                ("GUtranCellRelation", "LTE Frequency Inconsistencies"),
+            # NEW: TermPointToGNB / TermPointToENodeB
+            ("TermPointToGNB", "X2 Termpoint Audit"),
+            ("TermPointToENodeB", "X2 Termpoint Audit"),
 
-                # NEW: ExternalGUtranCell
-                ("ExternalGUtranCell", "LTE Frequency Audit"),
-                ("ExternalGUtranCell", "LTE Frequency Inconsistencies"),
+            # EndcDistrProfile
+            ("EndcDistrProfile", "ENDC Audit"),
+            ("EndcDistrProfile", "ENDC Inconsistencies"),
 
-                # NEW: TermPointToGNB / TermPointToENodeB
-                ("TermPointToGNB", "X2 Termpoint Audit"),
-                ("TermPointToENodeB", "X2 Termpoint Audit"),
+            # FreqPrioNR
+            ("FreqPrioNR", "ENDC Audit"),
+            ("FreqPrioNR", "ENDC Inconsistencies"),
 
-                # EndcDistrProfile
-                ("EndcDistrProfile", "ENDC Audit"),
-                ("EndcDistrProfile", "ENDC Inconsistencies"),
+            # Cardinality NRFrequency
+            ("Cardinality NRFrequency", "Cardinality Audit"),
+            ("Cardinality NRFrequency", "Cardinality Inconsistencies"),
 
-                # FreqPrioNR
-                ("FreqPrioNR", "ENDC Audit"),
-                ("FreqPrioNR", "ENDC Inconsistencies"),
+            # Cardinality NRFreqRelation
+            ("Cardinality NRFreqRelation", "Cardinality Audit"),
+            ("Cardinality NRFreqRelation", "Cardinality Inconsistencies"),
 
-                # Cardinality NRFrequency
-                ("Cardinality NRFrequency", "Cardinality Audit"),
-                ("Cardinality NRFrequency", "Cardinality Inconsistencies"),
+            # Cardinality GUtranSyncSignalFrequency
+            ("Cardinality GUtranSyncSignalFrequency", "Cardinality Audit"),
+            ("Cardinality GUtranSyncSignalFrequency", "Cardinality Inconsistencies"),
 
-                # Cardinality NRFreqRelation
-                ("Cardinality NRFreqRelation", "Cardinality Audit"),
-                ("Cardinality NRFreqRelation", "Cardinality Inconsistencies"),
+            # Cardinality GUtranFreqRelation
+            ("Cardinality GUtranFreqRelation", "Cardinality Audit"),
+            ("Cardinality GUtranFreqRelation", "Cardinality Inconsistencies"),
+        ]
 
-                # Cardinality GUtranSyncSignalFrequency
-                ("Cardinality GUtranSyncSignalFrequency", "Cardinality Audit"),
-                ("Cardinality GUtranSyncSignalFrequency", "Cardinality Inconsistencies"),
+        order_map = {k: i for i, k in enumerate(desired_order)}
 
-                # Cardinality GUtranFreqRelation
-                ("Cardinality GUtranFreqRelation", "Cardinality Audit"),
-                ("Cardinality GUtranFreqRelation", "Cardinality Inconsistencies"),
-            ]
+        df["_order_"] = df.apply(
+            lambda r: order_map.get((r["Category"], r["SubCategory"]), len(order_map)),
+            axis=1,
+        )
 
-            order_map = {k: i for i, k in enumerate(desired_order)}
+        df = df.sort_values(by=["_order_"], kind="stable").drop(columns="_order_").reset_index(drop=True)
 
-            df["_order_"] = df.apply(
-                lambda r: order_map.get((r["Category"], r["SubCategory"]), len(order_map)),
-                axis=1,
-            )
+        # Build NR param mismatching dataframe
+    df_param_mismatch_nr = pd.DataFrame(param_mismatch_rows_nr, columns=param_mismatch_columns_nr)
+    if df_param_mismatch_nr.empty:
+        df_param_mismatch_nr = pd.DataFrame(columns=param_mismatch_columns_nr)
 
-            df = df.sort_values(by=["_order_"], kind="stable").drop(columns="_order_").reset_index(drop=True)
+    # Build LTE param mismatching dataframe
+    df_param_mismatch_gu = pd.DataFrame(param_mismatch_rows_gu, columns=param_mismatch_columns_gu)
+    if df_param_mismatch_gu.empty:
+        df_param_mismatch_gu = pd.DataFrame(columns=param_mismatch_columns_gu)
 
-            # Build NR param mismatching dataframe
-        df_param_mismatch_nr = pd.DataFrame(param_mismatch_rows_nr, columns=param_mismatch_columns_nr)
-        if df_param_mismatch_nr.empty:
-            df_param_mismatch_nr = pd.DataFrame(columns=param_mismatch_columns_nr)
+    return df, df_param_mismatch_nr, df_param_mismatch_gu
 
-        # Build LTE param mismatching dataframe
-        df_param_mismatch_gu = pd.DataFrame(param_mismatch_rows_gu, columns=param_mismatch_columns_gu)
-        if df_param_mismatch_gu.empty:
-            df_param_mismatch_gu = pd.DataFrame(columns=param_mismatch_columns_gu)
-
-        return df, df_param_mismatch_nr, df_param_mismatch_gu
-
-    return main()

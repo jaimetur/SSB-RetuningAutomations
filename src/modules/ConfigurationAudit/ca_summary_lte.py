@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import pandas
+import pandas as pd
 
 from src.utils.utils_frequency import resolve_column_case_insensitive, parse_int_frequency
 

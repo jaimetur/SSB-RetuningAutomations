@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import pandas as pd
 
 from src.modules.Common.Common_Functions import load_nodes_names_and_id_from_summary_audit
 from src.utils.utils_dataframe import ensure_column_after
