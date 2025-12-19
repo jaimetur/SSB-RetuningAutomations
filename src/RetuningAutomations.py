@@ -31,7 +31,7 @@ from pathlib import Path
 from src.utils.utils_datetime import format_duration_hms
 from src.utils.utils_dialog import tk, ttk, filedialog, messagebox, ask_reopen_launcher, ask_yes_no_dialog, ask_yes_no_dialog_custom
 from src.utils.utils_infrastructure import LoggerDual
-from src.utils.utils_io import load_cfg_values, save_cfg_values, log_module_exception, to_long_path, pretty_path, folder_has_valid_logs, detect_pre_post_subfolders
+from src.utils.utils_io import load_cfg_values, save_cfg_values, log_module_exception, to_long_path, pretty_path, folder_has_valid_logs, detect_pre_post_subfolders, write_compared_folders_file
 from src.utils.utils_parsing import normalize_csv_list, parse_arfcn_csv_to_set, cap_rows
 
 from src.modules.ConsistencyChecks.ConsistencyChecks import ConsistencyChecks
@@ -905,6 +905,15 @@ def run_consistency_checks_for_market_pairs(
         else:
             output_dir = os.path.join(post_dir_fs, f"ConsistencyChecks_{versioned_suffix}")
         os.makedirs(output_dir, exist_ok=True)
+
+        # NEW: write ComparedFolders.txt with the exact PRE/POST folders used
+        try:
+            txt_path = write_compared_folders_file(output_dir=output_dir, pre_dir=pre_dir_fs, post_dir=post_dir_fs)
+            if txt_path:
+                print(f"{module_name} {market_tag} Compared folders file written: '{pretty_path(txt_path)}'")
+        except Exception as ex:
+            print(f"{module_name} {market_tag} [WARN] Failed to write ComparedFolders.txt: {ex}")
+
 
         # NEW: Build Pre/Post audit suffixes (Pre/Post before the timestamp)
         audit_pre_suffix = f"Pre_{versioned_suffix}"

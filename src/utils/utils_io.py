@@ -499,3 +499,29 @@ def pretty_path(path: str) -> str:
     if os.name == "nt" and isinstance(path, str) and path.startswith("\\\\?\\"):
         return path[4:]
     return path
+
+def write_compared_folders_file(output_dir: str, pre_dir: str, post_dir: str, filename: str = "ComparedFolders.txt") -> Optional[str]:
+    """
+    Write a small text file with the PRE/POST folders used for the comparison.
+
+    File format (2 lines):
+      Folder-Pre: <absolute path>
+      Folder-Post: <absolute path>
+
+    Returns the full path to the created file, or None if output_dir is missing.
+    """
+    if not output_dir:
+        return None
+
+    output_dir_fs = to_long_path(output_dir)
+    os.makedirs(output_dir_fs, exist_ok=True)
+
+    pre_path = pretty_path(to_long_path(pre_dir)) if pre_dir else ""
+    post_path = pretty_path(to_long_path(post_dir)) if post_dir else ""
+
+    out_path = os.path.join(output_dir_fs, filename)
+    with open(out_path, "w", encoding="utf-8", newline="\n") as f:
+        f.write(f"Folder-Pre: {pre_path}\n")
+        f.write(f"Folder-Post: {post_path}\n")
+
+    return out_path

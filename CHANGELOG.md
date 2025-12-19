@@ -14,6 +14,7 @@
   - #### 🌟 New Features:
 
   - #### 🚀 Enhancements:
+    - Added `ComparedFolders.txt` file to output folder when `ConsistencyCheck` module has been executed to show the folders used for Pre and Post. 
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
