@@ -4,10 +4,10 @@
 """
 compile.py
 ----------
-Build a standalone executable for the main module `RetuningAutomations.py` using PyInstaller.
+Build a standalone executable for the main module `SSB-RetuningAutomations.py` using PyInstaller.
 
 Features:
-- Reads VERSION (without leading 'v') from the first lines of RetuningAutomations.py.
+- Reads VERSION (without leading 'v') from the first lines of SSB-RetuningAutomations.py.
 - Generates an output binary named: RetuningAutomations_v{VERSION}.exe (Windows) or .run (Linux/macOS).
 - Works on each OS natively (PyInstaller cannot cross-compile OSes).
 - Optional Windows-only arch selection via env: TARGET_ARCH={32|64|ARM64}.
@@ -17,11 +17,11 @@ Features:
 
 Usage examples:
     python compile.py
-    python compile.py --main RetuningAutomations.py --onefile
+    python compile.py --main SSB-RetuningAutomations.py --onefile
     TARGET_ARCH=ARM64 python compile.py       # Windows-only
 
 Notes:
-- Keep RetuningAutomations.py with a top-level variable: VERSION = "x.x.x"
+- Keep SSB-RetuningAutomations.py with a top-level variable: VERSION = "x.x.x"
 - The filename will include a leading 'v' (e.g., RetuningAutomations_v0.2.0.exe)
 """
 
@@ -166,9 +166,9 @@ def write_github_outputs(binary_path: Path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build executable with PyInstaller for RetuningAutomations.py")
-    parser.add_argument("--main", default="./src/RetuningAutomations.py",
-                        help="Entry-point main module filename (default: RetuningAutomations.py)")
+    parser = argparse.ArgumentParser(description="Build executable with PyInstaller for SSB-RetuningAutomations.py")
+    parser.add_argument("--main", default="./src/SSB-RetuningAutomations.py",
+                        help="Entry-point main module filename (default: SSB-RetuningAutomations.py)")
     parser.add_argument("--onefile", action="store_true", default=True,
                         help="Force PyInstaller onefile build (default: True)")
     parser.add_argument("--no-onefile", dest="onefile", action="store_false",

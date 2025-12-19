@@ -85,6 +85,7 @@ class ConfigurationAudit:
             tables_order: Optional[List[str]] = None,  # optional sheet ordering
             filter_frequencies: Optional[List[str]] = None,  # substrings to filter pivot columns
             output_dir: Optional[str] = None,  # <<< NEW: optional dedicated output folder
+            profiles_audit: bool = False,  # <<< NEW: enable Profiles audit logic
     ) -> str:
         """
         Main entry point: creates an Excel file with one sheet per detected table.
@@ -98,6 +99,9 @@ class ConfigurationAudit:
         In addition, a 'SummaryAudit' sheet is created with high-level checks
         across the parsed tables, and a PowerPoint (.pptx) summary is generated
         with a textual bullet-style overview per category.
+
+        Optional:
+          - If profiles_audit=True, profiles tables will be collected and checked for old/new SSB replica consistency.
         """
         # --- Normalize filters ---
         freq_filters = [str(f).strip() for f in (filter_frequencies or []) if str(f).strip()]
@@ -333,6 +337,20 @@ class ConfigurationAudit:
             "TermPointToGNodeB": [],
             "TermPointToGNB": [],
             "TermPointToENodeB": [],
+
+            # <<< NEW: Profiles tables collectors >>>
+            "McpcPCellNrFreqRelProfileUeCfg": [],
+            "McpcPCellProfileUeCfg": [],
+            "UlQualMcpcMeasCfg": [],
+            "McpcPSCellProfileUeCfg": [],
+            "McfbCellProfile": [],
+            "McfbCellProfileUeCfg": [],
+            "TrStSaCellProfile": [],
+            "TrStSaCellProfileUeCfg": [],
+            "McpcPCellEUtranFreqRelProfile": [],
+            "McpcPCellEUtranFreqRelProfileUeCfg": [],
+            "UeMCEUtranFreqRelProfile": [],
+            "UeMCEUtranFreqRelProfileUeCfg": [],
         }
         for entry in table_entries:
             mo_name = str(entry.get("sheet_candidate", "")).strip()
@@ -424,6 +442,26 @@ class ConfigurationAudit:
         df_term_point_to_gnb = concat_or_empty(mo_collectors["TermPointToGNB"])
         df_term_point_to_enodeb = concat_or_empty(mo_collectors["TermPointToENodeB"])
 
+        # <<< NEW: Build profiles tables dict (only used when profiles_audit=True) >>>
+        profile_table_names = [
+            "McpcPCellNrFreqRelProfileUeCfg",
+            "McpcPCellProfileUeCfg",
+            "UlQualMcpcMeasCfg",
+            "McpcPSCellProfileUeCfg",
+            "McfbCellProfile",
+            "McfbCellProfileUeCfg",
+            "TrStSaCellProfile",
+            "TrStSaCellProfileUeCfg",
+            "McpcPCellEUtranFreqRelProfile",
+            "McpcPCellEUtranFreqRelProfileUeCfg",
+            "UeMCEUtranFreqRelProfile",
+            "UeMCEUtranFreqRelProfileUeCfg",
+        ]
+        profiles_tables: Dict[str, pd.DataFrame] = {}
+        if profiles_audit:
+            for table_name in profile_table_names:
+                profiles_tables[table_name] = concat_or_empty(mo_collectors.get(table_name, []))
+
         # =====================================================================
         #                PHASE 4.2: Build SummaryAudit
         # =====================================================================
@@ -450,7 +488,9 @@ class ConfigurationAudit:
             df_term_point_to_gnodeb=df_term_point_to_gnodeb,
             df_term_point_to_gnb=df_term_point_to_gnb,
             df_term_point_to_enodeb=df_term_point_to_enodeb,
-            module_name=module_name
+            module_name=module_name,
+            profiles_tables=profiles_tables if profiles_audit else None,
+            profiles_audit=profiles_audit,
         )
 
         # ------------------------------------------------------------------
@@ -544,4 +584,5 @@ class ConfigurationAudit:
             print(f"{module_name} [WARN] PPT summary generation failed: {ex}")
 
         return excel_path
+
 

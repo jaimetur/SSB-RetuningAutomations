@@ -21,6 +21,7 @@ from src.modules.ConfigurationAudit.ca_process_external_termpoint_tables import 
 from src.modules.ConfigurationAudit.ca_process_lte_tables import process_gu_sync_signal_freq, process_gu_freq_rel, process_gu_cell_relation
 from src.modules.ConfigurationAudit.ca_process_nr_tables import process_nr_cell_du, process_nr_freq, process_nr_freq_rel, process_nr_sector_carrier, process_nr_cell_relation
 from src.modules.ConfigurationAudit.ca_process_others_tables import process_endc_distr_profile, process_freq_prio_nr, process_cardinalities
+from src.modules.ConfigurationAudit.ca_process_profiles_tables import process_profiles_tables
 from src.modules.Common.common_functions import load_nodes_names_and_id_from_summary_audit
 from src.utils.utils_frequency import parse_int_frequency
 
@@ -53,8 +54,10 @@ def build_summary_audit(
         df_term_point_to_gnb,
         df_term_point_to_enodeb,
         module_name,
-
+        profiles_tables: Dict[str, pd.DataFrame] | None = None,
+        profiles_audit: bool = False,
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+
     """
     Build a synthetic 'SummaryAudit' table with high-level checks:
 
@@ -297,6 +300,12 @@ def build_summary_audit(
     process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row)
     process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel)
 
+    # Profiles Tables (optional)
+    if profiles_audit:
+        profiles_tables_work = profiles_tables or {}
+        process_profiles_tables(profiles_tables_work, add_row, n77_ssb_pre, n77_ssb_post)
+
+
     # If nothing was added, return at least an informational row
     if not rows:
         rows.append({
@@ -385,6 +394,43 @@ def build_summary_audit(
             # Cardinality GUtranFreqRelation
             ("Cardinality GUtranFreqRelation", "Cardinality Audit"),
             ("Cardinality GUtranFreqRelation", "Cardinality Inconsistencies"),
+
+            # Profiles tables
+            ("McpcPCellNrFreqRelProfileUeCfg", "Profiles Inconsistencies"),
+            ("McpcPCellNrFreqRelProfileUeCfg", "Profiles Discrepancies"),
+
+            ("McpcPCellProfileUeCfg", "Profiles Inconsistencies"),
+            ("McpcPCellProfileUeCfg", "Profiles Discrepancies"),
+
+            ("UlQualMcpcMeasCfg", "Profiles Inconsistencies"),
+            ("UlQualMcpcMeasCfg", "Profiles Discrepancies"),
+
+            ("McpcPSCellProfileUeCfg", "Profiles Inconsistencies"),
+            ("McpcPSCellProfileUeCfg", "Profiles Discrepancies"),
+
+            ("McfbCellProfile", "Profiles Inconsistencies"),
+            ("McfbCellProfile", "Profiles Discrepancies"),
+
+            ("McfbCellProfileUeCfg", "Profiles Inconsistencies"),
+            ("McfbCellProfileUeCfg", "Profiles Discrepancies"),
+
+            ("TrStSaCellProfile", "Profiles Inconsistencies"),
+            ("TrStSaCellProfile", "Profiles Discrepancies"),
+
+            ("TrStSaCellProfileUeCfg", "Profiles Inconsistencies"),
+            ("TrStSaCellProfileUeCfg", "Profiles Discrepancies"),
+
+            ("McpcPCellEUtranFreqRelProfile", "Profiles Inconsistencies"),
+            ("McpcPCellEUtranFreqRelProfile", "Profiles Discrepancies"),
+
+            ("McpcPCellEUtranFreqRelProfileUeCfg", "Profiles Inconsistencies"),
+            ("McpcPCellEUtranFreqRelProfileUeCfg", "Profiles Discrepancies"),
+
+            ("UeMCEUtranFreqRelProfile", "Profiles Inconsistencies"),
+            ("UeMCEUtranFreqRelProfile", "Profiles Discrepancies"),
+
+            ("UeMCEUtranFreqRelProfileUeCfg", "Profiles Inconsistencies"),
+            ("UeMCEUtranFreqRelProfileUeCfg", "Profiles Discrepancies"),
         ]
 
         order_map = {k: i for i, k in enumerate(desired_order)}

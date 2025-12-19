@@ -7,11 +7,184 @@ Helpers to export Correction_Cmd  to text files.
 from __future__ import annotations
 
 import os
+import re
 import pandas as pd
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Tuple
 
 from src.utils.utils_io import to_long_path, pretty_path
-from src.utils.utils_parsing import merge_command_blocks_for_node
+
+# ----------------------------------------------------------------------
+#  INTERNAL HELPERS
+# ----------------------------------------------------------------------
+_DEL_LINE_RE = re.compile(r"^\s*del\b", re.IGNORECASE)
+
+def _merge_blocks_hoist_header_footer(blocks: List[str], header_lines: int = 3, footer_lines: int = 1) -> str:
+    """
+    Merge multiple multi-line command blocks into a single script.
+
+    Rules:
+      - Hoist a common header of up to `header_lines` identical leading lines across all blocks (typically 3).
+      - Hoist a common footer of up to `footer_lines` identical trailing lines across all blocks (typically 1).
+      - Keep each block body in the same order as in Excel.
+      - Insert ONE blank line before the first body line of EACH block (including the first),
+        so blocks are visually separated like in Excel.
+      - Do NOT try to merge phases by 'wait' (no optimization/reordering).
+    """
+    if not blocks:
+        return ""
+
+    normalized_blocks: List[List[str]] = []
+    for b in blocks:
+        if b is None:
+            continue
+        text = str(b).replace("\r\n", "\n").replace("\r", "\n").strip("\n")
+        if not text.strip():
+            continue
+        lines = [ln.rstrip() for ln in text.split("\n") if ln.strip() != ""]
+        if lines:
+            normalized_blocks.append(lines)
+
+    if not normalized_blocks:
+        return ""
+
+    # -----------------------------
+    # Common header
+    # -----------------------------
+    min_len = min(len(x) for x in normalized_blocks)
+    max_header = min(header_lines, min_len)
+    common_header: List[str] = []
+
+    for i in range(max_header):
+        candidate = normalized_blocks[0][i].strip()
+        if all(x[i].strip() == candidate for x in normalized_blocks[1:]):
+            common_header.append(normalized_blocks[0][i].strip())
+        else:
+            break
+
+    # -----------------------------
+    # Common footer (up to footer_lines)
+    # -----------------------------
+    common_footer: List[str] = []
+    max_footer = min(footer_lines, min_len - len(common_header)) if min_len > len(common_header) else 0
+
+    for i in range(1, max_footer + 1):
+        candidate = normalized_blocks[0][-i].strip()
+        if all(x[-i].strip() == candidate for x in normalized_blocks[1:]):
+            common_footer.insert(0, candidate)  # keep order
+        else:
+            break
+
+    # -----------------------------
+    # Build output
+    # -----------------------------
+    out_lines: List[str] = []
+    out_lines.extend(common_header)
+
+    def _ensure_blank_line():
+        if out_lines and out_lines[-1] != "":
+            out_lines.append("")
+        elif not out_lines:
+            out_lines.append("")
+
+    for lines in normalized_blocks:
+        body = lines[len(common_header):]
+
+        if common_footer:
+            # Remove matching footer length from this block if it ends with the common footer
+            if len(body) >= len(common_footer) and [x.strip() for x in body[-len(common_footer):]] == common_footer:
+                body = body[:-len(common_footer)]
+
+        body = [ln.strip() for ln in body if ln.strip() != ""]
+        if not body:
+            continue
+
+        _ensure_blank_line()
+        out_lines.extend(body)
+
+    if common_footer:
+        if out_lines and out_lines[-1] == "":
+            out_lines.pop()
+        out_lines.extend(common_footer)
+
+    while out_lines and out_lines[0] == "":
+        out_lines.pop(0)
+    while out_lines and out_lines[-1] == "":
+        out_lines.pop()
+
+    return "\n".join(out_lines).strip()
+
+
+
+def _extract_del_lines_and_rest(cmd: object) -> Tuple[List[str], str]:
+    """
+    Split a command block into:
+      - del_lines: consecutive 'del ...' lines at the very beginning of the block (ignoring blank lines)
+      - rest: remaining text (may be empty)
+    This is useful for discrepancy blocks where we may have:
+      del ...
+      crn ...
+      ...
+    """
+    if cmd is None:
+        return [], ""
+
+    text = str(cmd)
+    if not text.strip():
+        return [], ""
+
+    raw_lines = text.splitlines()
+
+    # Skip leading empty lines
+    i = 0
+    n = len(raw_lines)
+    while i < n and raw_lines[i].strip() == "":
+        i += 1
+
+    del_lines: List[str] = []
+
+    # Collect consecutive del lines at the top
+    j = i
+    while j < n:
+        line = raw_lines[j]
+        if line.strip() == "":
+            # Allow blank lines inside the initial del block (rare) - skip them
+            j += 1
+            continue
+        if _DEL_LINE_RE.match(line):
+            del_lines.append(line.strip())
+            j += 1
+            continue
+        break
+
+    # Rest is everything from j onwards
+    rest = "\n".join(raw_lines[j:]).strip()
+
+    return del_lines, rest
+
+
+def _reorder_cmds_del_first(cmds: List[object]) -> List[str]:
+    """
+    Given a list of command blocks (strings), returns a new list of blocks where:
+      - all extracted 'del ...' lines are placed first (one per line)
+      - followed by the remaining blocks (without those del lines)
+    """
+    del_lines_all: List[str] = []
+    rest_blocks: List[str] = []
+
+    for c in cmds:
+        del_lines, rest = _extract_del_lines_and_rest(c)
+        if del_lines:
+            del_lines_all.extend(del_lines)
+        if rest:
+            rest_blocks.append(rest)
+
+    out: List[str] = []
+    if del_lines_all:
+        out.extend(del_lines_all)
+    if rest_blocks:
+        out.extend(rest_blocks)
+
+    return out
 
 
 # ----------------------------------------------------------------------
@@ -23,7 +196,11 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
 
     For each category (e.g. GU_missing, NR_new), one file per NodeId is created in:
       <output_dir>/Correction_Cmd/<GroupFolder>/<NR|GU>/<NodeId>_<Category>.txt
+
+    Additionally:
+      - All 'del ...' commands are moved to the top of each node file.
     """
+
     def _detect_layer_from_category(category: str) -> str:
         s = str(category or "").strip().upper()
         if s.startswith("NR"):
@@ -92,8 +269,29 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
             if not node_str:
                 continue
 
-            cmds = [cmd for cmd in group["Correction_Cmd"] if cmd.strip()]
-            if not cmds:
+            raw_cmds = [cmd for cmd in group["Correction_Cmd"] if str(cmd).strip()]
+            if not raw_cmds:
+                continue
+
+            # NEW: put all del first
+            ordered_blocks = _reorder_cmds_del_first(raw_cmds)
+            if not ordered_blocks:
+                continue
+
+            # Write:
+            # - del lines as single lines
+            # - rest blocks separated by blank line
+            del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
+            rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
+
+            pieces: List[str] = []
+            if del_lines:
+                pieces.append("\n".join(del_lines).strip())
+            if rest_blocks:
+                pieces.append("\n\n".join(rest_blocks).strip())
+
+            final_text = "\n\n".join([p for p in pieces if p.strip()]).strip()
+            if not final_text:
                 continue
 
             file_name = f"{node_str}_{category}.txt"
@@ -101,7 +299,7 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
             file_path_long = to_long_path(file_path)
 
             with open(file_path_long, "w", encoding="utf-8") as f:
-                f.write("\n\n".join(cmds))
+                f.write(final_text)
 
             total_files += 1
 
@@ -131,7 +329,8 @@ def export_external_and_termpoint_commands(
 
     One text file per NodeId is generated (grouped like other Correction_Cmd exports).
 
-    Returns the number of generated files.
+    Additionally:
+      - All 'del ...' commands are moved to the top of each node file.
     """
 
     def _read_sheet_case_insensitive(audit_excel: str, sheet_name: str) -> Optional[pd.DataFrame]:
@@ -164,6 +363,12 @@ def export_external_and_termpoint_commands(
         """
         Export Correction_Cmd grouped by NodeId from a given sheet into output_dir.
         Returns how many files were generated.
+
+        Behavior:
+          - 'del ...' lines are moved to the top of each node file.
+          - For External* and TermPoint* blocks, we keep per-block order exactly as in Excel,
+            but hoist ONLY the first 3 lines and the last line once per node file.
+            (No special single-instance handling for 'wait' or 'lt all' after wait.)
         """
         df = _read_sheet_case_insensitive(audit_excel, sheet_name)
         if df is None or df.empty:
@@ -175,7 +380,6 @@ def export_external_and_termpoint_commands(
 
         if command_column not in df.columns:
             return 0
-
         if node_column not in df.columns:
             return 0
 
@@ -214,13 +418,30 @@ def export_external_and_termpoint_commands(
             if not cmds:
                 continue
 
+            # del first (and keep rest blocks after)
+            ordered_blocks = _reorder_cmds_del_first(cmds)
+            if not ordered_blocks:
+                continue
+
+            del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
+            rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
+
+            # NEW: HOIST only the first 3 lines and the last line ONCE per node
+            merged_rest = _merge_blocks_hoist_header_footer(rest_blocks, header_lines=3, footer_lines=1) if rest_blocks else ""
+
+            pieces: List[str] = []
+            if del_lines:
+                pieces.append("\n".join(del_lines).strip())
+            if merged_rest.strip():
+                pieces.append(merged_rest.strip())
+
+            merged_script = "\n\n".join([p for p in pieces if p.strip()]).strip()
+            if not merged_script:
+                continue
+
             file_name = f"{node_str}_{suffix}.txt"
             out_path = os.path.join(output_dir, file_name)
             out_path_long = to_long_path(out_path)
-
-            merged_script = merge_command_blocks_for_node(cmds)
-            if not merged_script.strip():
-                continue
 
             with open(out_path_long, "w", encoding="utf-8") as f:
                 f.write(merged_script)
@@ -228,6 +449,7 @@ def export_external_and_termpoint_commands(
             generated_files += 1
 
         return generated_files
+
 
     if not audit_post_excel or not os.path.isfile(audit_post_excel):
         return 0

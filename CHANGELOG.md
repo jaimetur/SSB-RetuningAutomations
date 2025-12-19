@@ -4,6 +4,31 @@
 
 ---
 
+## Release: v0.5.0
+- ### Release Date: 2025-12-19
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+    - Renamed Tool name from `RetuningAutomations` to `SSB-RetuningAutomations`.
+    - Renamed module `4. Initial Clean-Up` to `4. Profiles Audit`.
+  
+  - #### 🌟 New Features:
+    - Include `Profiles Inconsistencies` to `Configuration Audit` module (in SummaryAudit table) when it is executed from module `4. Profiles Audit` module.
+    - Include `Profiles Discrepancies` to `Configuration Audit` module (in SummaryAudit table) when it is executed from module `4. Profiles Audit` module.
+
+  - #### 🚀 Enhancements:
+
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated README.md.
+    - Logo updated.
+    - Updated documentation with latest changes.
+
+---
+
 ## Release: v0.4.3
 - ### Release Date: 2025-12-19
 

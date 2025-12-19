@@ -3,7 +3,7 @@
 
 """
 Update version references inside DOWNLOAD.md based on TOOL_VERSION
-from src/RetuningAutomations.py.
+from src/SSB-RetuningAutomations.py.
 
 Safe replacement that preserves OS/arch suffixes like '_linux_x64.zip'.
 """
@@ -22,7 +22,7 @@ try:
         sys.path.insert(0, src_path)
     from RetuningAutomations import TOOL_VERSION
 except Exception as e:
-    print(f"❌ ERROR: Unable to import TOOL_VERSION from RetuningAutomations.py\n{e}")
+    print(f"❌ ERROR: Unable to import TOOL_VERSION from SSB-RetuningAutomations.py\n{e}")
     sys.exit(1)
 
 download_md = os.path.join(os.path.dirname(__file__), "DOWNLOAD.md")

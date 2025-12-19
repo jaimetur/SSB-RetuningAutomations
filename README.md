@@ -7,7 +7,7 @@
 
 # Retuning Automations
 <p align="center">
-  <img src="https://github.com/jaimetur/RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="600" height="480" />
+  <img src="https://github.com/jaimetur/RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="1024" height="820" />
 </p>
 
 ---
@@ -168,7 +168,7 @@ Running the launcher **without CLI arguments** opens a compact Tkinter dialog wh
 
 **Start (GUI):**
 ```bash
-python RetuningAutomations.py
+python SSB-RetuningAutomations.py
 ```
 
 > The GUI is skipped if Tkinter is not available or `--no-gui` is used.
@@ -184,7 +184,7 @@ This tool can be executed either with **GUI mode** (default when no arguments ar
 ```bash
 RetuningAutomations.exe/bin --module <module-name> [options]
 
---module                     Module to run: configuration-audit | consistency-check | initial-cleanup | final-cleanup
+--module                     Module to run: configuration-audit | consistency-check | profiles-audit | final-cleanup
 --input                      Input folder to process (single-input modules)
 --input-pre                  PRE input folder (only for consistency-check)
 --input-post                 POST input folder (only for consistency-check)
@@ -216,14 +216,14 @@ If `--module` is omitted and **no other arguments** are provided, the GUI will l
 | `configuration-audit`    | Runs the Configuration Audit module (single input folder).          |
 | `consistency-check`      | Runs the Pre/Post Relations Consistency Check (dual input folders). |
 | `consistency-check-bulk` | Runs the Pre/Post Relations Consistency Check (bulk mode).          |
-| `initial-cleanup`        | Runs the Initial Clean-Up module (single input folder).             |
+| `profiles-audit`         | Runs the Profiles Audit module (single input folder).               |
 | `final-cleanup`          | Runs the Final Clean-Up module (single input folder).               |
 
 ---
 
 ### 📂 Input Options
 
-#### Single-Input Modules (`configuration-audit`, 'consistency-check-bulk', `initial-cleanup`, `final-cleanup`)
+#### Single-Input Modules (`configuration-audit`, `consistency-check-bulk`, `profiles-audit`, `final-cleanup`)
 
 ```
 --input <folder>
@@ -304,7 +304,7 @@ Forces CLI-only mode even if arguments are missing.
 ### 1. Configuration Audit
 
 ```bash
-python RetuningAutomations.py \
+python SSB-RetuningAutomations.py \
   --module configuration-audit \
   --input "./AuditInput" \
   --n77-ssb-pre 647328 \
@@ -314,7 +314,7 @@ python RetuningAutomations.py \
 ### 2. Consistency Check (Pre/Post folders)
 
 ```bash
-python RetuningAutomations.py \
+python SSB-RetuningAutomations.py \
   --module consistency-check \
   --input-pre "./Step0" \
   --input-post "./Step3" \
@@ -325,7 +325,7 @@ python RetuningAutomations.py \
 ### 3. Configuration Audit with custom allowed lists
 
 ```bash
-python RetuningAutomations.py \
+python SSB-RetuningAutomations.py \
   --module configuration-audit \
   --input "./audit" \
   --allowed-n77-ssb-pre 648672,649200 \
