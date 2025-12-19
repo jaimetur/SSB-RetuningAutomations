@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import pandas as pd
 
-from src.modules.Common.correction_commands import build_correction_command_external_nr_cell_cu, build_correction_command_external_gutran_cell, build_correction_command_termpoint_to_gnodeb, build_correction_command_termpoint_to_gnb
+from src.modules.Common.correction_commands_builder import build_correction_command_external_nr_cell_cu, build_correction_command_external_gutran_cell, build_correction_command_termpoint_to_gnodeb, build_correction_command_termpoint_to_gnb
 from src.utils.utils_dataframe import ensure_column_after
 from src.utils.utils_frequency import resolve_column_case_insensitive
 

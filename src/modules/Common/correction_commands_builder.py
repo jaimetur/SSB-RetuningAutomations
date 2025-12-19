@@ -8,6 +8,14 @@ import pandas as pd
 from src.utils.utils_dataframe import build_row_lookup, pick_non_empty_value, ensure_column_after
 from src.utils.utils_parsing import extract_gnbcucp_segment, resolve_nrcell_ref
 
+"""
+Helpers to build Correction_Cmd columns and export them to text files.
+
+This module centralizes the logic used by ConsistencyChecks so that:
+- Code is reused between GU/NR and new/missing/disc variants.
+- The main ConsistencyChecks module stays smaller and easier to read.
+"""
+
 # ----------------------------------------------------------------------
 #  BUILD CORRECTION COMMANDS
 # ----------------------------------------------------------------------

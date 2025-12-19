@@ -1,11 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Helpers to build Correction_Cmd columns and export them to text files.
-
-This module centralizes the logic used by ConsistencyChecks so that:
-- Code is reused between GU/NR and new/missing/disc variants.
-- The main ConsistencyChecks module stays smaller and easier to read.
+Helpers to export Correction_Cmd  to text files.
 """
 
 from __future__ import annotations
@@ -19,24 +15,44 @@ from src.utils.utils_parsing import merge_command_blocks_for_node
 
 
 # ----------------------------------------------------------------------
-#  EXPORT TEXT FILES
+#  EXPORT CORRECTION COMMNANDS TO TEXT FILES
 # ----------------------------------------------------------------------
 def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.DataFrame]) -> int:
     """
     Export Correction_Cmd values to text files grouped by NodeId and category.
 
     For each category (e.g. GU_missing, NR_new), one file per NodeId is created in:
-      <output_dir>/Correction_Cmd/<NodeId>_<Category>.txt
+      <output_dir>/Correction_Cmd/<GroupFolder>/<NR|GU>/<NodeId>_<Category>.txt
     """
+    def _detect_layer_from_category(category: str) -> str:
+        s = str(category or "").strip().upper()
+        if s.startswith("NR"):
+            return "NR"
+        if s.startswith("GU"):
+            return "GU"
+
+        # Fallbacks if naming is not strictly prefix-based
+        if "NR_" in s or "_NR" in s or "NR-" in s:
+            return "NR"
+        if "GU_" in s or "_GU" in s or "GU-" in s:
+            return "GU"
+        return ""
+
     base_dir = os.path.join(output_dir, "Correction_Cmd")
     os.makedirs(base_dir, exist_ok=True)
 
-    new_dir = os.path.join(base_dir, "New Relations")
-    missing_dir = os.path.join(base_dir, "Missing Relations")
-    discrepancies_dir = os.path.join(base_dir, "Discrepancies")
+    # Renamed folders
+    new_dir = os.path.join(base_dir, "NewRelations")
+    missing_dir = os.path.join(base_dir, "MissingRelations")
+    discrepancies_dir = os.path.join(base_dir, "RelationsDiscrepancies")
     os.makedirs(new_dir, exist_ok=True)
     os.makedirs(missing_dir, exist_ok=True)
     os.makedirs(discrepancies_dir, exist_ok=True)
+
+    # Subfolders to distinguish NR vs GU
+    for parent in (new_dir, missing_dir, discrepancies_dir):
+        os.makedirs(os.path.join(parent, "NR"), exist_ok=True)
+        os.makedirs(os.path.join(parent, "GU"), exist_ok=True)
 
     total_files = 0
 
@@ -50,6 +66,27 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
         work["NodeId"] = work["NodeId"].astype(str).str.strip()
         work["Correction_Cmd"] = work["Correction_Cmd"].astype(str)
 
+        category_lower = str(category).lower()
+
+        # Choose the "group" folder (New/Missing/Discrepancies/Other)
+        if "new" in category_lower:
+            parent_dir = new_dir
+        elif "missing" in category_lower:
+            parent_dir = missing_dir
+        elif "disc" in category_lower:
+            parent_dir = discrepancies_dir
+        else:
+            parent_dir = base_dir
+
+        # If it's one of the 3 main folders, route into NR/GU subfolder when possible
+        target_dir = parent_dir
+        if parent_dir in (new_dir, missing_dir, discrepancies_dir):
+            layer = _detect_layer_from_category(category)
+            if layer in ("NR", "GU"):
+                target_dir = os.path.join(parent_dir, layer)
+
+        os.makedirs(target_dir, exist_ok=True)
+
         for node_id, group in work.groupby("NodeId"):
             node_str = str(node_id).strip()
             if not node_str:
@@ -58,15 +95,6 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
             cmds = [cmd for cmd in group["Correction_Cmd"] if cmd.strip()]
             if not cmds:
                 continue
-
-            if "new" in category.lower():
-                target_dir = new_dir
-            elif "missing" in category.lower():
-                target_dir = missing_dir
-            elif "disc" in category.lower():
-                target_dir = discrepancies_dir
-            else:
-                target_dir = base_dir
 
             file_name = f"{node_str}_{category}.txt"
             file_path = os.path.join(target_dir, file_name)
@@ -82,6 +110,7 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
         f"Generated {total_files} Correction_Cmd text files in: '{pretty_path(base_dir)}'"
     )
     return total_files
+
 
 # ----------------------------- EXTERNAL/TERMPOINTS COMMANDS ----------------------------- #
 def export_external_and_termpoint_commands(

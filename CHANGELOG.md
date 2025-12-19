@@ -18,6 +18,11 @@
     - Modified TermpointToGNB Correction Command.
     - Modified TermpointToGnodeB Correction Command.
     - Modified NR Relations Discrepancies Correction Command.
+    - Correction_Cmd output subfolders have been renamed as follow:
+      - from `Discrepancies` to `RelationsDiscrepancies`
+      - from `New Relations` to `NewRelations`
+      - from `Missing Relations` to `MissingRelations`
+    - Correction_Cmd output subfolders for `RelationsDiscrepancies`, `NewRelations` and `MissingRelations` are now sepparated into two subfolders (`NR` and `GU`) for a better organization.
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.

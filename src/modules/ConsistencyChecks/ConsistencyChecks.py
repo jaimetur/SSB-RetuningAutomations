@@ -6,8 +6,8 @@ from typing import Dict, Optional, List
 
 import pandas as pd
 
-from src.modules.ConsistencyChecks.cc_correction_cmd import export_correction_cmd_texts
-from src.modules.Common.correction_commands import build_correction_command_gu_new_relations, build_correction_command_gu_missing_relations, build_correction_command_gu_discrepancies, build_correction_command_nr_new_relations, build_correction_command_nr_missing_relations, build_correction_command_nr_discrepancies
+from src.modules.Common.correction_commands_exporter import export_correction_cmd_texts
+from src.modules.Common.correction_commands_builder import build_correction_command_gu_new_relations, build_correction_command_gu_missing_relations, build_correction_command_gu_discrepancies, build_correction_command_nr_new_relations, build_correction_command_nr_missing_relations, build_correction_command_nr_discrepancies
 from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_index_by_keys
 from src.utils.utils_datetime import extract_date
 from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit, apply_alternating_category_row_fills
@@ -15,7 +15,7 @@ from src.utils.utils_frequency import detect_freq_column, detect_key_columns, ex
 from src.utils.utils_io import read_text_lines, to_long_path, pretty_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
 from src.modules.Common.common_functions import load_nodes_names_and_id_from_summary_audit
-from src.modules.ConsistencyChecks.cc_correction_cmd import export_external_and_termpoint_commands
+from src.modules.Common.correction_commands_exporter import export_external_and_termpoint_commands
 
 
 
