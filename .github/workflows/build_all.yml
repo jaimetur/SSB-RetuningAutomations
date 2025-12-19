@@ -372,7 +372,7 @@ jobs:
           
           if [[ "${{ matrix.compilation_mode }}" == "standalone" ]]; then
             folder="${{ matrix.compiler }}_dist"
-            ZIP_FILE="RetuningAutomations_v${{ env.TOOL_VERSION }}_standalone_${{ matrix.os }}_${{ matrix.compiler }}.zip"
+            ZIP_FILE="SSB_RetuningAutomations_v${{ env.TOOL_VERSION }}_standalone_${{ matrix.os }}_${{ matrix.compiler }}.zip"
             echo "📁 Checking for folder: $folder"
           
             if [ -d "$folder" ]; then
@@ -464,7 +464,7 @@ jobs:
         id: extract_version                   # Importante añadir el ID para que outputs pueda encontrar la variable
         run: |
           # 1️⃣ Obtenemos el valor sin la “v”
-          TOOL_VERSION=$(grep -oP '^TOOL_VERSION\s*=\s*"\K[^"]+' ./src/RetuningAutomations.py)
+          TOOL_VERSION=$(grep -oP '^TOOL_VERSION\s*=\s*"\K[^"]+' ./src/SSB_RetuningAutomations.py)
           
           # 2️⃣ Lo ponemos en el entorno de los siguientes steps (opcional)
           echo "TOOL_VERSION=${TOOL_VERSION}" >> "$GITHUB_ENV"
@@ -563,7 +563,7 @@ jobs:
       - name: 📥 Download Artifacts (RELEASE-NOTES.md and Binaries)
         uses: actions/download-artifact@v4
         with:
-          pattern: RetuningAutomations*.zip
+          pattern: SSB_RetuningAutomations*.zip
           path: ./release_files
           merge-multiple: true
 
