@@ -132,7 +132,9 @@ class ConfigurationAudit:
             mo_rank = {name: i for i, name in enumerate(tables_order)}
 
         # --- Prepare Excel output path ---
-        excel_path = os.path.join(base_output_dir_long, f"ConfigurationAudit_{versioned_suffix}.xlsx")
+        prefix = "ProfilesAudit" if profiles_audit else "ConfigurationAudit"
+        excel_path = os.path.join(base_output_dir_long, f"{prefix}_{versioned_suffix}.xlsx")
+
         excel_path_long = to_long_path(excel_path)
 
         table_entries: List[Dict[str, object]] = []

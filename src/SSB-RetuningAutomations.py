@@ -729,7 +729,8 @@ def run_configuration_audit(
         if external_output_dir:
             output_dir = to_long_path(external_output_dir)
         else:
-            output_dir = os.path.join(folder_fs, f"ConfigurationAudit_{versioned_suffix}{suffix}")
+            folder_prefix = "ProfilesAudit" if profiles_audit else "ConfigurationAudit"
+            output_dir = os.path.join(folder_fs, f"{folder_prefix}_{versioned_suffix}{suffix}")
 
         os.makedirs(output_dir, exist_ok=True)
         print(f"{module_name} Output folder: '{pretty_path(output_dir)}'")
