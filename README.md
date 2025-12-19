@@ -214,7 +214,7 @@ This tool can be executed either with **GUI mode** (default when no arguments ar
 ```bash
 RetuningAutomations.exe/bin --module <module-name> [options]
 
---module                     Module to run: configuration-audit | consistency-check | profiles-audit | final-cleanup
+--module                     Module to run: configuration-audit | consistency-check | consistency-check-bulk | profiles-audit | final-cleanup
 --input                      Input folder to process (single-input modules)
 --input-pre                  PRE input folder (only for consistency-check)
 --input-post                 POST input folder (only for consistency-check)
