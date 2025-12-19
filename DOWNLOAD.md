@@ -2,15 +2,15 @@
 Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 architectures) or Docker version (platform & architecture independent) as you prefer, directly from following links:
 
 **Linux:**:  
-  - [Download x64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_linux_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_linux_arm64.zip)  
+  - [Download x64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_linux_x64.zip)  
+  - [Download arm64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_linux_arm64.zip)  
 
 **Mac OS:**
-  - [Download x64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_macos_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_macos_arm64.zip)  
+  - [Download x64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_macos_x64.zip)  
+  - [Download arm64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_macos_arm64.zip)  
 
 **Windows:**  
-  - [Download x64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_windows_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/SSB_RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_windows_arm64.zip)  
+  - [Download x64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_windows_x64.zip)  
+  - [Download arm64 version](https://github.com/`jaimetur/SSB-RetuningAutomations/releases/download/v0.5.0/SSB_RetuningAutomations_v0.5.0_windows_arm64.zip)  
 
 

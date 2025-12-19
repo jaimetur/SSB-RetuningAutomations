@@ -142,13 +142,45 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ---
 
-### `4. Profiles Audit (During Maintenance Window)`
-**Purpose:** Utility to execute a Profiles Audit during Maintainance Window (after retuning).
+### `3. Consistency Check (Bulk mode Pre/Post auto-detection)`
+**Purpose:** When this module is selected, the tool will automatically run an Smart Consistency Check in all markets detected in the input folder, selecting the most suitable folder for Pre and Post for each market.  
 
+The feature to auto-detect Pre/Post folders given only one Input folder with a predefined folder structure.  
+  - For this feature to work, the given input folder should contain subfolders with this naming convention: `yyyymmdd_hhmm_step0` (Optionally they may be a Market Subfolder inside it). 
+    - Example 1:
+      - 20251203_0530_step0 --> This is selected as Pre folder since is the oldest folder for the latest day
+      - 20251203_0730_step0 --> This is selected as Post folder since is the latest folder for the latest day
+    - Example 2:
+      - 20251202_0530_step0
+      - 20251202_0730_step0 --> This is selected as Pre folder since is the latest folder for the latest day previous to the Post folder day 
+      - 20251203_0530_step0
+      - 20251203_0730_step0 --> This is selected as Post folder since is the latest folder for the latest day
+
+
+  - There is a hardcoded Blacklist of words to discard any step0 subfolders from auto-detection function. By default, the tool will not consideer as Pre/Post candidates any folder with any of the following words in its name: `ignore`, `old`, `discard`, `bad`.
 
 ---
 
-### `4. Final Clean-Up (When retune is finished)`
+### `4. Profiles Audit (During Maintenance Window)`
+**Purpose:** Utility to execute a Profiles Audit during Maintainance Window (after retuning).
+
+This module will run a Enhanced Network Configuration Audit (including Profiles Audit) to detect any Inconsistency or Discrepancy on the following Profiles tables
+  - McpcPCellNrFreqRelProfileUeCfg (MOid: McpcPCellNrFreqRelProfileId)
+  - McpcPCellProfileUeCfg (MOid: McpcPCellProfileId)
+  - UlQualMcpcMeasCfg (MOid: UlQualMcpcMeasCfgId)
+  - McpcPSCellProfileUeCfg (MOid: McpcPSCellProfileId)
+  - McfbCellProfile (MOid: McfbCellProfileId)
+  - McfbCellProfileUeCfg (MOid: McfbCellProfileId)
+  - TrStSaCellProfile (MOid: TrStSaCellProfileId)
+  - TrStSaCellProfileUeCfg (MOid: TrStSaCellProfileId)
+  - McpcPCellEUtranFreqRelProfile (MOid: McpcPCellEUtranFreqRelProfileId)
+  - McpcPCellEUtranFreqRelProfileUeCfg (MOid: McpcPCellEUtranFreqRelProfileId)
+  - UeMCEUtranFreqRelProfile (MOid: UeMCEUtranFreqRelProfileId)
+  - UeMCEUtranFreqRelProfileUeCfg (MOid: UeMCEUtranFreqRelProfileId)
+
+---
+
+### `5. Final Clean-Up (When retune is finished)`
 **Purpose:** Utility to sanitize final cluster (delete profiles , etc.) when the retuning has finished.
 
 **Notes**
