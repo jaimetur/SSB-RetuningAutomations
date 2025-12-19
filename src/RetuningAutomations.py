@@ -71,7 +71,7 @@ NETWORK_FREQUENCIES: List[str] = [
 
 # Frequencies (single Pre/Post used by ConsistencyChecks)
 DEFAULT_N77_SSB_PRE = "648672"
-DEFAULT_N77_SSBQ_POST = "647328"
+DEFAULT_N77_SSB_POST = "647328"
 
 # Default N77B SSB frequency
 DEFAULT_N77B_SSB = "653952"
@@ -187,7 +187,7 @@ def gui_config_dialog(
     default_input_initial_cleanup: str = "",
     default_input_final_cleanup: str = "",
     default_n77_ssb_pre: str = DEFAULT_N77_SSB_PRE,
-    default_n77_ssb_post: str = DEFAULT_N77_SSBQ_POST,
+    default_n77_ssb_post: str = DEFAULT_N77_SSB_POST,
     default_n77b_ssb: str = DEFAULT_N77B_SSB,
     default_ca_filters_csv: str = "",
     default_cc_filters_csv: str = "",
@@ -643,9 +643,9 @@ def run_configuration_audit(
         local_n77_ssb_pre = int(DEFAULT_N77_SSB_PRE)
 
     try:
-        local_n77_ssb_post = int(n77_ssb_post) if n77_ssb_post else int(DEFAULT_N77_SSBQ_POST)
+        local_n77_ssb_post = int(n77_ssb_post) if n77_ssb_post else int(DEFAULT_N77_SSB_POST)
     except ValueError:
-        local_n77_ssb_post = int(DEFAULT_N77_SSBQ_POST)
+        local_n77_ssb_post = int(DEFAULT_N77_SSB_POST)
 
     # N77B SSB
     local_n77b_ssb = n77b_ssb
@@ -1482,7 +1482,7 @@ def main():
     default_input = default_input_audit
 
     default_n77_ssb_pre = args.n77_ssb_pre or persisted_n77_ssb_pre or DEFAULT_N77_SSB_PRE
-    default_n77_ssb_post = args.n77_ssb_post or persisted_n77_ssb_post or DEFAULT_N77_SSBQ_POST
+    default_n77_ssb_post = args.n77_ssb_post or persisted_n77_ssb_post or DEFAULT_N77_SSB_POST
     default_n77b_ssb = args.n77b_ssb or persisted_n77b_ssb or DEFAULT_N77B_SSB
 
     default_ca_filters_csv = normalize_csv_list(args.ca_freq_filters or persisted_ca_filters)
