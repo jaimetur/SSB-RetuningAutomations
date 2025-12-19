@@ -906,13 +906,13 @@ def run_consistency_checks_for_market_pairs(
             output_dir = os.path.join(post_dir_fs, f"ConsistencyChecks_{versioned_suffix}")
         os.makedirs(output_dir, exist_ok=True)
 
-        # NEW: write ComparedFolders.txt with the exact PRE/POST folders used
+        # NEW: write FoldersCompared.txt with the exact PRE/POST folders used
         try:
             txt_path = write_compared_folders_file(output_dir=output_dir, pre_dir=pre_dir_fs, post_dir=post_dir_fs)
             if txt_path:
                 print(f"{module_name} {market_tag} Compared folders file written: '{pretty_path(txt_path)}'")
         except Exception as ex:
-            print(f"{module_name} {market_tag} [WARN] Failed to write ComparedFolders.txt: {ex}")
+            print(f"{module_name} {market_tag} [WARN] Failed to write FoldersCompared.txt: {ex}")
 
 
         # NEW: Build Pre/Post audit suffixes (Pre/Post before the timestamp)

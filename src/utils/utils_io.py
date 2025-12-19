@@ -500,7 +500,7 @@ def pretty_path(path: str) -> str:
         return path[4:]
     return path
 
-def write_compared_folders_file(output_dir: str, pre_dir: str, post_dir: str, filename: str = "ComparedFolders.txt") -> Optional[str]:
+def write_compared_folders_file(output_dir: str, pre_dir: str, post_dir: str, filename: str = "FoldersCompared.txt") -> Optional[str]:
     """
     Write a small text file with the PRE/POST folders used for the comparison.
 
