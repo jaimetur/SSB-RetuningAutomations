@@ -101,16 +101,18 @@ def apply_alternating_category_row_fills(
             current_fill = fill1 if use_first else fill2
             last_category = cell_category
 
-        # Detect whether this row is an "Inconsistencies" row
-        is_inconsistency_row = False
+        # Detect whether this row is an "Inconsistencies" or "Discrepancy" row
+        is_inconsistency_or_discrepancy_row = False
         if subcategory_col_idx is not None:
             sub_val = ws.cell(row=row_idx, column=subcategory_col_idx).value
-            if sub_val is not None and "inconsist" in str(sub_val).strip().lower():
-                is_inconsistency_row = True
+            if sub_val is not None:
+                sub_norm = str(sub_val).strip().lower()
+                if "inconsist" in sub_norm or "discrep" in sub_norm:
+                    is_inconsistency_or_discrepancy_row = True
 
-        # Determine if the inconsistency has Value > 0
-        is_positive_inconsistency = False
-        if is_inconsistency_row and value_col_idx is not None:
+        # Determine if the inconsistency or discrepancy has Value > 0
+        is_positive_inconsistency_or_discrepancy = False
+        if is_inconsistency_or_discrepancy_row and value_col_idx is not None:
             value_cell = ws.cell(row=row_idx, column=value_col_idx).value
             num_val = None
             if isinstance(value_cell, (int, float)):
@@ -122,14 +124,15 @@ def apply_alternating_category_row_fills(
                 except Exception:
                     num_val = None
             if num_val is not None and num_val > 0:
-                is_positive_inconsistency = True
+                is_positive_inconsistency_or_discrepancy = True
 
         # Apply background color and (optionally) red/gray font to the entire row
         for col_idx in range(1, ws.max_column + 1):
             cell = ws.cell(row=row_idx, column=col_idx)
             cell.fill = current_fill
-            if is_inconsistency_row:
-                cell.font = red_font if is_positive_inconsistency else gray_font
+            if is_inconsistency_or_discrepancy_row:
+                cell.font = red_font if is_positive_inconsistency_or_discrepancy else gray_font
+
 
 
 def color_summary_tabs(writer, prefix: str = "Summary", rgb_hex: str = "00B050") -> None:

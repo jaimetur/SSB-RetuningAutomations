@@ -234,6 +234,12 @@ class ConfigurationAudit:
             used_sheet_names.add(final_sheet)
             entry["final_sheet"] = final_sheet
 
+        candidate_to_final_sheet: Dict[str, str] = {
+            str(e.get("sheet_candidate", "")).strip(): str(e.get("final_sheet", "")).strip()
+            for e in table_entries
+            if str(e.get("sheet_candidate", "")).strip() and str(e.get("final_sheet", "")).strip()
+        }
+
         # =====================================================================
         #                PHASE 4: Build the Summary sheet
         # =====================================================================
@@ -567,9 +573,16 @@ class ConfigurationAudit:
                 if category_col_idx:
                     for row in range(2, ws_summary_audit.max_row + 1):
                         cell = ws_summary_audit.cell(row=row, column=category_col_idx)
-                        sheet_name = str(cell.value).strip() if cell.value else ""
-                        if sheet_name and sheet_name in writer.book.sheetnames:
-                            cell.hyperlink = f"#{sheet_name}!A1"
+                        raw = str(cell.value).strip() if cell.value else ""
+                        target_sheet = raw
+
+                        # 1) If no exists a sheet with that name, try to resolve using the previous mapping
+                        if target_sheet and target_sheet not in writer.book.sheetnames:
+                            target_sheet = candidate_to_final_sheet.get(raw, raw)
+
+                        # 2) If exists a sheet with that name, create hyperlink
+                        if target_sheet and target_sheet in writer.book.sheetnames:
+                            cell.hyperlink = f"#{target_sheet}!A1"
                             cell.font = Font(color="0563C1", underline="single")
 
         print(f"{module_name} Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")

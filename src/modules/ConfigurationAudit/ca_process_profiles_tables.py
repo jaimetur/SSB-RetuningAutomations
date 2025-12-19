@@ -57,8 +57,8 @@ def _process_single_profiles_table(
     """
     Process one profiles table with a given MOid column name.
     """
-    metric_missing = f"Profiles with old N77 SSB ({ssb_pre_int}) but not new N77 SSB ({ssb_post_int})"
-    metric_discr = f"Profiles with old N77 SSB ({ssb_pre_int}) and new N77 SSB ({ssb_post_int}) but with param discrepancies"
+    metric_missing = f"Profiles with old N77 SSB ({ssb_pre_int}) but not new N77 SSB ({ssb_post_int}) (from {table_name})"
+    metric_discr = f"Profiles with old N77 SSB ({ssb_pre_int}) and new N77 SSB ({ssb_post_int}) but with param discrepancies (from {table_name})"
 
     try:
         if df is None or df.empty:

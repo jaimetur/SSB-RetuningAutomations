@@ -77,6 +77,9 @@ def generate_ppt_summary(
                 · Level-1 bullets with the node list parsed from ExtraInfo
                   (comma/semicolon separated), split into blocks of up to
                   100 items per slide (no truncation).
+
+        • If Category name contains 'discrep' (case-insensitive):
+            - SAME behavior as inconsistencies.
     """
     try:
         from pptx import Presentation
@@ -135,9 +138,11 @@ def generate_ppt_summary(
         cat_lower = category.lower()
         is_audit = "audit" in cat_lower
         is_incons = "inconsist" in cat_lower  # covers 'Inconsistences' typo as well
+        is_discrep = "discrep" in cat_lower  # covers 'Discrepancy/Discrepancies' and common variants
+        is_incons_or_discrep = is_incons or is_discrep
 
-        # ---------------------- INCONSISTENCIES: may need multiple slides ----------------------
-        if is_incons:
+        # ---------------------- INCONSISTENCIES / DISCREPANCIES: may need multiple slides ----------------------
+        if is_incons_or_discrep:
             if not items:
                 # No items at all: skip creating slides for this category
                 continue
