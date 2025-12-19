@@ -6,14 +6,15 @@ from typing import Dict, Optional, List
 
 import pandas as pd
 
-from src.modules.ConsistencyChecks.cc_correction_cmd import build_gu_new, build_gu_missing, build_gu_disc, build_nr_new, build_nr_missing, build_nr_disc, export_correction_cmd_texts
+from src.modules.ConsistencyChecks.cc_correction_cmd import export_correction_cmd_texts
+from src.modules.Common.correction_commands import build_correction_command_gu_new_relations, build_correction_command_gu_missing_relations, build_correction_command_gu_discrepancies, build_correction_command_nr_new_relations, build_correction_command_nr_missing_relations, build_correction_command_nr_discrepancies
 from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_index_by_keys
 from src.utils.utils_datetime import extract_date
 from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit, apply_alternating_category_row_fills
 from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
 from src.utils.utils_io import read_text_lines, to_long_path, pretty_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
-from src.modules.Common.Common_Functions import load_nodes_names_and_id_from_summary_audit
+from src.modules.Common.common_functions import load_nodes_names_and_id_from_summary_audit
 from src.modules.ConsistencyChecks.cc_correction_cmd import export_external_and_termpoint_commands
 
 
@@ -621,7 +622,7 @@ class ConsistencyChecks:
         return results
 
     # ----------------------------- SUMMARY AUDIT COMPARISSON ----------------------------- #
-    def build_summaryaudit_comparison(self) -> Optional[pd.DataFrame]:
+    def summaryaudit_comparison(self) -> Optional[pd.DataFrame]:
         """
         Build a comparison DataFrame from PRE and POST ConfigurationAudit SummaryAudit sheets.
 
@@ -781,7 +782,7 @@ class ConsistencyChecks:
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
 
             # NEW: add SummaryAuditComparisson sheet if PRE/POST ConfigurationAudit SummaryAudit are available
-            comparison_df = self.build_summaryaudit_comparison()
+            comparison_df = self.summaryaudit_comparison()
             if comparison_df is not None and not comparison_df.empty:
                 comparison_df.to_excel(writer, sheet_name="SummaryAuditComparisson", index=False)
 
@@ -878,9 +879,9 @@ class ConsistencyChecks:
                 gu_new_df = enforce_gu_columns(b.get("new_in_post"))
 
                 # Build correction commands using external helpers (relations as main source)
-                gu_new_df = build_gu_new(gu_new_df, gu_rel_df)
-                gu_missing_df = build_gu_missing(gu_missing_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
-                gu_disc_cmd_df = build_gu_disc(gu_disc_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                gu_new_df = build_correction_command_gu_new_relations(gu_new_df, gu_rel_df)
+                gu_missing_df = build_correction_command_gu_missing_relations(gu_missing_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                gu_disc_cmd_df = build_correction_command_gu_discrepancies(gu_disc_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
 
                 correction_cmd_sources["GU_missing"] = gu_missing_df
                 correction_cmd_sources["GU_new"] = gu_new_df
@@ -893,8 +894,8 @@ class ConsistencyChecks:
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_disc", index=False)
-                empty_gu_missing_df = build_gu_missing(enforce_gu_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
-                empty_gu_new_df = build_gu_new(enforce_gu_columns(pd.DataFrame()), None)
+                empty_gu_missing_df = build_correction_command_gu_missing_relations(enforce_gu_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
+                empty_gu_new_df = build_correction_command_gu_new_relations(enforce_gu_columns(pd.DataFrame()), None)
                 empty_gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 empty_gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
 
@@ -906,9 +907,9 @@ class ConsistencyChecks:
                 nr_missing_df = enforce_nr_columns(b.get("missing_in_post"))
                 nr_new_df = enforce_nr_columns(b.get("new_in_post"))
 
-                nr_new_df = build_nr_new(nr_new_df, nr_rel_df)
-                nr_missing_df = build_nr_missing(nr_missing_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
-                nr_disc_cmd_df = build_nr_disc(nr_disc_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                nr_new_df = build_correction_command_nr_new_relations(nr_new_df, nr_rel_df)
+                nr_missing_df = build_correction_command_nr_missing_relations(nr_missing_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                nr_disc_cmd_df = build_correction_command_nr_discrepancies(nr_disc_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
 
                 correction_cmd_sources["NR_missing"] = nr_missing_df
                 correction_cmd_sources["NR_new"] = nr_new_df
@@ -921,8 +922,8 @@ class ConsistencyChecks:
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_disc", index=False)
-                empty_nr_missing_df = build_nr_missing(enforce_nr_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
-                empty_nr_new_df = build_nr_new(enforce_nr_columns(pd.DataFrame()), None)
+                empty_nr_missing_df = build_correction_command_nr_missing_relations(enforce_nr_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
+                empty_nr_new_df = build_correction_command_nr_new_relations(enforce_nr_columns(pd.DataFrame()), None)
                 empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
 

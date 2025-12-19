@@ -15,6 +15,9 @@
 
   - #### 🚀 Enhancements:
     - Optimized TXT Commands file to group all commands within the same nodes and avoid duplicate lines with `confb+, lt all, alt, wait` commands.
+    - Modified TermpointToGNB Correction Command.
+    - Modified TermpointToGnodeB Correction Command.
+    - Modified NR Relations Discrepancies Correction Command.
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
