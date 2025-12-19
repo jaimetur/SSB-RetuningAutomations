@@ -911,7 +911,8 @@ def run_consistency_checks(
     # ----------------------------- MANUAL MODE (module 2) ----------------------------- #
     def run_consistency_check_manual() -> Optional[Dict[str, Tuple[str, str]]]:
         """
-        Runner for ConsistencyChecks in MANUAL mode (module 1).
+        Runner for ConsistencyChecks in MANUAL mode (module 2).
+
         Behavior:
         ---------
         - Both PRE and POST folders MUST be explicitly provided.
@@ -980,7 +981,8 @@ def run_consistency_checks(
     # ----------------------------- BULK MODE (module 3) ----------------------------- #
     def run_consistency_check_bulk() -> Optional[Dict[str, Tuple[str, str]]]:
         """
-        Runner for ConsistencyChecks in BULK mode (module 2).
+        Runner for ConsistencyChecks in BULK mode (module 3).
+
         Behavior:
         ---------
         - Only ONE base folder is provided (typically the root 'WP2_SamsungBorder_Logs').
