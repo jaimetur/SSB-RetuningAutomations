@@ -105,10 +105,7 @@ def export_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, pd.D
 
             total_files += 1
 
-    print(
-        f"\n[Consistency Checks (Pre/Post Comparison)] "
-        f"Generated {total_files} Correction_Cmd text files in: '{pretty_path(base_dir)}'"
-    )
+    print(f"\n[Consistency Checks (Pre/Post Comparison)] Generated {total_files} Correction_Cmd files in: '{pretty_path(base_dir)}'")
     return total_files
 
 
@@ -323,9 +320,6 @@ def export_external_and_termpoint_commands(
     )
 
     if generated:
-        print(
-            f"[Consistency Checks] Generated {generated} extra Correction_Cmd files "
-            f"from POST Configuration Audit in: '{pretty_path(base_dir)}'"
-        )
+        print(f"[Consistency Checks (Pre/Post Comparison)] Generated {generated} extra Correction_Cmd files from POST Configuration Audit in: '{pretty_path(base_dir)}'")
 
     return generated
