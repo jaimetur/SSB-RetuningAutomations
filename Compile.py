@@ -89,7 +89,7 @@ def clean_previous_artifacts(name_stem: str):
 def run_pyinstaller(entry_file: Path, name_stem: str, target_arch: str | None, onefile: bool = True):
     """Invoke PyInstaller to build the binary."""
     OPERATING_SYSTEM, _ = detect_platform_and_ext()
-    splash_image = "assets/logos/logo_01.png"  # Splash image for windows
+    splash_image = "assets/logos/logo_02.png"  # Splash image for windows
 
     cmd = [sys.executable, "-m", "PyInstaller", str(entry_file)]
     # Common flags

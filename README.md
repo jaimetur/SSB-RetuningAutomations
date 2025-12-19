@@ -7,7 +7,7 @@
 
 # Retuning Automations
 <p align="center">
-  <img src="https://github.com/jaimetur/RetuningAutomations/blob/main/assets/logos/logo_01.png?raw=true" alt="RetuningAutomations Logo" width="600" height="480" />
+  <img src="https://github.com/jaimetur/RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="600" height="480" />
 </p>
 
 ---
