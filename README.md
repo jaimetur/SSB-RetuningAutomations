@@ -142,11 +142,9 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 
 ---
 
-### `3. Initial Clean-Up (During Maintenance Window)`
-**Purpose:** Utility to sanitize intermediate outputs (delete/add relations, change parameters, etc.) during Maintainance Window (after retuning).
+### `4. Profiles Audit (During Maintenance Window)`
+**Purpose:** Utility to execute a Profiles Audit during Maintainance Window (after retuning).
 
-**Notes**
-- Module scaffold present. Extend `CleanUp.run(...)` with your clean-up policies.
 
 ---
 
