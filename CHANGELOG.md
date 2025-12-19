@@ -25,6 +25,7 @@
     - Correction_Cmd output subfolders for `RelationsDiscrepancies`, `NewRelations` and `MissingRelations` are now sepparated into two subfolders (`NR` and `GU`) for a better organization.
 
   - #### 🐛 Bug fixes:
+    - Fixed bug on table `Summary GU_FreqRelation` that was taking the data from `GUtranSyncSignalFrequency` table instead of `GUtranFreqRelation`.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 

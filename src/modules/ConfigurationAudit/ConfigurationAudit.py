@@ -401,7 +401,6 @@ class ConfigurationAudit:
             margins_name="Total",
         )
         pivot_gu_sync_signal_freq = apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
-        # pivot_gu_sync_signal_freq = add_lowmid_mmwave_to_nr_celldu(pivot_gu_sync_signal_freq)
 
         # Pivot GUtranFreqRelation
         df_gu_freq_rel = concat_or_empty(mo_collectors["GUtranFreqRelation"])
@@ -412,7 +411,7 @@ class ConfigurationAudit:
             add_margins=True,
             margins_name="Total",
         )
-        pivot_gu_freq_rel = apply_frequency_column_filter(pivot_gu_sync_signal_freq, freq_filters)
+        pivot_gu_freq_rel = apply_frequency_column_filter(pivot_gu_freq_rel, freq_filters)
 
         # Extra tables for audit logic
         df_nr_cell_rel = concat_or_empty(mo_collectors["NRCellRelation"])
