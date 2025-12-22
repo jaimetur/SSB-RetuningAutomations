@@ -17,13 +17,13 @@ IMPORTANT:
 import pandas as pd
 from typing import List, Dict
 
-from src.modules.Common.cc_post_step2 import cc_post_step2
+from src.modules.ProfilesAudit.pa_post_step2 import cc_post_step2
 from src.modules.Common.common_functions import load_nodes_names_and_id_from_summary_audit
 from src.modules.ConfigurationAudit.ca_process_external_termpoint_tables import process_external_nr_cell_cu, process_external_gutran_cell, process_termpoint_to_gnodeb, process_termpoint_to_gnb, process_term_point_to_enodeb
 from src.modules.ConfigurationAudit.ca_process_lte_tables import process_gu_sync_signal_freq, process_gu_freq_rel, process_gu_cell_relation
 from src.modules.ConfigurationAudit.ca_process_nr_tables import process_nr_cell_du, process_nr_freq, process_nr_freq_rel, process_nr_sector_carrier, process_nr_cell_relation
 from src.modules.ConfigurationAudit.ca_process_others_tables import process_endc_distr_profile, process_freq_prio_nr, process_cardinalities
-from src.modules.ConfigurationAudit.ca_process_profiles_tables import process_profiles_tables
+from src.modules.ProfilesAudit.pa_process_profiles_tables import process_profiles_tables
 from src.utils.utils_frequency import parse_int_frequency
 
 
