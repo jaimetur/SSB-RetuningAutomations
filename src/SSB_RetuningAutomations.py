@@ -42,7 +42,7 @@ from src.modules.CleanUp.FinalCleanUp import FinalCleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "SSB_RetuningAutomations"
-TOOL_VERSION        = "0.5.0"
+TOOL_VERSION        = "0.5.1"
 TOOL_DATE           = "2025-12-22"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
 COPYRIGHT_TEXT      = "(c) 2025 - Jaime Tur (jaime.tur@ericsson.com)"
@@ -94,8 +94,8 @@ MODULE_NAMES = [
     "1. Configuration Audit & Logs Parser",
     "2. Consistency Check (Pre/Post Comparison)",
     "3. Consistency Check (Bulk mode Pre/Post auto-detection)",
-    "4. Profiles Audit (During Maintenance Window)",
-    "5. Final Clean-Up (After Retune is completed)",
+    # NOTE: Module 4 (Profiles Audit) has been removed from GUI/CLI.
+    "4. Final Clean-Up (After Retune is completed)",
 ]
 
 # ============================== PERSISTENT CONFIG =========================== #
@@ -108,7 +108,7 @@ CONFIG_KEY_LAST_INPUT_AUDIT             = "last_input_dir_audit"
 CONFIG_KEY_LAST_INPUT_CC_PRE            = "last_input_dir_cc_pre"
 CONFIG_KEY_LAST_INPUT_CC_POST           = "last_input_dir_cc_post"
 CONFIG_KEY_LAST_INPUT_CC_BULK           = "last_input_dir_cc_bulk"
-CONFIG_KEY_LAST_INPUT_PROFILES_AUDIT    = "last_input_dir_profiles_audit"
+# CONFIG_KEY_LAST_INPUT_PROFILES_AUDIT    = "last_input_dir_profiles_audit"
 CONFIG_KEY_LAST_INPUT_FINAL_CLEANUP     = "last_input_dir_final_cleanup"
 CONFIG_KEY_N77_SSB_PRE                  = "n77_ssb_pre"
 CONFIG_KEY_N77_SSB_POST                 = "n77_ssb_post"
@@ -127,7 +127,7 @@ CFG_FIELD_MAP = {
     "last_input_cc_pre":          CONFIG_KEY_LAST_INPUT_CC_PRE,
     "last_input_cc_post":         CONFIG_KEY_LAST_INPUT_CC_POST,
     "last_input_cc_bulk":         CONFIG_KEY_LAST_INPUT_CC_BULK,
-    "last_input_profiles_audit":  CONFIG_KEY_LAST_INPUT_PROFILES_AUDIT,
+    # "last_input_profiles_audit":  CONFIG_KEY_LAST_INPUT_PROFILES_AUDIT,
     "last_input_final_cleanup":   CONFIG_KEY_LAST_INPUT_FINAL_CLEANUP,
     "n77_ssb_pre":                CONFIG_KEY_N77_SSB_PRE,
     "n77_ssb_post":               CONFIG_KEY_N77_SSB_POST,
@@ -183,7 +183,7 @@ def gui_config_dialog(
     default_input_cc_pre: str = "",
     default_input_cc_post: str = "",
     default_input_cc_bulk: str = "",
-    default_input_profiles_audit: str = "",
+    # default_input_profiles_audit: str = "",  # NOTE: removed module 4
     default_input_final_cleanup: str = "",
     default_n77_ssb_pre: str = DEFAULT_N77_SSB_PRE,
     default_n77_ssb_post: str = DEFAULT_N77_SSB_POST,
@@ -215,8 +215,7 @@ def gui_config_dialog(
     module_single_defaults: Dict[str, str] = {
         MODULE_NAMES[0]: default_input_audit or default_input or "",
         MODULE_NAMES[2]: default_input_cc_bulk or default_input or "",
-        MODULE_NAMES[3]: default_input_profiles_audit or default_input or "",
-        MODULE_NAMES[4]: default_input_final_cleanup or default_input or "",
+        MODULE_NAMES[3]: default_input_final_cleanup or default_input or "",
     }
 
     root = tk.Tk()
@@ -551,8 +550,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Launcher Retuning Automations Tool with GUI fallback.")
     parser.add_argument(
         "--module",
-        choices=["configuration-audit", "consistency-check", "consistency-check-bulk", "profiles-audit", "final-cleanup"],
-        help="Module to run: configuration-audit|consistency-check|consistency-check-bulk|profiles-audit|final-cleanup. "
+        choices=["configuration-audit", "consistency-check", "consistency-check-bulk", "final-cleanup"],
+        help="Module to run: configuration-audit|consistency-check|consistency-check-bulk|final-cleanup. "
              "If omitted and no other args are provided, GUI appears (if available)."
     )
     # Single-input (most modules)
@@ -598,8 +597,8 @@ def run_configuration_audit(
     versioned_suffix: Optional[str] = None,
     market_label: Optional[str] = None,
     external_output_dir: Optional[str] = None,
-    profiles_audit: bool = True,                 # <<< NEW
-    # profiles_audit: bool = False,                 # <<< NEW
+    profiles_audit: bool = True,                # <<< NEW (default now True because module 4 was removed and the logic have been incorporated to Default Configuration Audit)
+    # profiles_audit: bool = True,                 # <<< NEW
     module_name_override: Optional[str] = None,    # <<< NEW
 ) -> Optional[str]:
     """
@@ -1202,38 +1201,39 @@ def run_consistency_checks(
 
     main_logic(market_pairs)
 
-def run_profiles_audit(
-    input_dir: str,
-    ca_freq_filters_csv: str = "",
-    n77_ssb_pre: Optional[str] = None,
-    n77_ssb_post: Optional[str] = None,
-    n77b_ssb: Optional[str] = None,
-    allowed_n77_ssb_pre_csv: Optional[str] = None,
-    allowed_n77_arfcn_pre_csv: Optional[str] = None,
-    allowed_n77_ssb_post_csv: Optional[str] = None,
-    allowed_n77_arfcn_post_csv: Optional[str] = None,
-) -> Optional[str]:
-    """
-    Profiles Audit = Configuration Audit with profiles_audit=True
-    and module_name='[Profiles Audit]'.
-    """
 
-    module_name = "[Profiles Audit]"
-
-    return run_configuration_audit(
-        input_dir=input_dir,
-        ca_freq_filters_csv=ca_freq_filters_csv,
-        n77_ssb_pre=n77_ssb_pre,
-        n77_ssb_post=n77_ssb_post,
-        n77b_ssb=n77b_ssb,
-        allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv,
-        allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
-        allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
-        allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
-        profiles_audit=True,                   # <<< KEY
-        module_name_override=module_name,      # <<< KEY
-    )
-
+# NOTE: Module 4 (Profiles Audit) removed from GUI/CLI.
+# def run_profiles_audit(
+#     input_dir: str,
+#     ca_freq_filters_csv: str = "",
+#     n77_ssb_pre: Optional[str] = None,
+#     n77_ssb_post: Optional[str] = None,
+#     n77b_ssb: Optional[str] = None,
+#     allowed_n77_ssb_pre_csv: Optional[str] = None,
+#     allowed_n77_arfcn_pre_csv: Optional[str] = None,
+#     allowed_n77_ssb_post_csv: Optional[str] = None,
+#     allowed_n77_arfcn_post_csv: Optional[str] = None,
+# ) -> Optional[str]:
+#     """
+#     Profiles Audit = Configuration Audit with profiles_audit=True
+#     and module_name='[Profiles Audit]'.
+#     """
+#
+#     module_name = "[Profiles Audit]"
+#
+#     return run_configuration_audit(
+#         input_dir=input_dir,
+#         ca_freq_filters_csv=ca_freq_filters_csv,
+#         n77_ssb_pre=n77_ssb_pre,
+#         n77_ssb_post=n77_ssb_post,
+#         n77b_ssb=n77b_ssb,
+#         allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv,
+#         allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
+#         allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
+#         allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+#         profiles_audit=True,                   # <<< KEY
+#         module_name_override=module_name,      # <<< KEY
+#     )
 
 
 def run_final_cleanup(input_dir: str, *_args) -> None:
@@ -1263,9 +1263,8 @@ def resolve_module_callable(name: str):
         return run_consistency_checks
     if name in ("consistency-check-bulk", MODULE_NAMES[2].lower()):
         return run_consistency_checks
-    if name in ("profiles-audit", MODULE_NAMES[3].lower()):
-        return run_profiles_audit
-    if name in ("final-cleanup", MODULE_NAMES[4].lower(), "final-cleanup"):
+    # NOTE: profiles-audit removed
+    if name in ("final-cleanup", MODULE_NAMES[3].lower(), "final-cleanup"):
         return run_final_cleanup
     return None
 
@@ -1331,20 +1330,7 @@ def execute_module(
                 n77b_ssb=n77b_ssb,
             )
 
-
-        elif module_fn is run_profiles_audit:
-            module_fn(
-                input_dir,
-                ca_freq_filters_csv=ca_freq_filters_csv,
-                n77_ssb_pre=n77_ssb_pre,
-                n77_ssb_post=n77_ssb_post,
-                n77b_ssb=n77b_ssb,
-                allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv,
-                allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
-                allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
-                allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
-            )
-
+        # NOTE: run_profiles_audit removed
 
         elif module_fn is run_final_cleanup:
             module_fn(input_dir, n77_ssb_pre, n77_ssb_post)
@@ -1417,7 +1403,7 @@ def main():
         "last_input",
         "last_input_audit",
         "last_input_cc_bulk",
-        "last_input_profiles_audit",
+        # "last_input_profiles_audit",  # NOTE: removed module 4
         "last_input_final_cleanup",
         "last_input_cc_pre",
         "last_input_cc_post",
@@ -1440,7 +1426,7 @@ def main():
     persisted_last_cc_pre              = cfg["last_input_cc_pre"]
     persisted_last_cc_post             = cfg["last_input_cc_post"]
     persisted_last_cc_bulk             = cfg["last_input_cc_bulk"]
-    persisted_last_profiles_audit      = cfg["last_input_profiles_audit"]
+    # persisted_last_profiles_audit      = cfg["last_input_profiles_audit"]
     persisted_last_final_cleanup       = cfg["last_input_final_cleanup"]
 
     persisted_n77_ssb_pre              = cfg["n77_ssb_pre"]
@@ -1456,7 +1442,7 @@ def main():
     # Defaults per module (CLI > persisted per-module > global fallback > hardcode)
     default_input_audit = args.input or persisted_last_audit or persisted_last_single or INPUT_FOLDER or ""
     default_input_cc_bulk = args.input or persisted_last_cc_bulk or persisted_last_single or INPUT_FOLDER or ""
-    default_input_profiles_audit = args.input or persisted_last_profiles_audit or persisted_last_single or INPUT_FOLDER or ""
+    # default_input_profiles_audit = args.input or persisted_last_profiles_audit or persisted_last_single or INPUT_FOLDER or ""
     default_input_final_cleanup = args.input or persisted_last_final_cleanup or persisted_last_single or INPUT_FOLDER or ""
 
     default_input_cc_pre = args.input_pre or persisted_last_cc_pre or INPUT_FOLDER_PRE or ""
@@ -1492,7 +1478,7 @@ def main():
                 default_input_cc_pre=default_input_cc_pre,
                 default_input_cc_post=default_input_cc_post,
                 default_input_cc_bulk=default_input_cc_bulk,
-                default_input_profiles_audit=default_input_profiles_audit,
+                # default_input_profiles_audit=default_input_profiles_audit,  # NOTE: removed module 4
                 default_input_final_cleanup=default_input_final_cleanup,
                 default_n77_ssb_pre=default_n77_ssb_pre,
                 default_n77_ssb_post=default_n77_ssb_post,
@@ -1526,8 +1512,6 @@ def main():
                 elif sel.module == MODULE_NAMES[2]:
                     default_input_cc_bulk = sel.input_dir
                 elif sel.module == MODULE_NAMES[3]:
-                    default_input_profiles_audit = sel.input_dir
-                elif sel.module == MODULE_NAMES[4]:
                     default_input_final_cleanup = sel.input_dir
                 default_input = default_input_audit
 
@@ -1558,9 +1542,6 @@ def main():
                     persist_kwargs["last_input_cc_bulk"] = sel.input_dir
                     persist_kwargs["last_input"] = sel.input_dir
                 elif sel.module == MODULE_NAMES[3]:
-                    persist_kwargs["last_input_profiles_audit"] = sel.input_dir
-                    persist_kwargs["last_input"] = sel.input_dir
-                elif sel.module == MODULE_NAMES[4]:
                     persist_kwargs["last_input_final_cleanup"] = sel.input_dir
                     persist_kwargs["last_input"] = sel.input_dir
 
@@ -1760,48 +1741,30 @@ def main():
         return
 
     # Initial Clean-Up (module 4) and Final Clean-Up (module 5): single-input
-    input_dir = args.input or (default_input_profiles_audit if module_fn is run_profiles_audit else default_input_final_cleanup)
+    # NOTE: Profiles Audit module removed; Final Clean-Up is now module 4.
+    input_dir = args.input or default_input_final_cleanup
     if not input_dir:
         print("Error: --input is required for this module in CLI mode.\n")
         parser.print_help()
         return
 
-    if module_fn is run_profiles_audit:
-        save_cfg_values(
-            config_dir=CONFIG_DIR,
-            config_path=CONFIG_PATH,
-            config_section=CONFIG_SECTION,
-            cfg_field_map=CFG_FIELD_MAP,
-            last_input_profiles_audit=input_dir,
-            last_input=input_dir,
-            n77_ssb_pre=n77_ssb_pre,
-            n77_ssb_post=n77_ssb_post,
-            n77b_ssb=n77b_ssb,
-            ca_freq_filters=ca_freq_filters_csv,
-            cc_freq_filters=cc_freq_filters_csv,
-            allowed_n77_ssb_pre=allowed_n77_ssb_pre_csv,
-            allowed_n77_arfcn_pre=allowed_n77_arfcn_pre_csv,
-            allowed_n77_ssb_post=allowed_n77_ssb_post_csv,
-            allowed_n77_arfcn_post=allowed_n77_arfcn_post_csv,
-        )
-    else:
-        save_cfg_values(
-            config_dir=CONFIG_DIR,
-            config_path=CONFIG_PATH,
-            config_section=CONFIG_SECTION,
-            cfg_field_map=CFG_FIELD_MAP,
-            last_input_final_cleanup=input_dir,
-            last_input=input_dir,
-            n77_ssb_pre=n77_ssb_pre,
-            n77_ssb_post=n77_ssb_post,
-            n77b_ssb=n77b_ssb,
-            ca_freq_filters=ca_freq_filters_csv,
-            cc_freq_filters=cc_freq_filters_csv,
-            allowed_n77_ssb_pre=allowed_n77_ssb_pre_csv,
-            allowed_n77_arfcn_pre=allowed_n77_arfcn_pre_csv,
-            allowed_n77_ssb_post=allowed_n77_ssb_post_csv,
-            allowed_n77_arfcn_post=allowed_n77_arfcn_post_csv,
-        )
+    save_cfg_values(
+        config_dir=CONFIG_DIR,
+        config_path=CONFIG_PATH,
+        config_section=CONFIG_SECTION,
+        cfg_field_map=CFG_FIELD_MAP,
+        last_input_final_cleanup=input_dir,
+        last_input=input_dir,
+        n77_ssb_pre=n77_ssb_pre,
+        n77_ssb_post=n77_ssb_post,
+        n77b_ssb=n77b_ssb,
+        ca_freq_filters=ca_freq_filters_csv,
+        cc_freq_filters=cc_freq_filters_csv,
+        allowed_n77_ssb_pre=allowed_n77_ssb_pre_csv,
+        allowed_n77_arfcn_pre=allowed_n77_arfcn_pre_csv,
+        allowed_n77_ssb_post=allowed_n77_ssb_post_csv,
+        allowed_n77_arfcn_post=allowed_n77_arfcn_post_csv,
+    )
 
     execute_module(
         module_fn,

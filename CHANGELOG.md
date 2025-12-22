@@ -4,6 +4,26 @@
 
 ---
 
+## Release: v0.5.1
+- ### Release Date: 2025-12-22
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+    - Removed module `4. Profiles Audit` and incorporated the logic within module `1. Configuration Audit`.
+  
+  - #### 🌟 New Features:
+
+  - #### 🚀 Enhancements:
+
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
+
+---
+
 ## Release: v0.5.0
 - ### Release Date: 2025-12-22
 
