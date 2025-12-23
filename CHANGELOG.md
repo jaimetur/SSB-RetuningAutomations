@@ -5,7 +5,7 @@
 ---
 
 ## Release: v0.5.1
-- ### Release Date: 2025-12-22
+- ### Release Date: 2025-12-23
 
 - ### Main Changes:
   
@@ -17,6 +17,8 @@
   - #### 🚀 Enhancements:
 
   - #### 🐛 Bug fixes:
+    - Fixed error in `NR Frequency Inconsistencies (from NRFreqRelation)`
+    - Fixed error in `Profiles Discrepancies (from McpcPCellNrFreqRelProfileUeCfg)`
     - Minor bug fixing.
     
   - #### 📚 Documentation: 

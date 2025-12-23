@@ -269,6 +269,41 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                                 vals = [v for v in vals if v]
                                 return sorted(set(vals))
 
+                            # NEW: smart clone builder for McpcPCellNrFreqRelProfileRef
+                            # Some refs contain the old SSB twice, e.g. "...McpcPCellNrFreqRelProfile=648672_648672"
+                            # Expected post-retune clone is typically "...McpcPCellNrFreqRelProfile=648672_647328"
+                            # So we must NOT replace both occurrences (a naive replace would create 647328_647328).
+                            def _build_expected_profile_ref_clone_smart(old_ref: object, old_ssb: object, new_ssb: object) -> str:
+                                s = "" if old_ref is None else str(old_ref).strip()
+                                if not s:
+                                    return s
+
+                                old_ssb_str = str(old_ssb).strip()
+                                new_ssb_str = str(new_ssb).strip()
+
+                                key = "McpcPCellNrFreqRelProfile="
+                                idx = s.find(key)
+                                if idx >= 0:
+                                    start = idx + len(key)
+                                    end = s.find(",", start)
+                                    if end < 0:
+                                        end = len(s)
+
+                                    token = s[start:end].strip()
+                                    if "_" in token:
+                                        left, right = token.split("_", 1)
+                                        # Only replace the RIGHT side when it matches old SSB (keep LEFT as-is)
+                                        if str(right).strip() == old_ssb_str:
+                                            right = new_ssb_str
+                                        new_token = f"{left}_{right}"
+                                        return s[:start] + new_token + s[end:]
+
+                                # Fallback to legacy function (if available) for other formats
+                                try:
+                                    return build_expected_profile_ref_clone(s, old_ssb, new_ssb)
+                                except Exception:
+                                    return s
+
                             # Compare OLD vs NEW by NodeId + NRCellCUId (NRCellRelationId is not expected to match)
                             group_cols = [node_col, cell_col]
                             for (node_id_val, cell_id_val), grp in full_n77.groupby(group_cols, dropna=False):
@@ -284,7 +319,11 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
 
                                 node_id_val = str(node_id_val)
                                 same_found = any(new_ref == old_ref for old_ref in old_refs for new_ref in new_refs)
-                                clone_found = any(new_ref == build_expected_profile_ref_clone(old_ref, n77_ssb_pre, n77_ssb_post) for old_ref in old_refs for new_ref in new_refs)
+                                clone_found = any(
+                                    new_ref == _build_expected_profile_ref_clone_smart(old_ref, n77_ssb_pre, n77_ssb_post)
+                                    for old_ref in old_refs
+                                    for new_ref in new_refs
+                                )
 
                                 if same_found:
                                     nodes_pointing_to_same_profile_ref.add(node_id_val)
@@ -305,6 +344,40 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                             lname = str(name).lower()
                             if lname in {"nrfreqrelationid", "nrfrequencyref", "reservedby"}:
                                 cols_to_ignore.add(name)
+
+                        # NEW: intelligent rule for mcpcPCellNrFreqRelProfileRef differences (expected clone is NOT a mismatch)
+                        profile_ref_col_local = resolve_column_case_insensitive(full_n77, ["mcpcPCellNrFreqRelProfileRef"])
+
+                        def _is_expected_profile_ref_clone(old_value: object, new_value: object) -> bool:
+                            if profile_ref_col_local is None:
+                                return False
+                            if pd.isna(old_value) or pd.isna(new_value):
+                                return False
+                            old_str = str(old_value).strip()
+                            new_str = str(new_value).strip()
+                            if not old_str or not new_str:
+                                return False
+
+                            # NEW: use the smart clone builder to avoid double-replacing the old SSB when it appears twice
+                            try:
+                                expected_smart = _build_expected_profile_ref_clone_smart(old_str, n77_ssb_pre, n77_ssb_post)
+                                if new_str == expected_smart:
+                                    return True
+                            except Exception:
+                                pass
+
+                            # Fallback to legacy clone builder for backward compatibility
+                            try:
+                                expected = build_expected_profile_ref_clone(old_str, n77_ssb_pre, n77_ssb_post)
+                                return new_str == expected
+                            except Exception:
+                                return False
+
+                        def _values_differ(col_name: str, old_value: object, new_value: object) -> bool:
+                            # NEW: ignore profile ref changes when they match the expected clone
+                            if profile_ref_col_local and str(col_name) == str(profile_ref_col_local) and _is_expected_profile_ref_clone(old_value, new_value):
+                                return False
+                            return (pd.isna(old_value) and not pd.isna(new_value)) or (not pd.isna(old_value) and pd.isna(new_value)) or (old_value != new_value)
 
                         bad_cells_params = []
 
@@ -341,12 +414,26 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                                     new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
 
                                     if not old_clean.equals(new_clean):
+                                        # NEW: if after applying the intelligent rule there are no real mismatches, treat as equal and skip
+                                        mismatch_cols = []
+                                        for col_name in sort_cols:
+                                            try:
+                                                if _values_differ(col_name, old_clean.iloc[0][col_name], new_clean.iloc[0][col_name]):
+                                                    mismatch_cols.append(str(col_name))
+                                            except Exception:
+                                                mismatch_cols.append(str(col_name))
+
+                                        if not mismatch_cols:
+                                            continue
+
+                                        # NEW: if the only differences are expected profile ref clones, treat as equal and skip mismatch
+                                        if profile_ref_col_local and set(mismatch_cols).issubset({str(profile_ref_col_local)}):
+                                            if _is_expected_profile_ref_clone(old_clean.iloc[0][profile_ref_col_local], new_clean.iloc[0][profile_ref_col_local]):
+                                                continue
+
                                         # Take first row of each side to report parameter-level differences
                                         old_row = old_clean.iloc[0]
                                         new_row = new_clean.iloc[0]
-
-                                        def _values_differ(a: object, b: object) -> bool:
-                                            return (pd.isna(a) and not pd.isna(b)) or (not pd.isna(a) and pd.isna(b)) or (a != b)
 
                                         node_val = ""
                                         gnb_val = ""
@@ -364,14 +451,17 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                                         except Exception:
                                             node_val = ""
 
+                                        diff_reported = False
                                         for col_name in sort_cols:
                                             old_val = old_row[col_name]
                                             new_val = new_row[col_name]
-                                            if _values_differ(old_val, new_val):
+                                            if _values_differ(str(col_name), old_val, new_val):
                                                 param_mismatch_rows_nr.append({"Layer": "NR", "Table": "NRFreqRelation", "NodeId": node_val, "GNBCUCPFunctionId": gnb_val, "NRCellCUId": nrcell_val, "NRFreqRelationId": nrfreqrel_val, "Parameter": str(col_name), "OldSSB": n77_ssb_pre, "NewSSB": n77_ssb_post, "OldValue": "" if pd.isna(old_val) else str(old_val), "NewValue": "" if pd.isna(new_val) else str(new_val)})
+                                                diff_reported = True
 
-                                        bad_cells_params.append(str(cell_id))
-                                        break
+                                        if diff_reported:
+                                            bad_cells_params.append(str(cell_id))
+                                            break
 
                             else:
                                 # Fallback: without NRCellRelationId, compare all block OLD vs NEW
@@ -386,11 +476,25 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                                 new_clean = new_clean.sort_values(by=sort_cols).reset_index(drop=True)
 
                                 if not old_clean.equals(new_clean):
+                                    # NEW: if after applying the intelligent rule there are no real mismatches, treat as equal and skip
+                                    mismatch_cols = []
+                                    for col_name in sort_cols:
+                                        try:
+                                            if _values_differ(col_name, old_clean.iloc[0][col_name], new_clean.iloc[0][col_name]):
+                                                mismatch_cols.append(str(col_name))
+                                        except Exception:
+                                            mismatch_cols.append(str(col_name))
+
+                                    if not mismatch_cols:
+                                        continue
+
+                                    # NEW: if the only differences are expected profile ref clones, treat as equal and skip mismatch
+                                    if profile_ref_col_local and set(mismatch_cols).issubset({str(profile_ref_col_local)}):
+                                        if _is_expected_profile_ref_clone(old_clean.iloc[0][profile_ref_col_local], new_clean.iloc[0][profile_ref_col_local]):
+                                            continue
+
                                     old_row = old_clean.iloc[0]
                                     new_row = new_clean.iloc[0]
-
-                                    def _values_differ(a: object, b: object) -> bool:
-                                        return (pd.isna(a) and not pd.isna(b)) or (not pd.isna(a) and pd.isna(b)) or (a != b)
 
                                     node_val = ""
                                     gnb_val = ""
@@ -408,13 +512,16 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
                                     except Exception:
                                         node_val = ""
 
+                                    diff_reported = False
                                     for col_name in sort_cols:
                                         old_val = old_row[col_name]
                                         new_val = new_row[col_name]
-                                        if _values_differ(old_val, new_val):
+                                        if _values_differ(str(col_name), old_val, new_val):
                                             param_mismatch_rows_nr.append({"Layer": "NR", "Table": "NRFreqRelation", "NodeId": node_val, "GNBCUCPFunctionId": gnb_val, "NRCellCUId": nrcell_val, "NRFreqRelationId": nrfreqrel_val, "Parameter": str(col_name), "OldSSB": n77_ssb_pre, "NewSSB": n77_ssb_post, "OldValue": "" if pd.isna(old_val) else str(old_val), "NewValue": "" if pd.isna(new_val) else str(new_val)})
+                                            diff_reported = True
 
-                                    bad_cells_params.append(str(cell_id))
+                                    if diff_reported:
+                                        bad_cells_params.append(str(cell_id))
 
                         bad_cells_params = sorted(set(bad_cells_params))
                         add_row("NRFreqRelation", "NR Frequency Inconsistencies", f"NR cells with mismatching params between old N77 SSB ({n77_ssb_pre}) and the new N77 SSB ({n77_ssb_post}) (from NRFreqRelation table)", len(bad_cells_params), ", ".join(bad_cells_params))
@@ -428,6 +535,7 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
             add_row("NRFreqRelation", "NR Frequency Audit", "NRFreqRelation table", "Table not found or empty")
     except Exception as ex:
         add_row("NRFreqRelation", "NR Frequency Audit", "Error while checking NRFreqRelation", f"ERROR: {ex}")
+
 
 
 # ----------------------------- NRSectorCarrier (N77 + allowed ARCFN) -----------------------------

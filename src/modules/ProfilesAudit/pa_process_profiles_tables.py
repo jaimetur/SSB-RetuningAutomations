@@ -84,8 +84,18 @@ def _process_single_profiles_table(
         work[node_col] = work[node_col].astype(str).str.strip()
         work[moid_col] = work[moid_col].astype(str).str.strip()
 
+        # If this is a *UeCfg table and we can resolve the corresponding UeCfgId column, pair rows by (NodeId, UeCfgId).
+        # This matches the user's requirement: rows with the same key (NodeId, XxxUeCfgId) must come in pairs where only the ProfileId changes old->new.
+        uecfg_col = _resolve_uecfg_id_col_for_profile_id(work, moid_col_name)
+        if uecfg_col:
+            work[uecfg_col] = work[uecfg_col].astype(str).str.strip()
+            _process_profiles_table_by_pair_key(work, table_name, node_col, moid_col, uecfg_col, reserved_col, add_row, ssb_pre_int, ssb_post_int, metric_missing, metric_discr)
+            return
+
         compare_cols = [c for c in work.columns if c not in {moid_col, reserved_col}]
 
+        # OLD behavior (fallback): pre/post detection directly on MOid and matching expected post MOid inside the same table.
+        # This can overcount discrepancies in UeCfg tables where the correct key is (NodeId, UeCfgId).
         pre_mask = work[moid_col].map(lambda v: _contains_int_token(str(v), ssb_pre_int))
         post_mask = work[moid_col].map(lambda v: _contains_int_token(str(v), ssb_post_int))
 
@@ -144,6 +154,108 @@ def _process_single_profiles_table(
     except Exception as ex:
         add_row(table_name, "Profiles Inconsistencies", metric_missing, f"ERROR: {ex}")
         add_row(table_name, "Profiles Discrepancies", metric_discr, f"ERROR: {ex}")
+
+
+def _process_profiles_table_by_pair_key(
+    work: pd.DataFrame,
+    table_name: str,
+    node_col: str,
+    profile_id_col: str,
+    uecfg_col: str,
+    reserved_col: Optional[str],
+    add_row,
+    ssb_pre_int: int,
+    ssb_post_int: int,
+    metric_missing: str,
+    metric_discr: str,
+) -> None:
+    """
+    Pair rows by (NodeId, UeCfgId). For each "old-only" row, expect a matching "new-only" row in the same key group
+    where the ProfileId has old->new replacement and all other columns (except reservedBy and ProfileId) are identical.
+    """
+    compare_cols = [c for c in work.columns if c not in {profile_id_col, reserved_col}]
+
+    # Avoid false positives when a ProfileId contains BOTH old and new (e.g. "648672_647328").
+    # Only treat as PRE if it contains old and NOT new, and as POST if it contains new and NOT old.
+    def _is_old_only(v: object) -> bool:
+        s = "" if v is None else str(v)
+        return _contains_int_token(s, ssb_pre_int) and not _contains_int_token(s, ssb_post_int)
+
+    def _is_new_only(v: object) -> bool:
+        s = "" if v is None else str(v)
+        return _contains_int_token(s, ssb_post_int) and not _contains_int_token(s, ssb_pre_int)
+
+    pre_rows = work.loc[work[profile_id_col].map(_is_old_only)].copy()
+    post_rows = work.loc[work[profile_id_col].map(_is_new_only)].copy()
+
+    if pre_rows.empty:
+        add_row(table_name, "Profiles Inconsistencies", metric_missing, 0, "")
+        add_row(table_name, "Profiles Discrepancies", metric_discr, 0, "")
+        return
+
+    # Index POST rows by (key, profile_id, signature)
+    post_exact: Set[Tuple[Tuple[str, str], str, Tuple[Optional[str], ...]]] = set()
+    post_by_key_and_profile: Dict[Tuple[str, str], Dict[str, List[Dict[str, Optional[str]]]]] = {}
+
+    for _, r in post_rows.iterrows():
+        key = (str(r.get(node_col, "")).strip(), str(r.get(uecfg_col, "")).strip())
+        pid = str(r.get(profile_id_col, "")).strip()
+        norm = _normalize_row_for_compare(r, compare_cols)
+        sig = tuple(norm.get(c) for c in compare_cols)
+        post_exact.add((key, pid, sig))
+        post_by_key_and_profile.setdefault(key, {}).setdefault(pid, []).append(norm)
+
+    missing_count = 0
+    discrepancy_count = 0
+    missing_nodes: Set[str] = set()
+    discrepancy_nodes_to_cols: Dict[str, Set[str]] = {}
+
+    for _, pre in pre_rows.iterrows():
+        key = (str(pre.get(node_col, "")).strip(), str(pre.get(uecfg_col, "")).strip())
+        pre_pid = str(pre.get(profile_id_col, "")).strip()
+        expected_pid = _replace_int_token(pre_pid, ssb_pre_int, ssb_post_int)
+
+        pre_norm = _normalize_row_for_compare(pre, compare_cols)
+        sig = tuple(pre_norm.get(c) for c in compare_cols)
+
+        if (key, expected_pid, sig) in post_exact:
+            continue
+
+        node_val = key[0]
+
+        candidates = post_by_key_and_profile.get(key, {}).get(expected_pid, [])
+        if not candidates:
+            missing_count += 1
+            if node_val:
+                missing_nodes.add(node_val)
+            continue
+
+        discrepancy_count += 1
+        diff_cols = _best_diff_columns(pre_norm, candidates, compare_cols)
+        if node_val:
+            discrepancy_nodes_to_cols.setdefault(node_val, set()).update(diff_cols)
+
+    missing_nodes_str = ", ".join(sorted(missing_nodes))
+    add_row(table_name, "Profiles Inconsistencies", metric_missing, missing_count, missing_nodes_str)
+
+    discrepancy_extra = _format_discrepancy_extrainfo(discrepancy_nodes_to_cols)
+    add_row(table_name, "Profiles Discrepancies", metric_discr, discrepancy_count, discrepancy_extra)
+
+
+def _resolve_uecfg_id_col_for_profile_id(df: pd.DataFrame, profile_id_col_name: str) -> Optional[str]:
+    """
+    Heuristic for *UeCfg tables: if profile id column is Xxx...Id, try to locate Xxx...UeCfgId.
+    Returns the resolved column name in df, or None if not found.
+    """
+    if not profile_id_col_name:
+        return None
+
+    if profile_id_col_name.lower().endswith("id"):
+        expected = f"{profile_id_col_name[:-2]}UeCfgId"
+    else:
+        expected = f"{profile_id_col_name}UeCfgId"
+
+    return resolve_column_case_insensitive(df, [expected])
 
 
 def _safe_parse_int(value: object) -> Optional[int]:
