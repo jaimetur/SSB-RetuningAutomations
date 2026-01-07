@@ -12,16 +12,20 @@
   - #### 🚨 Breaking Changes:
   
   - #### 🌟 New Features:
-    - New Checks in `McpcPCellNrFreqRelProfileUeCfg` table.
+    - New Checks in `McpcPCellNrFreqRelProfileUeCfg` table to consideer the following consraints:
+      - Step1 script will create new McpcPCellNrFreqRelProfile with id xxxx_647328, exact replica of existing profiles with ids xxxx_648672.
+      - Step2 script will create new McpcPCellNrFreqRelProfile with id 647328_xxxx, exact replica of existing profiles with ids 648672_xxxx.
 
   - #### 🚀 Enhancements:
-    - Improved Checks in `NRFreqRelation` table.
+    - Improved Checks in `NRFreqRelation` table to check that all rows with NRFreqRelationId = SSB-Post and with the same NRCellCUId will have column mcpcPCellNrFreqRelProfileRef  identical for both, but only difference will be SSB in profile name replacing xxxx_SSB-Pre with xxxx_SSB-Post.  
+      - Example: McpcPCellNrFreqRelProfile=430090_648672 -> McpcPCellNrFreqRelProfile=430090_647328 
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
     - Updated documentation with latest changes.
+
 ---
 
 ## Release: v0.5.1

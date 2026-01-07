@@ -414,6 +414,10 @@ def build_summary_audit(
             ("Cardinality GUtranFreqRelation", "Cardinality Audit"),
             ("Cardinality GUtranFreqRelation", "Cardinality Inconsistencies"),
 
+            # Profiles Audit (Post Step2)
+            ("NRCellCU", "Profiles Audit"),
+            ("EUtranFreqRelation", "Profiles Audit"),
+
             # Profiles tables
             ("McpcPCellNrFreqRelProfileUeCfg", "Profiles Inconsistencies"),
             ("McpcPCellNrFreqRelProfileUeCfg", "Profiles Discrepancies"),
@@ -450,10 +454,6 @@ def build_summary_audit(
 
             ("UeMCEUtranFreqRelProfileUeCfg", "Profiles Inconsistencies"),
             ("UeMCEUtranFreqRelProfileUeCfg", "Profiles Discrepancies"),
-
-            # Profiles Audit (Post Step2)
-            ("NRCellCU", "Profiles Audit"),
-            ("EUtranFreqRelation", "Profiles Audit"),
 
         ]
 
