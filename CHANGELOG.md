@@ -4,6 +4,26 @@
 
 ---
 
+## Release: v0.5.2
+- ### Release Date: 2026-01-07
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🌟 New Features:
+    - New Checks in `McpcPCellNrFreqRelProfileUeCfg` table.
+
+  - #### 🚀 Enhancements:
+    - Improved Checks in `NRFreqRelation` table.
+
+  - #### 🐛 Bug fixes:
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
+---
+
 ## Release: v0.5.1
 - ### Release Date: 2025-12-23
 
