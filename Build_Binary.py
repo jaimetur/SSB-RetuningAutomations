@@ -37,7 +37,7 @@ def include_extrafiles_and_zip(input_file, output_file):
         {
             'subdir': 'assets/logos',# Estos ficheros van al subdirectorio 'assets'
             # 'files': ["./assets/logos/logo.png"]
-            'files': ["./assets/logos/logo_01*.png"]
+            'files': ["./assets/logos/logo_02*.png"]
         },
         {
             'subdir': 'docs',# Estos ficheros van al subdirectorio 'docs'

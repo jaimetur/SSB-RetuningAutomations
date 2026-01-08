@@ -1,6 +1,6 @@
 # 🗓️ CHANGELOG
-[Planned Roadmap](https://github.com/jaimetur/RetuningAutomations/blob/main/ROADMAP.md) for the following releases
-[Changelog](https://github.com/jaimetur/RetuningAutomations/blob/main/CHANGELOG.md) for the past releases
+[Planned Roadmap](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/ROADMAP.md) for the following releases
+[Changelog](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/CHANGELOG.md) for the past releases
 
 ---
 
@@ -14,6 +14,7 @@
   - #### 🚀 Enhancements:
 
   - #### 🐛 Bug fixes:
+    - Fixed GitHub repository name.
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
