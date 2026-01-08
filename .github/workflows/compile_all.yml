@@ -1,4 +1,4 @@
-name: ▶️ Build RetuningAutomations
+name: ▶️ Build SSB-RetuningAutomations
 
 on:
   workflow_dispatch:
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build-binaries:
-    name: ▶️ Build RetuningAutomations
+    name: ▶️ Build SSB-RetuningAutomations
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -79,5 +79,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RetuningAutomations-${{ matrix.os }}-${{ matrix.arch }}
+          name: SSB-RetuningAutomations-${{ matrix.os }}-${{ matrix.arch }}
           path: dist/*

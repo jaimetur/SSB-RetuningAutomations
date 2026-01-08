@@ -23,7 +23,6 @@ from datetime import datetime
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Tuple
 import textwrap
-import importlib
 from pathlib import Path
 
 
@@ -42,14 +41,14 @@ from src.modules.CleanUp.FinalCleanUp import FinalCleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "SSB_RetuningAutomations"
-TOOL_VERSION        = "0.5.2"
-TOOL_DATE           = "2026-01-07"
+TOOL_VERSION        = "0.5.3"
+TOOL_DATE           = "2026-01-08"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
-COPYRIGHT_TEXT      = "(c) 2025 - Jaime Tur (jaime.tur@ericsson.com)"
+COPYRIGHT_TEXT      = "(c) 2025-2026 - Jaime Tur (jaime.tur@ericsson.com)"
 TOOL_DESCRIPTION    = textwrap.dedent(f"""
 {TOOL_NAME_VERSION} - {TOOL_DATE}
 Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retuning
-©️ 2025 by Jaime Tur (jaime.tur@ericsson.com)
+©️ 2025-2026 by Jaime Tur (jaime.tur@ericsson.com)
 """)
 
 # ================================ DEFAULTS ================================= #
@@ -1352,6 +1351,7 @@ def execute_module(
 
 # ================================== MAIN =================================== #
 def main():
+    import os
     os.system('cls' if os.name == 'nt' else 'clear')
 
     # --- Initialize log file inside ./Logs folder ---
@@ -1375,6 +1375,8 @@ def main():
 
     print("\nLoading Tool...")
     # Remove Splash image from Pyinstaller
+    import os
+    import importlib
     if '_PYI_SPLASH_IPC' in os.environ and importlib.util.find_spec("pyi_splash"):
         import pyi_splash
         pyi_splash.update_text('UI Loaded ...')

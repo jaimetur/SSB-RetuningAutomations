@@ -1,6 +1,31 @@
 # 🗓️ CHANGELOG
-[Planned Roadmap](https://github.com/jaimetur/RetuningAutomations/blob/main/ROADMAP.md) for the following releases
-[Changelog](https://github.com/jaimetur/RetuningAutomations/blob/main/CHANGELOG.md) for the past releases
+[Planned Roadmap](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/ROADMAP.md) for the following releases
+[Changelog](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/CHANGELOG.md) for the past releases
+
+---
+
+## Release: v0.5.3
+- ### Release Date: 2026-01-08
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+  
+  - #### 🚀 Enhancements:
+
+  - #### 🐛 Bug fixes:
+    - Fixed the “same profileRef containing old SSB name” KPI to exclude Default / empty profile refs, so nodes pointing to ...=Default are no longer incorrectly counted as “same old-SSB profile”.
+    - Tightened the “same profileRef” condition to only count refs that actually encode an SSB and where the extracted SSB matches n77_ssb_pre, aligning the output with the wording “containing old SSB name”.
+    - Corrected the “cloned or Other” KPI so it now represents all nodes having both OLD+NEW SSB minus the “same old-name profileRef” nodes, ensuring “Default/Other” cases fall into the intended bucket (as shown in your slide).
+    - Optimized the new SSB referencing old-prefix profile inconsistency detection by replacing the slow iterrows() loop with a vectorized approach using map + unique().
+    - Replaced the heavy per-cell slicing loop (for cell_id in cells_both + repeated full_n77.loc[...]) with a merge-based OLD vs NEW comparison, drastically reducing repeated filtering and improving runtime on large tables.
+    - Added a robust value normalization step (_normalize_value_for_compare) to avoid false mismatches caused by complex objects (lists/tuples/dicts/numpy arrays) and to make comparisons stable.
+    - Improved mismatch detection to only report real parameter differences after applying the “expected profile clone is not a mismatch” rule, reducing noisy “empty-column” inconsistencies.
+    - Fixed GitHub repository name.
+    - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
 
 ---
 

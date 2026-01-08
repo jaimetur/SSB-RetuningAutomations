@@ -22,15 +22,15 @@ copy-src-to-nas*.*
 /BatchRun_RetuningAutomations_GDrive_NAS.ffs_batch
 
 # Compiled Code and others project files
-RetuningAutomations*.exe
-RetuningAutomations*.run
-RetuningAutomations*.bin
+SSB-RetuningAutomations*.exe
+SSB-RetuningAutomations*.run
+SSB-RetuningAutomations*.bin
 
-# RetuningAutomations distribution Zips
-RetuningAutomations*.zip
+# SSB-RetuningAutomations distribution Zips
+SSB-RetuningAutomations*.zip
 
 # Builts versions
-RetuningAutomations-builds/
+SSB-RetuningAutomations-builds/
 
 # Exclude Logs folders
 Logs/

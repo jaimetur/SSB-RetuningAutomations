@@ -1,28 +1,28 @@
 # 📈 Repo Statistics
-[![Commit activity](https://img.shields.io/github/commit-activity/y/jaimetur/RetuningAutomations?label=Commit%20activity)](https://github.com/jaimetur/RetuningAutomations/graphs/contributors)
-[![Resolved Github issues](https://img.shields.io/github/issues-closed/jaimetur/RetuningAutomations?label=Resolved%20issues)](https://github.com/jaimetur/RetuningAutomations/issues?q=is%3Aissue%20state%3Aclosed)
-[![Open Github issues](https://img.shields.io/github/issues/jaimetur/RetuningAutomations?label=Open%20Issues)](https://github.com/jaimetur/RetuningAutomations/issues)
+[![Commit activity](https://img.shields.io/github/commit-activity/y/jaimetur/SSB-RetuningAutomations?label=Commit%20activity)](https://github.com/jaimetur/SSB-RetuningAutomations/graphs/contributors)
+[![Resolved Github issues](https://img.shields.io/github/issues-closed/jaimetur/SSB-RetuningAutomations?label=Resolved%20issues)](https://github.com/jaimetur/SSB-RetuningAutomations/issues?q=is%3Aissue%20state%3Aclosed)
+[![Open Github issues](https://img.shields.io/github/issues/jaimetur/SSB-RetuningAutomations?label=Open%20Issues)](https://github.com/jaimetur/SSB-RetuningAutomations/issues)
 
 ---
 
 # Retuning Automations
 <p align="center">
-  <img src="https://github.com/jaimetur/RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="1024" height="820" />
+  <img src="https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="1024" height="820" />
 </p>
 
 ---
 
 ## 📝 Changelog
 The Historical Change Log can be checked in the following link:
-[Changelog](https://github.com/jaimetur/RetuningAutomations/blob/main/CHANGELOG.md)
+[Changelog](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/CHANGELOG.md)
 
 ## 📅 Roadmap
 The Planned Roadmap for futures releases can be checked in the following link:
-[Planned Roadmap](https://github.com/jaimetur/RetuningAutomations/blob/main/ROADMAP.md)
+[Planned Roadmap](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/ROADMAP.md)
 
 ## 💾 Download
 Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 architectures) as you prefer, directly from following link:
-[Latest Stable Release](https://github.com/jaimetur/RetuningAutomations/releases/latest)
+[Latest Stable Release](https://github.com/jaimetur/SSB-RetuningAutomations/releases/latest)
 
 ---
 
@@ -41,7 +41,7 @@ The tool automatically adds a **timestamped + versioned suffix** to outputs, whi
 ---
 
 ## 🖥️ Module Selector
-![Module Selector](https://github.com/jaimetur/RetuningAutomations/blob/main/assets/screenshots/module_selector.png?raw=true) 
+![Module Selector](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/assets/screenshots/module_selector.png?raw=true) 
 
 ---
 
@@ -368,7 +368,7 @@ python SSB_RetuningAutomations.py \
 
 - The launcher prints a banner on start:
   ```
-  RetuningAutomations_v0.2.0 - 2025-11-05
+  SSB-RetuningAutomations_v0.2.0 - 2025-11-05
   Multi-Platform/Multi-Arch tool designed to Automate some process during SSB Retuning
   ©️ 2025 by Jaime Tur (jaime.tur@ericsson.com)
   ```
@@ -381,7 +381,7 @@ python SSB_RetuningAutomations.py \
 ---
 
 ## 🛡️ Code of Conduct
-By participating in this project, you agree to abide by our [Code of Conduct](https://github.com/jaimetur/RetuningAutomations/blob/main/CODE_OF_CONDUCT.md).
+By participating in this project, you agree to abide by our [Code of Conduct](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/CODE_OF_CONDUCT.md).
 
 ## 📢 Disclaimer
 
@@ -394,20 +394,20 @@ By participating in this project, you agree to abide by our [Code of Conduct](ht
 ![Alt](https://repobeats.axiom.co/api/embed/b3021f0fd0db11466b473e34c9de04cc5d85f110.svg "Repobeats analytics image")
 
 ## 📈 Star History
-<a href="https://www.star-history.com/#jaimetur/RetuningAutomations&Date">
+<a href="https://www.star-history.com/#jaimetur/SSB-RetuningAutomations&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jaimetur/RetuningAutomations&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jaimetur/RetuningAutomations&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=jaimetur/RetuningAutomations&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=jaimetur/SSB-RetuningAutomations&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=jaimetur/SSB-RetuningAutomations&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=jaimetur/SSB-RetuningAutomations&type=Date" />
  </picture>
 </a>
 
 ## 👥 Contributors
-<a href="https://github.com/jaimetur/RetuningAutomations/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=jaimetur/RetuningAutomations" width="15%"/>
+<a href="https://github.com/jaimetur/SSB-RetuningAutomations/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=jaimetur/SSB-RetuningAutomations" width="15%"/>
 </a>
 
-If you want to Contribute to this project please, first read the file [CONTRIBUTING.md](https://github.com/jaimetur/RetuningAutomations/blob/main/CONTRIBUTING.md)
+If you want to Contribute to this project please, first read the file [CONTRIBUTING.md](https://github.com/jaimetur/SSB-RetuningAutomations/blob/main/CONTRIBUTING.md)
 
 ---
 
