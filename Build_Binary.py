@@ -150,7 +150,7 @@ def _zip_folder(temp_dir, output_file):
                     zipf.write(dir_path, dir_path.relative_to(temp_dir))
     print(f"File successfully packed: {output_file}")
 
-def include_extrafiles_and_zip(input_file, output_file):
+def _include_extrafiles_and_zip(input_file, output_file):
     extra_files_to_subdir = [
         {
             'subdir': 'assets/logos',  # These files go into the 'assets/logos' subdirectory
@@ -167,7 +167,7 @@ def include_extrafiles_and_zip(input_file, output_file):
         },
     ]
     if not input_file or not output_file:
-        print("Usage: include_extrafiles_and_zip(input_file, output_file)")
+        print("Usage: _include_extrafiles_and_zip(input_file, output_file)")
         sys.exit(1)
     if not Path(input_file).is_file():
         print(f"ERROR   : The input file '{input_file}' does not exists.")
@@ -549,7 +549,7 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
         print(f"Moving compiled script '{script_compiled_with_version_os_arch_extension}'...")
         shutil.move(f'{dist_path}/{script_compiled}', f'./{script_compiled_with_version_os_arch_extension}')
         # Zip the compiled script together with the extra files/directories
-        include_extrafiles_and_zip(f'./{script_compiled_with_version_os_arch_extension}', script_zip_file)
+        _include_extrafiles_and_zip(f'./{script_compiled_with_version_os_arch_extension}', script_zip_file)
         script_compiled_abs_path = os.path.abspath(script_compiled_with_version_os_arch_extension)
 
     # Delete temporary files and folders created during compilation
