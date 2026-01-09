@@ -10,7 +10,5 @@ Download the tool either for Linux, MacOS or Windows (for both x64 and arm64 arc
   - [Download arm64 version](https://github.com/jaimetur/SSB-RetuningAutomations/releases/download/v0.5.3/SSB_RetuningAutomations_v0.5.3_macos_arm64.zip)  
 
 **Windows:**  
-  - [Download x64 version](https://github.com/jaimetur/SSB-RetuningAutomations/releases/download/v0.5.3/SSB_RetuningAutomations_v0.5.3_windows_x64.zip)  
-  - [Download arm64 version](https://github.com/jaimetur/SSB-RetuningAutomations/releases/download/v0.5.3/SSB_RetuningAutomations_v0.5.3_windows_arm64.zip)  
-
+  - [Download x64 version](https://github.com/jaimetur/SSB-RetuningAutomations/releases/download/v0.5.3/SSB_RetuningAutomations_v0.5.3_windows_x64.zip)
 
