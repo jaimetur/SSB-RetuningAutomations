@@ -13,7 +13,7 @@ import re
 import sys
 
 # ---------------------------------------------------------------------
-# Import TOOL_VERSION dynamically from src/RetuningAutomations
+# Import TOOL_VERSION dynamically from src/SSB_RetuningAutomations
 # ---------------------------------------------------------------------
 try:
     current_dir = os.path.dirname(__file__)

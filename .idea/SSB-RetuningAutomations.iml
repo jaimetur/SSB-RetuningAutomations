@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="PYTHON_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$">
-      <excludeFolder url="file://$MODULE_DIR$/.venv" />
-      <excludeFolder url="file://$MODULE_DIR$/src/Logs" />
+    <content url="file://$MODULE_DIR$/../SSB_RetuningAutomations">
+      <excludeFolder url="file://$MODULE_DIR$/../SSB_RetuningAutomations/.venv" />
+      <excludeFolder url="file://$MODULE_DIR$/../SSB_RetuningAutomations/src/Logs" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.12 (RetuningAutomations)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

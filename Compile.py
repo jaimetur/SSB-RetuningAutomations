@@ -8,7 +8,7 @@ Build a standalone executable for the main module `SSB_RetuningAutomations.py` u
 
 Features:
 - Reads VERSION (without leading 'v') from the first lines of SSB_RetuningAutomations.py.
-- Generates an output binary named: SSB-RetuningAutomations_v{VERSION}.exe (Windows) or .run (Linux/macOS).
+- Generates an output binary named: SSB_RetuningAutomations_v{VERSION}.exe (Windows) or .run (Linux/macOS).
 - Works on each OS natively (PyInstaller cannot cross-compile OSes).
 - Optional Windows-only arch selection via env: TARGET_ARCH={32|64|ARM64}.
 - Cleans previous build artifacts (build/, dist/, *.spec) before building.
@@ -22,7 +22,7 @@ Usage examples:
 
 Notes:
 - Keep SSB_RetuningAutomations.py with a top-level variable: VERSION = "x.x.x"
-- The filename will include a leading 'v' (e.g., SSB-RetuningAutomations_v0.2.0.exe)
+- The filename will include a leading 'v' (e.g., SSB_RetuningAutomations_v0.2.0.exe)
 """
 
 import argparse
@@ -185,9 +185,9 @@ def main():
     version = read_version_from_main(entry_file)
     os_key, ext = detect_platform_and_ext()
 
-    # Compute final file name stem: SSB-RetuningAutomations_v{VERSION}
+    # Compute final file name stem: SSB_RetuningAutomations_v{VERSION}
     # (Always add leading 'v' in the filename, as requested)
-    module_stem = "RetuningAutomations"
+    module_stem = "SSB_RetuningAutomations"
     name_stem = f"{module_stem}_v{version}"
 
     print(f"[INFO] Detected OS: {os_key} ({platform.platform()})")
