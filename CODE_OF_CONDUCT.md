@@ -1,6 +1,6 @@
 # Code of Conduct
 
-Everyone interacting in [RetuningAutomations] project is expected to follow the [PSF Code of Conduct]. 
+Everyone interacting in [SSB_RetuningAutomations] project is expected to follow the [PSF Code of Conduct]. 
 This includes all infrastructure used in the development of PyPA-supported projects, 
 such as codebases, issue trackers, chat rooms, and mailing lists.
 

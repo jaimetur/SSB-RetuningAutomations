@@ -7,7 +7,7 @@
 
 # SSB Retuning Automations
 <p align="center">
-  <img src="https://github.com/jaimetur/SSB_RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="RetuningAutomations Logo" width="1024" height="820" />
+  <img src="https://github.com/jaimetur/SSB_RetuningAutomations/blob/main/assets/logos/logo_02.png?raw=true" alt="SSB_RetuningAutomations Logo" width="1024" height="820" />
 </p>
 
 ---

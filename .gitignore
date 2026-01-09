@@ -10,16 +10,16 @@
 # FreeFileSync files
 /*.ffs_db
 /*.ffs_lock
-/BatchRun_RetuningAutomations_GDrive_NAS.ffs_batch
-/BatchRun_RetuningAutomations_GDrive_NAS.ffs_gui
+/BatchRun_SSB_RetuningAutomations_GDrive_NAS.ffs_batch
+/BatchRun_SSB_RetuningAutomations_GDrive_NAS.ffs_gui
 
 # Auxiliary Scripts
 copy-src-to-nas*.*
 
 # FreeFilesync files
 /sync.ffs_db
-/BatchRun_RetuningAutomations_GDrive_NAS.ffs_gui
-/BatchRun_RetuningAutomations_GDrive_NAS.ffs_batch
+/BatchRun_SSB_RetuningAutomations_GDrive_NAS.ffs_gui
+/BatchRun_SSB_RetuningAutomations_GDrive_NAS.ffs_batch
 
 # Compiled Code and others project files
 SSB_RetuningAutomations*.exe

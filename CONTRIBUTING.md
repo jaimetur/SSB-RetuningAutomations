@@ -1,6 +1,6 @@
 # 🤝 Contributing to SSB_RetuningAutomations
 
-First of all, **thank you** for considering contributing to **RetuningAutomations** — your help makes the project better for everyone! 🚀
+First of all, **thank you** for considering contributing to **SSB_RetuningAutomations** — your help makes the project better for everyone! 🚀
 
 Whether you want to fix a bug, suggest a feature, improve documentation, or just report an issue, this guide will help you get started.
 
@@ -109,4 +109,4 @@ Optional tools:
 
 ## 💙 Thank you!
 
-Whether it's fixing a typo or building a major feature — your help means a lot. Let's make **RetuningAutomations** better together!
+Whether it's fixing a typo or building a major feature — your help means a lot. Let's make **SSB_RetuningAutomations** better together!
