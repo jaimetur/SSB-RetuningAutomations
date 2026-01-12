@@ -669,7 +669,7 @@ def compile(compiler='pyinstaller', compile_in_one_file=COMPILE_IN_ONE_FILE):
                 # Nuitka: --include-data-dir=SOURCE=DESTINATION
                 nuitka_command.extend([f'--include-data-dir={str(bin_dir)}=tableauhyperapi/bin'])
         except Exception as e:
-            print(f"[WARN] Could not auto-detect tableauhyperapi paths to include binaries for Nuitka: {e}")
+            print(f"[WARNING] Could not auto-detect tableauhyperapi paths to include binaries for Nuitka: {e}")
 
         # Set runtime tmp dir to a specific folder within /var/tmp or %TEMP% to reduce antivirus detection probability
         if OPERATING_SYSTEM != 'windows':

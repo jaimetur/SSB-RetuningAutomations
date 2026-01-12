@@ -341,7 +341,7 @@ def parse_arfcn_csv_to_set(
             try:
                 values.append(int(tok))
             except ValueError:
-                print(f"[Configuration Audit] [WARN] Ignoring invalid ARFCN '{tok}' in {label} list.")
+                print(f"[Configuration Audit] [WARNING] Ignoring invalid ARFCN '{tok}' in {label} list.")
 
     if not values:
         return set(default_values)

@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
+# src/utils/utils_datetime.py
 
 import re
+import time
 from datetime import datetime
-from typing import Optional, Iterable
+from contextlib import contextmanager
+from typing import Callable, Iterator, Iterable, Optional
 
 
 # --- HELPERS FOR DATE DETECTION ---
@@ -191,3 +194,63 @@ def format_duration_hms(seconds: float) -> str:
     hours, rem = divmod(total_seconds, 3600)
     minutes, secs = divmod(rem, 60)
     return f"{hours}:{minutes:02d}:{secs:02d}.{ms:03d}"
+
+
+def format_duration_hms(seconds: float) -> str:
+    """
+    Format a duration in seconds into HH:MM:SS (and milliseconds when useful).
+    """
+    if seconds is None:
+        return "00:00:00"
+    try:
+        total_ms = int(round(float(seconds) * 1000.0))
+    except Exception:
+        return "00:00:00"
+    ms = total_ms % 1000
+    total_s = total_ms // 1000
+    s = total_s % 60
+    total_m = total_s // 60
+    m = total_m % 60
+    h = total_m // 60
+    if h > 0:
+        return f"{h:02d}:{m:02d}:{s:02d}.{ms:03d}"
+    return f"{m:02d}:{s:02d}.{ms:03d}"
+
+
+@contextmanager
+def log_phase_timer(
+    phase_name: str,
+    log_fn: Callable[[str], None],
+    show_start: bool = True,
+    show_end: bool = False,
+    show_timing: bool = True,
+    line_prefix: str = "",
+    start_level: str = "INFO",
+    end_level: str = "INFO",
+    timing_level: str = "INFO",
+) -> Iterator[None]:
+    """
+    Context manager to log phase boundaries and elapsed time.
+
+    Behavior (configurable):
+      - show_start=True prints only START line (no END unless show_end=True).
+      - show_end=True prints END line.
+      - show_timing=True prints the elapsed time line.
+
+    All lines can be labeled as INFO/DEBUG/etc. via *_level params.
+    """
+    start = time.perf_counter()
+
+    if show_start:
+        log_fn(f"{line_prefix}[{start_level}] {phase_name} (START)")
+
+    try:
+        yield
+    finally:
+        elapsed = time.perf_counter() - start
+
+        if show_end:
+            log_fn(f"{line_prefix}[{end_level}] {phase_name} (END)")
+
+        if show_timing:
+            log_fn(f"{line_prefix}[{timing_level}] {phase_name} took {format_duration_hms(elapsed)} ({elapsed:.3f}s)")

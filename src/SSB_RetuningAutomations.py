@@ -653,7 +653,7 @@ def run_configuration_audit(
         try:
             local_n77b_ssb = int(local_n77b_ssb)
         except ValueError:
-            print(f"{module_name} [WARN] Invalid N77B SSB frequency '{local_n77b_ssb}'. Ignoring.")
+            print(f"{module_name} [WARNING] Invalid N77B SSB frequency '{local_n77b_ssb}'. Ignoring.")
             local_n77b_ssb = None
 
     # Allowed sets (PRE)
@@ -687,17 +687,17 @@ def run_configuration_audit(
     )
 
     # Print ConfigurationAudit Settings:
-    print(f"{module_name} Configuration Audit Settings:")
-    print(f"{module_name} Old N77 SSB = {local_n77_ssb_pre} --> New N77 SSB = {local_n77_ssb_post}")
+    print(f"{module_name} [INFO] Configuration Audit Settings:")
+    print(f"{module_name} [INFO] Old N77 SSB = {local_n77_ssb_pre} --> New N77 SSB = {local_n77_ssb_post}")
     if local_n77b_ssb is not None:
-        print(f"{module_name} N77B SSB = {local_n77b_ssb}")
+        print(f"{module_name} [INFO] N77B SSB = {local_n77b_ssb}")
     else:
-        print(f"{module_name} N77B SSB not provided or invalid.")
+        print(f"{module_name} [WARNING] N77B SSB not provided or invalid.")
 
-    print(f"{module_name} Allowed N77 SSB set (Pre)    = {sorted(allowed_n77_ssb_pre)}")
-    print(f"{module_name} Allowed N77 ARFCN set (Pre)  = {sorted(allowed_n77_arfcn_pre)}")
-    print(f"{module_name} Allowed N77 SSB set (Post)   = {sorted(allowed_n77_ssb_post)}")
-    print(f"{module_name} Allowed N77 ARFCN set (Post) = {sorted(allowed_n77_arfcn_post)}")
+    print(f"{module_name} [INFO] Allowed N77 SSB set (Pre)    = {sorted(allowed_n77_ssb_pre)}")
+    print(f"{module_name} [INFO] Allowed N77 ARFCN set (Pre)  = {sorted(allowed_n77_arfcn_pre)}")
+    print(f"{module_name} [INFO] Allowed N77 SSB set (Post)   = {sorted(allowed_n77_ssb_post)}")
+    print(f"{module_name} [INFO] Allowed N77 ARFCN set (Post) = {sorted(allowed_n77_arfcn_post)}")
 
     if not versioned_suffix:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -708,8 +708,8 @@ def run_configuration_audit(
         Run ConfigurationAudit for a single folder that is already known
         to contain valid logs.
         """
-        print(f"{module_name} Running Audit…")
-        print(f"{module_name} Input folder: '{pretty_path(folder)}'")
+        print(f"{module_name} [INFO] Running Audit…")
+        print(f"{module_name} [INFO] Input folder: '{pretty_path(folder)}'")
         if ca_freq_filters_csv:
             print(f"{module_name} Summary column filters: {ca_freq_filters_csv}")
 
@@ -742,7 +742,7 @@ def run_configuration_audit(
             output_dir = os.path.join(folder_fs, f"{folder_prefix}_{versioned_suffix}{suffix}")
 
         os.makedirs(output_dir, exist_ok=True)
-        print(f"{module_name} Output folder: '{pretty_path(output_dir)}'")
+        print(f"{module_name} [INFO] Output folder: '{pretty_path(output_dir)}'")
 
         # Progressive fallback in case the installed ConfigurationAudit has an older signature
         try:
@@ -756,7 +756,7 @@ def run_configuration_audit(
                 allowed_n77_arfcn_post=allowed_n77_arfcn_post,
             )
         except TypeError:
-            print(f"{module_name} [WARN] Installed ConfigurationAudit does not support full PRE/POST + N77B parameters.")
+            print(f"{module_name} [WARNING] Installed ConfigurationAudit does not support full PRE/POST + N77B parameters.")
             try:
                 app = ConfigurationAudit(
                     n77_ssb_pre=local_n77_ssb_pre,
@@ -767,7 +767,7 @@ def run_configuration_audit(
                     allowed_n77_arfcn_post=allowed_n77_arfcn_post,
                 )
             except TypeError:
-                print(f"{module_name} [WARN] Installed ConfigurationAudit does not support PRE/POST allowed sets.")
+                print(f"{module_name} [WARNING] Installed ConfigurationAudit does not support PRE/POST allowed sets.")
                 try:
                     app = ConfigurationAudit(
                         n77_ssb_pre=local_n77_ssb_pre,
@@ -776,7 +776,7 @@ def run_configuration_audit(
                         allowed_n77_arfcn_pre=allowed_n77_arfcn_pre,
                     )
                 except TypeError:
-                    print(f"{module_name} [WARN] Installed ConfigurationAudit only supports basic old/new SSB parameters.")
+                    print(f"{module_name} [WARNING] Installed ConfigurationAudit only supports basic old/new SSB parameters.")
                     app = ConfigurationAudit(
                         n77_ssb_pre=local_n77_ssb_pre,
                         n77_ssb_post=local_n77_ssb_post,
@@ -803,7 +803,7 @@ def run_configuration_audit(
 
             # Legacy fallback: ConfigurationAudit without output_dir / filters
             if "unexpected keyword argument" in msg:
-                print(f"{module_name} [WARN] Installed ConfigurationAudit does not support 'output_dir' and/or 'filter_frequencies'. Running with legacy signature.")
+                print(f"{module_name} [WARNING] Installed ConfigurationAudit does not support 'output_dir' and/or 'filter_frequencies'. Running with legacy signature.")
                 out = app.run(folder_to_process_fs, module_name=module_name, versioned_suffix=versioned_suffix, tables_order=TABLES_ORDER)
 
             else:
@@ -812,9 +812,9 @@ def run_configuration_audit(
         if out:
             print(f"{module_name} Done → '{pretty_path(out)}'")
             if os.path.isdir(output_dir):
-                print(f"{module_name} Outputs saved to: '{pretty_path(output_dir)}'")
+                print(f"{module_name} [INFO] Outputs saved to: '{pretty_path(output_dir)}'")
         else:
-            msg = f"{module_name} No logs found or nothing written."
+            msg = f"{module_name} [WARNING] No logs found or nothing written."
             print(msg)
             if messagebox is not None:
                 try:
@@ -841,7 +841,7 @@ def run_configuration_audit(
     )
 
     if not ask_yes_no_dialog(title, message, default=False):
-        print(f"{module_name} Recursive search cancelled by user.")
+        print(f"{module_name} [WARNING] Recursive search cancelled by user.")
         return None
 
     # 3) Recursive search: only keep subfolders with valid logs
@@ -861,20 +861,20 @@ def run_configuration_audit(
 
     candidate_dirs.sort()
     if not candidate_dirs:
-        print(f"{module_name} No subfolders with valid log files were found under '{pretty_path(base_dir_fs)}'.")
+        print(f"{module_name} [WARNING] No subfolders with valid log files were found under '{pretty_path(base_dir_fs)}'.")
         return None
 
-    print(f"{module_name} Found {len(candidate_dirs)} subfolder(s) with valid log files. Running Configuration Audit for each of them...")
+    print(f"{module_name} [INFO] Found {len(candidate_dirs)} subfolder(s) with valid log files. Running Configuration Audit for each of them...")
 
     last_excel: Optional[str] = None
     for sub_dir in candidate_dirs:
-        print(f"{module_name} → Running Configuration Audit in subfolder: '{pretty_path(sub_dir)}'")
+        print(f"{module_name} [INFO] → Running Configuration Audit in subfolder: '{pretty_path(sub_dir)}'")
         try:
             excel_path = run_for_folder(sub_dir)
             if excel_path:
                 last_excel = excel_path
         except Exception as ex:
-            print(f"{module_name} [WARN] Failed to run Configuration Audit in '{pretty_path(sub_dir)}': {ex}")
+            print(f"{module_name} [WARNING] Failed to run Configuration Audit in '{pretty_path(sub_dir)}': {ex}")
 
     return last_excel
 
@@ -917,7 +917,7 @@ def run_consistency_checks(
     is_bulk = ("bulk" in mode_low) or (mode_low == "consistency-check-bulk") or (mode_low == MODULE_NAMES[2].lower())
 
     module_name = "[Consistency Checks (Bulk Pre/Post Auto-Detection)]" if is_bulk else "[Consistency Checks (Pre/Post Comparison)]"
-    print(f"{module_name} Running Consistency Check ({'bulk mode' if is_bulk else 'manual mode'})…")
+    print(f"{module_name} [INFO] Running Consistency Check ({'bulk mode' if is_bulk else 'manual mode'})…")
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
@@ -927,7 +927,7 @@ def run_consistency_checks(
     cc_freq_filters_csv = normalize_csv_list(cc_freq_filters_csv or "648672,647328")
 
     cc_filter_list = [x.strip() for x in cc_freq_filters_csv.split(",") if x.strip()]
-    print(f"{module_name} Consistency Checks Filters: {cc_filter_list}" if cc_filter_list else f"{module_name} Consistency Checks Filters: (no filter)")
+    print(f"{module_name} [INFO] Consistency Checks Filters: {cc_filter_list}" if cc_filter_list else f"{module_name} Consistency Checks Filters: (no filter)")
 
     # ----------------------------- MANUAL MODE (module 2) ----------------------------- #
     def run_consistency_check_manual() -> Optional[Dict[str, Tuple[str, str]]]:
@@ -1091,11 +1091,11 @@ def run_consistency_checks(
         # ----------------------------- SHARED PER-MARKET EXECUTION ----------------------------- #
         for market_label, (pre_dir, post_dir) in sorted(market_pairs.items()):
             market_tag = f"[Market: {market_label}]" if market_label != "GLOBAL" else ""
-            print(f"\n{module_name} Processing Market: {market_label}")
+            print(f"\n{module_name} [INFO] Processing Market: {market_label}")
             print("=" * 80)
-            print(f"{module_name} {market_tag} Processing PRE/POST pair:")
-            print(f"{module_name} {market_tag} PRE folder:  '{pretty_path(pre_dir)}'")
-            print(f"{module_name} {market_tag} POST folder: '{pretty_path(post_dir)}'")
+            print(f"{module_name} {market_tag} [INFO] Processing PRE/POST pair:")
+            print(f"{module_name} {market_tag} [INFO] PRE folder:  '{pretty_path(pre_dir)}'")
+            print(f"{module_name} {market_tag} [INFO] POST folder: '{pretty_path(post_dir)}'")
 
             pre_dir_fs = to_long_path(pre_dir)
             post_dir_fs = to_long_path(post_dir)
@@ -1123,7 +1123,7 @@ def run_consistency_checks(
                 if txt_path:
                     print(f"{module_name} {market_tag} Compared folders file written: '{pretty_path(txt_path)}'")
             except Exception as ex:
-                print(f"{module_name} {market_tag} [WARN] Failed to write FoldersCompared.txt: {ex}")
+                print(f"{module_name} {market_tag} [WARNING] Failed to write FoldersCompared.txt: {ex}")
 
 
             # NEW: Build Pre/Post audit suffixes (Pre/Post before the timestamp)
@@ -1131,7 +1131,7 @@ def run_consistency_checks(
             audit_post_suffix = f"Post_{versioned_suffix}"
 
             # --- Run Configuration Audit for PRE and POST ---
-            print(f"{module_name} {market_tag} Running Configuration Audit for PRE folder before consistency checks...")
+            print(f"{module_name} {market_tag} [INFO] Running Configuration Audit for PRE folder before consistency checks...")
             print("-" * 80)
             pre_audit_excel = run_configuration_audit(
                 input_dir=pre_dir_fs,
@@ -1149,11 +1149,11 @@ def run_consistency_checks(
             )
             print("-" * 80)
             if pre_audit_excel:
-                print(f"{module_name} {market_tag} PRE Configuration Audit output: '{pretty_path(pre_audit_excel)}'")
+                print(f"{module_name} {market_tag} [INFO] PRE Configuration Audit output: '{pretty_path(pre_audit_excel)}'")
             else:
-                print(f"{module_name} {market_tag} PRE Configuration Audit did not generate an output Excel file.")
+                print(f"{module_name} {market_tag} [INFO] PRE Configuration Audit did not generate an output Excel file.")
 
-            print(f"{module_name} {market_tag} Running Configuration Audit for POST folder before consistency checks...")
+            print(f"{module_name} {market_tag} [INFO] Running Configuration Audit for POST folder before consistency checks...")
             print("-" * 80)
             post_audit_excel = run_configuration_audit(
                 input_dir=post_dir_fs,
@@ -1215,11 +1215,11 @@ def run_consistency_checks(
             # output_dir is already the shared folder (audits + consistency outputs)
             app.save_outputs_excel(output_dir, results, versioned_suffix=versioned_suffix)
 
-            print(f"\n{module_name} {market_tag} Outputs saved to: '{pretty_path(output_dir)}'")
+            print(f"\n{module_name} {market_tag} [INFO] Outputs saved to: '{pretty_path(output_dir)}'")
             if results:
-                print(f"{module_name} {market_tag} Wrote CellRelation.xlsx and ConsistencyChecks_CellRelation.xlsx (with Summary and details).")
+                print(f"{module_name} {market_tag} [INFO] Wrote CellRelation.xlsx and ConsistencyChecks_CellRelation.xlsx (with Summary and details).")
             else:
-                print(f"{module_name} {market_tag} Wrote CellRelation.xlsx (all tables). No comparison Excel because frequencies were not provided.")
+                print(f"{module_name} {market_tag} [INFO] Wrote CellRelation.xlsx (all tables). No comparison Excel because frequencies were not provided.")
 
     market_pairs = run_consistency_check_bulk() if is_bulk else run_consistency_check_manual()
     if not market_pairs:
@@ -1266,8 +1266,8 @@ def run_final_cleanup(input_dir: str, *_args) -> None:
     module_name = "[Final Clean-Up]"
     input_dir_fs = to_long_path(input_dir) if input_dir else input_dir
 
-    print(f"{module_name} Running Final Clean-up…")
-    print(f"{module_name} Input folder: '{pretty_path(input_dir_fs)}'")
+    print(f"{module_name} [INFO] Running Final Clean-up…")
+    print(f"{module_name} [INFO] Input folder: '{pretty_path(input_dir_fs)}'")
 
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     versioned_suffix = f"{timestamp}_v{TOOL_VERSION}"
@@ -1276,9 +1276,9 @@ def run_final_cleanup(input_dir: str, *_args) -> None:
     out = app.run(input_dir_fs, module_name=module_name, versioned_suffix=versioned_suffix)
 
     if out:
-        print(f"{module_name} Done → '{pretty_path(out)}'")
+        print(f"{module_name} [INFO] Done → '{pretty_path(out)}'")
     else:
-        print(f"{module_name} Module logic not yet implemented (under development). Exiting...")
+        print(f"{module_name} [INFO] Module logic not yet implemented (under development). Exiting...")
 
 
 def resolve_module_callable(name: str):
@@ -1367,7 +1367,7 @@ def execute_module(
 
     finally:
         elapsed = time.perf_counter() - start_ts
-        print(f"[Timer] {label} finished in {format_duration_hms(elapsed)}")
+        print(f"[TIMER] [INFO] {label} finished in {format_duration_hms(elapsed)}")
 
 
 # ================================== MAIN =================================== #
@@ -1392,9 +1392,9 @@ def main():
     # Replace stdout/stderr with our dual logger
     sys.stdout = LoggerDual(log_path)
     sys.stderr = sys.stdout
-    print(f"[Logger] Output will also be written to: {log_path}\n")
+    print(f"[LOGGER] Output will also be written to: {log_path}\n")
 
-    print("\nLoading Tool...")
+    print("\n[INFO] Loading Tool...")
     # Remove Splash image from Pyinstaller
     import os
     import importlib
@@ -1415,9 +1415,9 @@ def main():
         if os.path.exists(splash_filename):
             os.unlink(splash_filename)
 
-    print("Tool loaded!")
+    print("[INFO] Tool loaded!")
     print(TOOL_DESCRIPTION)
-    print(f"\n[Config] Using config file: {CONFIG_PATH}\n")
+    print(f"\n[CONFIG] [INFO] Using config file: {CONFIG_PATH}\n")
 
     # Parse CLI
     args = parse_args()
@@ -1520,11 +1520,11 @@ def main():
                 default_allowed_n77_arfcn_post_csv=default_allowed_n77_arfcn_post_csv,
             )
             if sel is None:
-                raise SystemExit("Cancelled.")
+                raise SystemExit("[INFO] Cancelled.")
 
             module_fn = resolve_module_callable(sel.module)
             if module_fn is None:
-                raise SystemExit(f"Unknown module selected: {sel.module}")
+                raise SystemExit(f"[WARNING] Unknown module selected: {sel.module}")
 
             # Decide which input(s) to use based on selected module
             if is_consistency_module(sel.module):
@@ -1620,13 +1620,13 @@ def main():
 
     # ====================== MODE 2: PURE CLI (WITH ARGS) ====================
     if not args.module:
-        print("Error: --module is required when running in CLI mode.\n")
+        print("[ERROR] Error: --module is required when running in CLI mode.\n")
         parser.print_help()
         return
 
     module_fn = resolve_module_callable(args.module)
     if module_fn is None:
-        print(f"Error: Unknown module '{args.module}'.\n")
+        print(f"[ERROR] Error: Unknown module '{args.module}'.\n")
         parser.print_help()
         return
 
@@ -1644,7 +1644,7 @@ def main():
     if module_fn is run_configuration_audit:
         input_dir = args.input or default_input_audit
         if not input_dir:
-            print("Error: --input is required for configuration-audit in CLI mode.\n")
+            print("[ERROR] Error: --input is required for configuration-audit in CLI mode.\n")
             parser.print_help()
             return
 
@@ -1688,7 +1688,7 @@ def main():
         input_post_dir = args.input_post or default_input_cc_post
 
         if not input_pre_dir or not input_post_dir:
-            print("Error: --input-pre and --input-post are required for consistency-check manual in CLI mode.\n")
+            print("[ERROR] Error: --input-pre and --input-post are required for consistency-check manual in CLI mode.\n")
             parser.print_help()
             return
 
@@ -1731,7 +1731,7 @@ def main():
     if args.module == "consistency-check-bulk":
         input_dir = args.input or default_input_cc_bulk
         if not input_dir:
-            print("Error: --input is required for consistency-check-bulk in CLI mode.\n")
+            print("[ERROR] Error: --input is required for consistency-check-bulk in CLI mode.\n")
             parser.print_help()
             return
 
@@ -1773,7 +1773,7 @@ def main():
     # NOTE: Profiles Audit module removed; Final Clean-Up is now module 4.
     input_dir = args.input or default_input_final_cleanup
     if not input_dir:
-        print("Error: --input is required for this module in CLI mode.\n")
+        print("[ERROR] Error: --input is required for this module in CLI mode.\n")
         parser.print_help()
         return
 

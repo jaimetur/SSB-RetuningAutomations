@@ -118,7 +118,7 @@ def generate_ppt_summary(
         prs = Presentation(template_path)
         print(f"{module_name} Using PPT template: {template_path}")
     except Exception as e:
-        print(f"{module_name} [WARN] Could not load PPT template, using default. ({e})")
+        print(f"{module_name} [WARNING] Could not load PPT template, using default. ({e})")
         prs = Presentation()
 
     title_slide_layout = prs.slide_layouts[0]
