@@ -93,6 +93,7 @@ class ConfigurationAudit:
             show_phase_starts: bool = False,  # <<< NEW: show only START lines (no END lines)
             show_phase_timings: bool = True,  # <<< NEW: show timings as [INFO]
             slow_file_seconds_threshold: float = 5.0,  # <<< NEW: report per-file parsing when a file is slow
+            slow_sheet_seconds_threshold: float = 3.0, # <<< NEW: report per-sheet when a sheet is slow
     ) -> str:
         """
         Main entry point: creates an Excel file with one sheet per detected table.
@@ -552,90 +553,121 @@ class ConfigurationAudit:
 
                 try:
                     with pd.ExcelWriter(tmp_excel_path_long, engine="openpyxl") as writer:
-                        # Write Summary first
-                        pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
-
-                        # SummaryAudit with high-level checks
-                        summary_audit_df.to_excel(writer, sheet_name="SummaryAudit", index=False)
-                        # Apply alternating background colors by Category for SummaryAudit sheet
-                        wb = writer.book
-                        ws_summary_audit = writer.sheets.get("SummaryAudit")
-                        if ws_summary_audit is not None:
-                            apply_alternating_category_row_fills(ws_summary_audit, category_header="Category")
-
-                        # New: separate NR / LTE param mismatching sheets
-                        if not param_mismatch_nr_df.empty:
-                            param_mismatch_nr_df.to_excel(writer, sheet_name="Summary NR Param Mismatching", index=False)
-
-                        if not param_mismatch_gu_df.empty:
-                            param_mismatch_gu_df.to_excel(writer, sheet_name="Summary LTE Param Mismatching", index=False)
-
-                        # Extra summary sheets
-                        pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CellDU", index=False)
-                        pivot_nr_sector_carrier.to_excel(writer, sheet_name="Summary NR_SectorCarrier", index=False)
-                        pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
-                        pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
-                        pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
-                        pivot_gu_freq_rel.to_excel(writer, sheet_name="Summary GU_FreqRelation", index=False)
-
-                        # Then write each table in the final determined order
-                        for entry in table_entries:
-                            entry["df"].to_excel(writer, sheet_name=entry["final_sheet"], index=False)
-
-                        # Color the 'Summary*' tabs in green
-                        color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
-
-                        # Apply header color + auto-fit to all sheets
-                        style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
 
                         # ------------------------------------------------------------------
-                        # Add hyperlinks from SummaryAudit.Category to corresponding sheets
+                        # PHASE 5.1: Write Summary + SummaryAudit + Param mismatch sheets
                         # ------------------------------------------------------------------
-                        ws_summary_audit = writer.sheets.get("SummaryAudit")
-                        if ws_summary_audit is not None:
-                            header = [cell.value for cell in ws_summary_audit[1]]
-                            try:
-                                category_col_idx = header.index("Category") + 1
-                            except ValueError:
-                                category_col_idx = None
+                        with log_phase_timer("PHASE 5.1: Write Summary + SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
+                                             timing_level="INFO"):
+                            # Write Summary first
+                            pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
-                            if category_col_idx:
-                                for row in range(2, ws_summary_audit.max_row + 1):
-                                    cell = ws_summary_audit.cell(row=row, column=category_col_idx)
-                                    raw = str(cell.value).strip() if cell.value else ""
-                                    target_sheet = raw
+                            # SummaryAudit with high-level checks
+                            summary_audit_df.to_excel(writer, sheet_name="SummaryAudit", index=False)
+                            # Apply alternating background colors by Category for SummaryAudit sheet
+                            wb = writer.book
+                            ws_summary_audit = writer.sheets.get("SummaryAudit")
+                            if ws_summary_audit is not None:
+                                apply_alternating_category_row_fills(ws_summary_audit, category_header="Category")
 
-                                    # 1) If no exists a sheet with that name, try to resolve using the previous mapping
-                                    if target_sheet and target_sheet not in writer.book.sheetnames:
-                                        target_sheet = candidate_to_final_sheet.get(raw, raw)
+                            # New: separate NR / LTE param mismatching sheets
+                            if not param_mismatch_nr_df.empty:
+                                param_mismatch_nr_df.to_excel(writer, sheet_name="Summary NR Param Mismatching", index=False)
 
-                                    # 2) If exists a sheet with that name, create hyperlink
-                                    if target_sheet and target_sheet in writer.book.sheetnames:
-                                        cell.hyperlink = f"#{target_sheet}!A1"
-                                        cell.font = Font(color="0563C1", underline="single")
+                            if not param_mismatch_gu_df.empty:
+                                param_mismatch_gu_df.to_excel(writer, sheet_name="Summary LTE Param Mismatching", index=False)
 
-                    # Move into final destination (prefer atomic replace)
-                    _move_into_place(tmp_excel_path_long, excel_path_long)
+                        # ------------------------------------------------------------------
+                        # PHASE 5.2: Write pivot summary sheets
+                        # ------------------------------------------------------------------
+                        with log_phase_timer("PHASE 5.2: Write pivot summary sheets", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
+                                             timing_level="INFO"):
+                            # Extra summary sheets
+                            pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CellDU", index=False)
+                            pivot_nr_sector_carrier.to_excel(writer, sheet_name="Summary NR_SectorCarrier", index=False)
+                            pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
+                            pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
+                            pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
+                            pivot_gu_freq_rel.to_excel(writer, sheet_name="Summary GU_FreqRelation", index=False)
+
+                        # ------------------------------------------------------------------
+                        # PHASE 5.3: Write parsed MO tables
+                        # ------------------------------------------------------------------
+                        with log_phase_timer("PHASE 5.3: Write parsed MO tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+                            # Then write each table in the final determined order
+                            for si, entry in enumerate(table_entries, start=1):
+                                sheet_start = time.perf_counter()
+                                entry["df"].to_excel(writer, sheet_name=entry["final_sheet"], index=False)
+                                sheet_elapsed = time.perf_counter() - sheet_start
+
+                                if show_phase_timings and sheet_elapsed >= float(slow_sheet_seconds_threshold):
+                                    _log_info(f"PHASE 5.3: Write parsed MO tables - Slow sheet write {si}/{len(table_entries)}: '{entry['final_sheet']}' ({entry.get('log_file', '')}) took {sheet_elapsed:.3f}s")
+
+                        # ------------------------------------------------------------------
+                        # PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)
+                        # ------------------------------------------------------------------
+                        with log_phase_timer("PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO",
+                                             end_level="INFO", timing_level="INFO"):
+                            # Color the 'Summary*' tabs in green
+                            color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
+
+                            # Apply header color + auto-fit to all sheets
+                            # Optimization: default autofit only scans the first N rows (handled inside style_headers_autofilter_and_autofit)
+                            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
+
+                            # ------------------------------------------------------------------
+                            # Add hyperlinks from SummaryAudit.Category to corresponding sheets
+                            # ------------------------------------------------------------------
+                            ws_summary_audit = writer.sheets.get("SummaryAudit")
+                            if ws_summary_audit is not None:
+                                header = [cell.value for cell in ws_summary_audit[1]]
+                                try:
+                                    category_col_idx = header.index("Category") + 1
+                                except ValueError:
+                                    category_col_idx = None
+
+                                if category_col_idx:
+                                    for row in range(2, ws_summary_audit.max_row + 1):
+                                        cell = ws_summary_audit.cell(row=row, column=category_col_idx)
+                                        raw = str(cell.value).strip() if cell.value else ""
+                                        target_sheet = raw
+
+                                        # 1) If no exists a sheet with that name, try to resolve using the previous mapping
+                                        if target_sheet and target_sheet not in writer.book.sheetnames:
+                                            target_sheet = candidate_to_final_sheet.get(raw, raw)
+
+                                        # 2) If exists a sheet with that name, create hyperlink
+                                        if target_sheet and target_sheet in writer.book.sheetnames:
+                                            cell.hyperlink = f"#{target_sheet}!A1"
+                                            cell.font = Font(color="0563C1", underline="single")
+
+                    # ----------------------------------------------------------------------
+                    # PHASE 5.5: Move Excel into final destination (prefer atomic replace)
+                    # ----------------------------------------------------------------------
+                    with log_phase_timer("PHASE 5.5: Move Excel into destination", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
+                                         timing_level="INFO"):
+                        # Move into final destination (prefer atomic replace)
+                        _move_into_place(tmp_excel_path_long, excel_path_long)
 
                 finally:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-        _log_info(f"Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")
+            _log_info(f"Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")
 
-        # =====================================================================
-        #                PHASE 6: Generate PPT textual summary
-        # =====================================================================
-        with log_phase_timer("PHASE 6: Generate PPT summary", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
-            try:
-                ppt_path = generate_ppt_summary(summary_audit_df, excel_path, module_name)
-                if ppt_path:
-                    _log_info(f"PPT summary generated in: '{pretty_path(ppt_path)}'")
-            except Exception as ex:
-                # Never fail the whole module just for PPT creation
-                _log_warn(f"PPT summary generation failed: {ex}")
+            # =====================================================================
+            #                PHASE 6: Generate PPT textual summary
+            # =====================================================================
+            with log_phase_timer("PHASE 6: Generate PPT summary", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+                try:
+                    ppt_path = generate_ppt_summary(summary_audit_df, excel_path, module_name)
+                    if ppt_path:
+                        _log_info(f"PPT summary generated in: '{pretty_path(ppt_path)}'")
+                except Exception as ex:
+                    # Never fail the whole module just for PPT creation
+                    _log_warn(f"PPT summary generation failed: {ex}")
 
-        overall_elapsed = time.perf_counter() - overall_start
-        if show_phase_timings:
-            _log_info(f"TOTAL ConfigurationAudit.run took {overall_elapsed:.3f}s")
+            overall_elapsed = time.perf_counter() - overall_start
+            if show_phase_timings:
+                _log_info(f"TOTAL ConfigurationAudit.run took {overall_elapsed:.3f}s")
 
         return excel_path

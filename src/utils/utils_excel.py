@@ -190,7 +190,7 @@ def enable_header_filters(writer, freeze_header: bool = True, align_left: bool =
         pass
 
 
-def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, align: str = "left", header_color: str = "CCE5FF", max_width: int = 100) -> None:
+def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, align: str = "left", header_color: str = "CCE5FF", max_width: int = 100, autofit_rows: object = 100) -> None:
     """
     Apply header styling (with configurable color), enable auto-filter on the first row,
     freeze header optionally, and auto-fit all column widths.
@@ -201,8 +201,25 @@ def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, ali
         align: horizontal alignment for header text ("left", "center", "right")
         header_color: fill color for header row (hex string, default="CCE5FF")
         max_width: maximum allowed column width when auto-fitting (default=100)
+        autofit_rows: number of content rows (starting from row 2) to sample when auto-fitting.
+                     - default: 100
+                     - "All": scan all rows
+                     - any int <= 0: behaves like 0 (header-only)
     """
     workbook = writer.book
+
+    # Normalize autofit_rows
+    use_all_rows = False
+    rows_to_scan = 100
+    if isinstance(autofit_rows, str) and autofit_rows.strip().lower() == "all":
+        use_all_rows = True
+    else:
+        try:
+            rows_to_scan = int(autofit_rows)
+        except Exception:
+            rows_to_scan = 100  # safe default
+        if rows_to_scan < 0:
+            rows_to_scan = 0
 
     for ws in workbook.worksheets:
         # Skip sheets without content
@@ -213,7 +230,6 @@ def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, ali
         # 1) Apply header style
         # --------------------------------------------------------------
         header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
-
         header_alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
 
         for cell in ws[1]:
@@ -235,31 +251,33 @@ def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, ali
             ws.freeze_panes = "A2"
 
         # --------------------------------------------------------------
-        # 4) Auto-fit column widths (max between header and content, capped by max_width)
+        # 4) Auto-fit column widths (sample first N rows by default)
         # --------------------------------------------------------------
-        for col_idx in range(1, ws.max_column + 1):
-            col_letter = get_column_letter(col_idx)
+        # Content starts at row 2
+        if use_all_rows:
+            row_end = ws.max_row
+        else:
+            # scan up to (rows_to_scan) content rows (row 2 counts as 1st content row)
+            row_end = min(ws.max_row, 1 + rows_to_scan)
 
-            header_cell = ws.cell(row=1, column=col_idx)
-            header_value = str(header_cell.value) if header_cell.value is not None else ""
-            header_value = header_value.replace("\r\n", " ").replace("\n", " ").strip()
-            header_length = len(header_value)
+        # Improvement A: Use ws.iter_rows(values_only=True) to reduce openpyxl cell overhead
+        last_row_to_scan = row_end
+        max_lens = [0] * ws.max_column
 
-            max_content_length = 0
-            found_non_empty = False
-
-            # Start from row 2 so that "content" does not double-count the header
-            for row_idx in range(2, ws.max_row + 1):
-                cell = ws.cell(row=row_idx, column=col_idx)
+        for row in ws.iter_rows(min_row=1, max_row=last_row_to_scan, min_col=1, max_col=ws.max_column, values_only=True):
+            for j, v in enumerate(row):
                 try:
-                    value = "" if cell.value is None else str(cell.value)
-                    value = value.replace("\r\n", " ").replace("\n", " ").strip()
-                    if value != "":
-                        found_non_empty = True
-                        max_content_length = max(max_content_length, len(value))
+                    s = "" if v is None else str(v)
+                    s = s.replace("\r\n", " ").replace("\n", " ").strip()
+                    l = len(s)
+                    if l > max_lens[j]:
+                        max_lens[j] = l
                 except Exception:
                     pass
 
-            max_length = max(header_length, max_content_length) if found_non_empty else header_length
-            ws.column_dimensions[col_letter].width = min(max_length + 2, max_width)
+        for col_idx in range(1, ws.max_column + 1):
+            col_letter = get_column_letter(col_idx)
+            ws.column_dimensions[col_letter].width = min(max_lens[col_idx - 1] + 2, max_width)
+
+
 

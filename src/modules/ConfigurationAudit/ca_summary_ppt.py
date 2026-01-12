@@ -116,7 +116,7 @@ def generate_ppt_summary(
     template_path = get_resource_path("ppt_templates/ConfigurationAuditTemplate.pptx")
     try:
         prs = Presentation(template_path)
-        print(f"{module_name} Using PPT template: {template_path}")
+        print(f"{module_name} [INFO] Using PPT template: {template_path}")
     except Exception as e:
         print(f"{module_name} [WARNING] Could not load PPT template, using default. ({e})")
         prs = Presentation()

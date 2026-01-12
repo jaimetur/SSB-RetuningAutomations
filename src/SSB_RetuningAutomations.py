@@ -810,7 +810,7 @@ def run_configuration_audit(
                 raise
 
         if out:
-            print(f"{module_name} Done → '{pretty_path(out)}'")
+            print(f"{module_name} [INFO] Done → '{pretty_path(out)}'")
             if os.path.isdir(output_dir):
                 print(f"{module_name} [INFO] Outputs saved to: '{pretty_path(output_dir)}'")
         else:
