@@ -92,8 +92,8 @@ class ConfigurationAudit:
             profiles_audit: bool = False,  # <<< NEW: enable Profiles audit logic
             show_phase_starts: bool = False,  # <<< NEW: show only START lines (no END lines)
             show_phase_timings: bool = True,  # <<< NEW: show timings as [INFO]
-            slow_file_seconds_threshold: float = 5.0,  # <<< NEW: report per-file parsing when a file is slow
-            slow_sheet_seconds_threshold: float = 3.0, # <<< NEW: report per-sheet when a sheet is slow
+            slow_file_seconds_threshold: float = 10.0,  # <<< NEW: report per-file parsing when a file is slow
+            slow_sheet_seconds_threshold: float = 10.0, # <<< NEW: report per-sheet when a sheet is slow
     ) -> str:
         """
         Main entry point: creates an Excel file with one sheet per detected table.
@@ -162,37 +162,36 @@ class ConfigurationAudit:
 
         with log_phase_timer("ConfigurationAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
             # --- Normalize filters ---
-            with log_phase_timer("PHASE 0: Normalize filters", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 0.1: Normalize filters", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 freq_filters = [str(f).strip() for f in (filter_frequencies or []) if str(f).strip()]
 
             # --- Validate the input directory ---
-            with log_phase_timer("PHASE 0.1: Validate input directory", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 0.2: Validate input directory", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 if not os.path.isdir(input_dir):
                     raise NotADirectoryError(f"Invalid directory: {input_dir}")
 
             # <<< NEW: decide the base output folder and ensure it exists >>>
             # If output_dir is provided, all generated files (Excel/PPT) will be written there.
             # Otherwise, legacy behavior is kept and files are created under input_dir.
-            with log_phase_timer("PHASE 0.2: Prepare output directory", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 0.3: Prepare output directory", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 base_output_dir = output_dir or input_dir
                 base_output_dir_long = to_long_path(base_output_dir)
                 os.makedirs(base_output_dir_long, exist_ok=True)
 
             # --- Detect log/txt files ---
-            with log_phase_timer("PHASE 0.3: Detect log/txt files", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 0.4: Detect log/txt files", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 log_files = find_log_files(input_dir)
                 if not log_files:
                     _log_info(f"No log/txt files found in: '{pretty_path(input_dir)}'")
                     return ""
 
             # --- Natural sorting of files (handles '(1)', '(2)', '(10)', etc.) ---
-            with log_phase_timer("PHASE 0.4: Sort files (natural order)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 0.5: Sort files (natural order)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 sorted_files = sorted(log_files, key=natural_logfile_key)
                 file_rank: Dict[str, int] = {os.path.basename(p): i for i, p in enumerate(sorted_files)}
 
             # --- Build MO (table) ranking if TABLES_ORDER is provided ---
-            with log_phase_timer("PHASE 0.5: Build MO rank (optional TABLES_ORDER)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
-                                 timing_level="INFO"):
+            with log_phase_timer("PHASE 0.6: Build MO rank (optional TABLES_ORDER)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 mo_rank: Dict[str, int] = {}
                 if tables_order:
                     mo_rank = {name: i for i, name in enumerate(tables_order)}
@@ -276,7 +275,7 @@ class ConfigurationAudit:
 
                     file_elapsed = time.perf_counter() - file_start
                     if show_phase_timings and file_elapsed >= float(slow_file_seconds_threshold):
-                        _log_info(f"PHASE 1: Parse all log/txt files - Slow file parse {i}/{len(log_files)}: '{base_filename}' took {file_elapsed:.3f}s")
+                        _log_info(f"PHASE 1: Parse all log/txt files - Slow file parse {i}/{len(log_files)} (>{slow_file_seconds_threshold}s): '{base_filename}' took {file_elapsed:.3f}s")
 
             # =====================================================================
             #                PHASE 2: Determine final sorting order
@@ -557,8 +556,7 @@ class ConfigurationAudit:
                         # ------------------------------------------------------------------
                         # PHASE 5.1: Write Summary + SummaryAudit + Param mismatch sheets
                         # ------------------------------------------------------------------
-                        with log_phase_timer("PHASE 5.1: Write Summary + SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
-                                             timing_level="INFO"):
+                        with log_phase_timer("PHASE 5.1: Write Summary + SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                             # Write Summary first
                             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
 
@@ -601,13 +599,12 @@ class ConfigurationAudit:
                                 sheet_elapsed = time.perf_counter() - sheet_start
 
                                 if show_phase_timings and sheet_elapsed >= float(slow_sheet_seconds_threshold):
-                                    _log_info(f"PHASE 5.3: Write parsed MO tables - Slow sheet write {si}/{len(table_entries)}: '{entry['final_sheet']}' ({entry.get('log_file', '')}) took {sheet_elapsed:.3f}s")
+                                    _log_info(f"PHASE 5.3: Write parsed MO tables - Slow sheet write {si}/{len(table_entries) }(>{slow_sheet_seconds_threshold}s): '{entry['final_sheet']}' ({entry.get('log_file', '')}) took {sheet_elapsed:.3f}s")
 
                         # ------------------------------------------------------------------
                         # PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)
                         # ------------------------------------------------------------------
-                        with log_phase_timer("PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO",
-                                             end_level="INFO", timing_level="INFO"):
+                        with log_phase_timer("PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                             # Color the 'Summary*' tabs in green
                             color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
 
@@ -644,8 +641,7 @@ class ConfigurationAudit:
                     # ----------------------------------------------------------------------
                     # PHASE 5.5: Move Excel into final destination (prefer atomic replace)
                     # ----------------------------------------------------------------------
-                    with log_phase_timer("PHASE 5.5: Move Excel into destination", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO",
-                                         timing_level="INFO"):
+                    with log_phase_timer("PHASE 5.5: Move Excel into destination", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                         # Move into final destination (prefer atomic replace)
                         _move_into_place(tmp_excel_path_long, excel_path_long)
 
