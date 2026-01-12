@@ -1121,7 +1121,7 @@ def run_consistency_checks(
             try:
                 txt_path = write_compared_folders_file(output_dir=output_dir, pre_dir=pre_dir_fs, post_dir=post_dir_fs)
                 if txt_path:
-                    print(f"{module_name} {market_tag} Compared folders file written: '{pretty_path(txt_path)}'")
+                    print(f"{module_name} {market_tag} [INFO] Compared folders file written: '{pretty_path(txt_path)}'")
             except Exception as ex:
                 print(f"{module_name} {market_tag} [WARNING] Failed to write FoldersCompared.txt: {ex}")
 
