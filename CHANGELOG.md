@@ -5,7 +5,7 @@
 ---
 
 ## Release: v0.5.4
-- ### Release Date: 2026-01-12
+- ### Release Date: 2026-01-13
 
 - ### Main Changes:
   
