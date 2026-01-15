@@ -98,7 +98,7 @@
       - Step2 script will create new McpcPCellNrFreqRelProfile with id 647328_xxxx, exact replica of existing profiles with ids 648672_xxxx.
 
   - #### 🚀 Enhancements:
-    - Improved Checks in `NRFreqRelation` table to check that all rows with NRFreqRelationId = SSB-Post and with the same NRCellCUId will have column mcpcPCellNrFreqRelProfileRef  identical for both, but only difference will be SSB in profile name replacing xxxx_SSB-Pre with xxxx_SSB-Post.  
+    - Improved Checks in `NRFreqRelation` table to check that all rows with NRFreqRelationId = SSB-Post and with the same NRCellCUId will have column mcpcPCellNrFreqRelProfileRef identical for both, but only difference will be SSB in profile name replacing xxxx_SSB-Pre with xxxx_SSB-Post.  
       - Example: McpcPCellNrFreqRelProfile=430090_648672 -> McpcPCellNrFreqRelProfile=430090_647328 
 
   - #### 🐛 Bug fixes:
