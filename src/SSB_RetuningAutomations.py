@@ -1054,7 +1054,8 @@ def run_consistency_checks(
             parent_ts, parent_market = infer_parent_timestamp_and_market(post_dir_fs)
             file_ts = parent_ts or exec_timestamp
             base_file_suffix = f"{file_ts}_v{TOOL_VERSION}"
-            file_versioned_suffix = f"{parent_market}_{base_file_suffix}" if parent_market else base_file_suffix
+            market_for_files = market_label if market_label and market_label != "GLOBAL" else (parent_market or "")
+            file_versioned_suffix = f"{market_for_files}_{base_file_suffix}" if market_for_files else base_file_suffix
 
             pre_resolved = ensure_logs_available(pre_dir_fs)
             post_resolved = ensure_logs_available(post_dir_fs)
@@ -1084,12 +1085,9 @@ def run_consistency_checks(
                     print(f"{module_name} {market_tag} [WARNING] Failed to write FoldersCompared.txt: {ex}")
 
                 # Ensure PRE/POST audit files do not overwrite each other inside shared output_dir
-                if parent_market:
-                    audit_pre_suffix = f"{parent_market}_Pre_{base_file_suffix}"
-                    audit_post_suffix = f"{parent_market}_Post_{base_file_suffix}"
-                else:
-                    audit_pre_suffix = f"Pre_{base_file_suffix}"
-                    audit_post_suffix = f"Post_{base_file_suffix}"
+                market_for_files = market_label if market_label and market_label != "GLOBAL" else (parent_market or "")
+                audit_pre_suffix = f"{market_for_files}_Pre_{base_file_suffix}" if market_for_files else f"Pre_{base_file_suffix}"
+                audit_post_suffix = f"{market_for_files}_Post_{base_file_suffix}" if market_for_files else f"Post_{base_file_suffix}"
 
                 # --- Run Configuration Audit for PRE and POST ---
                 print(f"{module_name} {market_tag} [INFO] Running Configuration Audit for PRE folder before consistency checks...")

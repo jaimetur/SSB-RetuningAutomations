@@ -663,6 +663,78 @@ def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzip
     import tempfile
     import hashlib
 
+    # ----------------------------- LOCAL HELPERS ----------------------------- #
+    def _looks_like_onedrive_path(p: str) -> bool:
+        """
+        Heuristic: True if path appears to be inside OneDrive/SharePoint synced folders.
+        """
+        try:
+            pl = (p or "").lower()
+            # Common OneDrive markers on Windows
+            if "onedrive" in pl:
+                return True
+            # SharePoint sync often includes this text in Spanish/English tenants
+            if "sharepoint" in pl or " - ericsson" in pl:
+                return True
+            # Corporate sync sometimes uses these names (best-effort heuristics)
+            if "\\teams\\" in pl or "\\sites\\" in pl:
+                return True
+        except Exception:
+            pass
+        return False
+
+    def _should_copy_zip_to_tmp(zip_path: str) -> bool:
+        """
+        Decide whether to copy ZIP to local temp before extracting.
+        Rationale:
+        - ZIP extraction performs many random reads/seek operations.
+        - On OneDrive synced folders this can be slower than copying first (sequential) then extracting locally.
+        """
+        try:
+            zp = pretty_path(to_long_path(zip_path))
+            if _looks_like_onedrive_path(zp):
+                return True
+        except Exception:
+            pass
+
+        # Size-based fallback: copy if large (avoid slow random reads over sync layer)
+        try:
+            size = os.path.getsize(to_long_path(zip_path))
+            # Threshold: 500 MB (tweakable). Many of your ZIPs are multi-GB.
+            if size >= 500 * 1024 * 1024:
+                return True
+        except Exception:
+            pass
+
+        return False
+
+    def _copy_zip_to_local_tmp(src_zip: str, zip_hash8: str) -> Optional[str]:
+        """
+        Copy ZIP to local temp folder and return local ZIP path.
+        Returns None on failure (caller can fallback to using original ZIP).
+        """
+        try:
+            tmp_root = tempfile.gettempdir()
+            local_dir = os.path.join(tmp_root, extraction_parent_dirname, "_zip_cache_")
+            local_dir_fs = to_long_path(local_dir)
+            os.makedirs(local_dir_fs, exist_ok=True)
+
+            base = os.path.basename(src_zip)
+            stem, ext = os.path.splitext(base)
+            local_zip = os.path.join(local_dir_fs, f"{stem}_{zip_hash8}{ext}")
+            local_zip_fs = to_long_path(local_zip)
+
+            # If already cached, reuse
+            if os.path.isfile(local_zip_fs):
+                return local_zip_fs
+
+            shutil.copy2(to_long_path(src_zip), local_zip_fs)
+            return local_zip_fs
+        except Exception:
+            return None
+
+    # ------------------------------------------------------------------------ #
+
     folder_fs = to_long_path(folder)
 
     # 1) Direct logs
@@ -712,13 +784,22 @@ def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzip
     # Extract
     try:
         os.makedirs(extract_root_fs, exist_ok=True)
-        with zipfile.ZipFile(to_long_path(chosen_zip), "r") as zf:
+
+        # NEW: If ZIP is on OneDrive (or very large), copy it to local temp first and extract from there.
+        zip_to_extract = chosen_zip
+        if _should_copy_zip_to_tmp(chosen_zip):
+            local_zip = _copy_zip_to_local_tmp(chosen_zip, zip_hash8)
+            if local_zip:
+                zip_to_extract = local_zip
+
+        with zipfile.ZipFile(to_long_path(zip_to_extract), "r") as zf:
             zf.extractall(path=extract_root_fs)
     except Exception:
         return LogsExtractionResult(process_dir=folder_fs, is_extracted=False)
 
     found = _find_first_dir_with_valid_logs(extract_root_fs)
     return LogsExtractionResult(process_dir=(found or extract_root_fs), extracted_root=extract_root_fs, is_extracted=True, zip_path=chosen_zip)
+
 
 
 
