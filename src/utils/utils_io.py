@@ -62,21 +62,32 @@ class LogsExtractionResult:
         try:
             if os.path.isdir(extracted_root_fs):
                 shutil.rmtree(extracted_root_fs, ignore_errors=False)
-            # If the parent __unzipped_logs__ folder is now empty, remove it too (robust: scandir + rmdir fallback)
+
+            # Remove empty subfolders inside the __unzipped_logs__ container (bottom-up), then remove the container if empty
             parent_dir = os.path.dirname(extracted_root_fs.rstrip("\\/"))
+            parent_dir_fs = to_long_path(parent_dir)
+
+            is_target_parent = os.path.isdir(parent_dir_fs) and os.path.basename(parent_dir_fs.rstrip("\\/")) == extraction_parent_dirname
+            if not is_target_parent:
+                return
+
             try:
-                parent_dir_fs = to_long_path(parent_dir)
-                is_target_parent = os.path.isdir(parent_dir_fs) and os.path.basename(parent_dir_fs.rstrip("\\/")) == extraction_parent_dirname
-                is_empty = is_target_parent and not any(os.scandir(parent_dir_fs))
-                if is_empty:
+                for dirpath, dirnames, filenames in os.walk(parent_dir_fs, topdown=False):
                     try:
-                        os.rmdir(parent_dir_fs)
+                        if not dirnames and not filenames:
+                            os.rmdir(to_long_path(dirpath))
                     except Exception:
-                        # In some Windows setups rmdir may fail even if empty; rmtree is safe here because we already verified emptiness
-                        shutil.rmtree(parent_dir_fs, ignore_errors=True)
+                        pass
+
+                try:
+                    if os.path.isdir(parent_dir_fs) and not any(os.scandir(parent_dir_fs)):
+                        os.rmdir(parent_dir_fs)
+                except Exception:
+                    pass
+
             except Exception:
-                # Never break execution due to cleanup failures
                 pass
+
         except Exception:
             # Never break execution due to cleanup failures
             pass
