@@ -325,7 +325,7 @@ def export_external_and_termpoint_commands(
       <output_dir>/Correction_Cmd/ExternalNRCellCU/{SSB-Post,Unknown}
       <output_dir>/Correction_Cmd/ExternalGUtranCell/{SSB-Post,Unknown}
       <output_dir>/Correction_Cmd/TermPointToGNB
-      <output_dir>/Correction_Cmd/TermPointToGNodeB
+      <output_dir>/Correction_Cmd/TermPointToGNodeB/{SSB-Post,Unknown}
 
     One text file per NodeId is generated (grouped like other Correction_Cmd exports).
 
@@ -381,6 +381,10 @@ def export_external_and_termpoint_commands(
         if command_column not in df.columns:
             return 0
         if node_column not in df.columns:
+            return 0
+
+        # IMPORTANT: if caller requested a filter but column is missing, do not export to avoid mixing targets
+        if filter_column and filter_values is not None and filter_column not in df.columns:
             return 0
 
         if filter_column and filter_column in df.columns and filter_values is not None:
@@ -459,19 +463,24 @@ def export_external_and_termpoint_commands(
     ext_nr_base = os.path.join(base_dir, "ExternalNRCellCU")
     ext_gu_base = os.path.join(base_dir, "ExternalGUtranCell")
     tp_gnb_dir = os.path.join(base_dir, "TermPointToGNB")
-    tp_gnodeb_dir = os.path.join(base_dir, "TermPointToGNodeB")
+    tp_gnodeb_base = os.path.join(base_dir, "TermPointToGNodeB")
 
     ext_nr_ssbpost_dir = os.path.join(ext_nr_base, "SSB-Post")
     ext_nr_unknown_dir = os.path.join(ext_nr_base, "Unknown")
     ext_gu_ssbpost_dir = os.path.join(ext_gu_base, "SSB-Post")
     ext_gu_unknown_dir = os.path.join(ext_gu_base, "Unknown")
 
+    # NEW: TermPointToGNodeB subfolders (Punto 2 de la slide)
+    tp_gnodeb_ssbpost_dir = os.path.join(tp_gnodeb_base, "SSB-Post")
+    tp_gnodeb_unknown_dir = os.path.join(tp_gnodeb_base, "Unknown")
+
     os.makedirs(ext_nr_ssbpost_dir, exist_ok=True)
     os.makedirs(ext_nr_unknown_dir, exist_ok=True)
     os.makedirs(ext_gu_ssbpost_dir, exist_ok=True)
     os.makedirs(ext_gu_unknown_dir, exist_ok=True)
     os.makedirs(tp_gnb_dir, exist_ok=True)
-    os.makedirs(tp_gnodeb_dir, exist_ok=True)
+    os.makedirs(tp_gnodeb_ssbpost_dir, exist_ok=True)
+    os.makedirs(tp_gnodeb_unknown_dir, exist_ok=True)
 
     generated = 0
 
@@ -520,13 +529,26 @@ def export_external_and_termpoint_commands(
     )
 
     # -----------------------------
-    # TermPointToGNodeB
+    # TermPointToGNodeB - SSB-Post / Unknown  (Bullets 2 & 3 from new requirements slide)
+    # - Bullet 2: export to two subfolders
+    # - Bullet 3: if a NodeId has both targets, grouping is done within each filtered subset
     # -----------------------------
     generated += _export_grouped_commands_from_sheet(
         audit_excel=audit_post_excel,
         sheet_name="TermPointToGNodeB",
-        output_dir=tp_gnodeb_dir,
+        output_dir=tp_gnodeb_ssbpost_dir,
         command_column="Correction_Cmd",
+        filter_column="GNodeB_SSB_Target",
+        filter_values=["SSB-Post"],
+        filename_suffix="TermPointToGNodeB",
+    )
+    generated += _export_grouped_commands_from_sheet(
+        audit_excel=audit_post_excel,
+        sheet_name="TermPointToGNodeB",
+        output_dir=tp_gnodeb_unknown_dir,
+        command_column="Correction_Cmd",
+        filter_column="GNodeB_SSB_Target",
+        filter_values=["Unknown", "Unkwnow"],
         filename_suffix="TermPointToGNodeB",
     )
 

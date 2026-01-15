@@ -674,6 +674,7 @@ def build_correction_command_nr_discrepancies(
 def build_correction_command_external_nr_cell_cu(n77_ssb_pre, n77_ssb_post, ext_gnb: str, ext_cell: str, nr_tail: str) -> str:
     """
     Build correction command replacing old N77 SSB with new N77 SSB inside nr_tail.
+    Adds two hget lines (before and after the set) to show the current nRFrequencyRef, as requested by the slide.
     Safely returns empty string if mandatory parameters are missing.
     """
     if not ext_gnb or not ext_cell or not nr_tail:
@@ -686,7 +687,9 @@ def build_correction_command_external_nr_cell_cu(n77_ssb_pre, n77_ssb_post, ext_
         "gs+\n"
         "lt all\n"
         "alt\n"
+        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef 64\n"
         f"set ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU={ext_cell} nRFrequencyRef {nr_tail}\n"
+        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef 64\n"
         "alt"
     )
 
@@ -707,28 +710,31 @@ def build_correction_command_external_gutran_cell(ext_gnb: str, ext_cell: str, s
 def build_correction_command_termpoint_to_gnodeb(ext_gnb: str, ssb_post: int, ssb_pre: int) -> str:
     """
     Build correction command for TermPointToGNodeB.
+    Slide point #4: remove the dynamic (blue) hget lines using ssb_post/ssb_pre, and add the new (yellow) hget lines with hardcoded '64'.
     Safely returns empty string if ext_gnb is missing.
     """
     if not ext_gnb:
         return ""
 
+    # NOTE: ssb_post and ssb_pre are kept in the signature for compatibility, but point #4 requires hardcoding the final '64'.
+    hardcoded_ref = 64
+
     return (
         "confb+\n"
         "lt all\n"
         "alt\n"
-        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {ssb_post}\n"
-        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {ssb_pre}\n"
+        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {hardcoded_ref}\n"
         f"get ExternalGNBCUCPFunction={ext_gnb},TermpointToGnodeB\n"
         f"bl ExternalGNBCUCPFunction={ext_gnb},TermpointToGnodeB\n"
         "wait 5\n"
         f"deb ExternalGNBCUCPFunction={ext_gnb},TermpointToGnodeB\n"
         "wait 10\n"
-        "lt all\n"
+        "lt ExternalGNBCUCPFunction\n"
         f"get ExternalGNBCUCPFunction={ext_gnb},TermpointToGnodeB\n"
-        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {ssb_post}\n"
-        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {ssb_pre}\n"
+        f"hget ExternalGNBCUCPFunction={ext_gnb},ExternalNRCellCU nRFrequencyRef {hardcoded_ref}\n"
         "alt"
     )
+
 
 
 def build_correction_command_termpoint_to_gnb(ext_gnb: str, ssb_post: object, ssb_pre: object) -> str:

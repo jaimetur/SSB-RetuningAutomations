@@ -4,6 +4,31 @@
 
 ---
 
+## Release: v0.5.6
+- ### Release Date: 2026-01-16
+
+- ### Main Changes:
+  
+  - #### 🚨 Breaking Changes:
+
+  - #### 🌟 New Features:
+    - Added GNodeB_SSB_Target classification to TermPointToGNodeB using the same SummaryAudit node-id based logic (nodes_pre / nodes_post) already used in ExternalNRCellCU, ensuring consistent SSB-Pre/SSB-Post/Unknown targeting.
+    - Updated the orchestrator call chain so process_termpoint_to_gnodeb() now receives nodes_id_pre and nodes_id_post, avoiding any dependency on “NR must run first” just to inherit the target.
+    - Enhanced the external/termpoint command exporter to split TermPointToGNodeB outputs into two folders: TermPointToGNodeB/SSB-Post and TermPointToGNodeB/Unknown.
+    - Implemented per-target grouping by NodeId for TermPointToGNodeB exports: if a NodeId contains rows with both targets, the commands are exported into separate node files per target (via target filtering before grouping).
+
+  - #### 🚀 Enhancements:
+    - Added pre- and post-change hget checks around the set in the ExternalNRCellCU correction command, so nRFrequencyRef is displayed before and after applying the SSB update.
+    - Updated TermPointToGNodeB correction command template to match the slide’s final format: removed dynamic hget lines using ssb_pre/ssb_post and replaced them with the hardcoded hget ... nRFrequencyRef 64 checks in the correct places, aligning with the expected command sequence.
+
+  - #### 🐛 Bug fixes:
+   - Minor bug fixing.
+    
+  - #### 📚 Documentation: 
+    - Updated documentation with latest changes.
+
+---
+
 ## Release: v0.5.5
 - ### Release Date: 2026-01-15
 

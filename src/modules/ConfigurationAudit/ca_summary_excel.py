@@ -298,7 +298,7 @@ def build_summary_audit(
 
     process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, extract_freq_from_nrfrequencyref, extract_nr_network_tail, nodes_id_pre, nodes_id_post)
     process_external_gutran_cell(df_external_gutran_cell, extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, normalize_state, df_term_point_to_gnb, rows, module_name, nodes_id_pre, nodes_id_post)
-    process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre)
+    process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre, nodes_id_pre, nodes_id_post)
     process_termpoint_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre)
     process_term_point_to_enodeb(df_term_point_to_enodeb, normalize_state, add_row)
 

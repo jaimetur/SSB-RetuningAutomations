@@ -301,7 +301,7 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
 
 
 # ----------------------------- NEW: TermPointToGNodeB (NR Termpoint Audit) -----------------------------
-def process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre):
+def process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre, nodes_pre=None, nodes_post=None):
     try:
         if df_term_point_to_gnodeb is None or df_term_point_to_gnodeb.empty:
             add_row("TermPointToGNodeB", "NR Termpoint Audit", "TermPointToGNodeB table", "Table not found or empty")
@@ -371,6 +371,23 @@ def process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr
                 work["SSB needs update"] = False
 
         # -------------------------------------------------
+        # GNodeB_SSB_Target - Same detection logic as ExternalNRCellCU (based on SummaryAudit node ids)
+        # -------------------------------------------------
+        if "GNodeB_SSB_Target" not in work.columns:
+            nodes_without_retune_ids = {str(v) for v in (nodes_pre or [])}
+            nodes_with_retune_ids = {str(v) for v in (nodes_post or [])}
+
+            def _detect_gnodeb_target(ext_gnb: object) -> str:
+                val = str(ext_gnb) if ext_gnb is not None else ""
+                if any(n in val for n in nodes_without_retune_ids):
+                    return "SSB-Pre"
+                if any(n in val for n in nodes_with_retune_ids):
+                    return "SSB-Post"
+                return "Unknown"
+
+            work["GNodeB_SSB_Target"] = work[ext_gnb_col].map(_detect_gnodeb_target)
+
+        # -------------------------------------------------
         # Correction Command
         # (ONLY when SSB needs update == True)
         # -------------------------------------------------
@@ -397,6 +414,7 @@ def process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr
 
     except Exception as ex:
         add_row("TermPointToGNodeB", "NR Termpoint Audit", "Error while checking TermPointToGNodeB", f"{type(ex).__name__}: {ex}")
+
 
 
 # ----------------------------- NEW: TermPointToGNB (X2 Termpoint Audit, LTE -> NR) -----------------------------
