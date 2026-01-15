@@ -2,6 +2,7 @@
 import configparser
 import os
 import re
+import shutil
 import traceback
 import zipfile
 from dataclasses import dataclass
@@ -31,6 +32,54 @@ class Step0RunInfo:
     date: str               # yyyymmdd
     time_hhmm: str          # hhmm in 24h format
     datetime_key: datetime  # yyyymmddhhmm for sorting
+
+@dataclass
+class LogsExtractionResult:
+    """
+    Result of resolving logs source. If a ZIP was extracted, extracted_root will be set and cleanup() can delete it.
+    """
+    process_dir: str
+    extracted_root: Optional[str] = None
+    is_extracted: bool = False
+    zip_path: Optional[str] = None
+
+    def cleanup(self, extraction_parent_dirname: str = "__unzipped_logs__") -> None:
+        """
+        Delete extracted logs folder (if any) without touching the original ZIP.
+        Safety: only deletes if the path contains the extraction_parent_dirname segment.
+        """
+        if not self.is_extracted or not self.extracted_root:
+            return
+
+        extracted_root_fs = to_long_path(self.extracted_root)
+        marker = f"\\{extraction_parent_dirname}\\" if os.name == "nt" else f"/{extraction_parent_dirname}/"
+        extracted_norm = extracted_root_fs.replace("/", "\\") if os.name == "nt" else extracted_root_fs
+
+        # Safety guard: only delete inside our controlled extraction folder
+        if marker not in extracted_norm:
+            return
+
+        try:
+            if os.path.isdir(extracted_root_fs):
+                shutil.rmtree(extracted_root_fs, ignore_errors=False)
+            # If the parent __unzipped_logs__ folder is now empty, remove it too (robust: scandir + rmdir fallback)
+            parent_dir = os.path.dirname(extracted_root_fs.rstrip("\\/"))
+            try:
+                parent_dir_fs = to_long_path(parent_dir)
+                is_target_parent = os.path.isdir(parent_dir_fs) and os.path.basename(parent_dir_fs.rstrip("\\/")) == extraction_parent_dirname
+                is_empty = is_target_parent and not any(os.scandir(parent_dir_fs))
+                if is_empty:
+                    try:
+                        os.rmdir(parent_dir_fs)
+                    except Exception:
+                        # In some Windows setups rmdir may fail even if empty; rmtree is safe here because we already verified emptiness
+                        shutil.rmtree(parent_dir_fs, ignore_errors=True)
+            except Exception:
+                # Never break execution due to cleanup failures
+                pass
+        except Exception:
+            # Never break execution due to cleanup failures
+            pass
 
 
 def detect_step0_folders(entry_name: str, base_folder: str) -> Optional[Step0RunInfo]:
@@ -250,30 +299,14 @@ def try_read_text_file_with_encoding(path: str) -> Tuple[List[str], Optional[str
     Robust text reader that tries several encodings and returns (lines, encoding_used).
     If it falls back to 'replace' mode, returns (lines, None) to signal that encoding is uncertain.
     """
-    # <<< Ensure Windows long path compatibility >>>
-    path_long = to_long_path(path)
-
-    encodings = ["utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "utf-8"]
-    for enc in encodings:
-        try:
-            with open(path_long, "r", encoding=enc, errors="strict") as f:
-                return [ln.rstrip("\n") for ln in f], enc
-        except Exception:
-            continue
-    # last permissive attempt
-    with open(path_long, "r", encoding="utf-8", errors="replace") as f:
-        return [ln.rstrip("\n") for ln in f], None
+    return read_text_with_encoding(path)
 
 
 def try_read_text_file_lines(path: str) -> Optional[List[str]]:
     """
     Same as above but returns only the lines (used by PrePostRelations.loaders).
     """
-    try:
-        lines, _ = try_read_text_file_with_encoding(path)
-        return lines
-    except Exception:
-        return None
+    return read_text_lines(path)
 
 
 def find_log_files(folder: str, recursive: bool = False) -> List[str]:
@@ -309,86 +342,26 @@ def find_log_files(folder: str, recursive: bool = False) -> List[str]:
     return files
 
 
-def _folder_has_valid_logs_plain(folder: str, recursive: bool = False) -> bool:
+def zip_has_subnetwork_logs(zip_path: str, max_members_to_check: int = 200, max_bytes_per_member: int = 2_000_000) -> bool:
     """
-    Plain check: True if folder contains at least one .log/.logs/.txt file
-    with a line starting by 'SubNetwork'. Does NOT consider ZIPs.
-    """
-    try:
-        folder_fs = to_long_path(folder)
-        log_files = find_log_files(folder_fs, recursive=recursive)
-    except Exception:
-        return False
-
-    for fpath in log_files:
-        try:
-            fpath_fs = to_long_path(fpath)
-            with open(fpath_fs, "r", encoding="utf-8", errors="ignore") as fh:
-                for line in fh:
-                    stripped = line.lstrip("\ufeff").lstrip()
-                    if stripped.startswith("SubNetwork"):
-                        return True
-        except Exception:
-            # If a file cannot be opened or read, skip and continue
-            continue
-
-    return False
-
-
-def _find_zip_files(folder: str) -> List[str]:
-    """
-    Return a sorted list of *.zip files found directly inside 'folder'.
-    """
-    zips: List[str] = []
-    try:
-        folder_fs = to_long_path(folder)
-        for name in os.listdir(folder_fs):
-            if name.lower().endswith(".zip"):
-                p = os.path.join(folder_fs, name)
-                if os.path.isfile(p):
-                    zips.append(p)
-    except Exception:
-        return []
-    zips.sort()
-    return zips
-
-
-def zip_has_log_members_fast(zip_path: str, extensions: Tuple[str, ...] = (".log", ".logs", ".txt")) -> bool:
-    """
-    Fast check (no extraction, no member reads): True if the ZIP contains at least one file
-    ending with the given extensions.
-    """
-    zip_path_fs = to_long_path(zip_path)
-    try:
-        with zipfile.ZipFile(zip_path_fs, "r") as zf:
-            for name in zf.namelist():
-                if not name or name.endswith("/"):
-                    continue
-                low = name.lower()
-                if low.endswith(extensions):
-                    return True
-    except Exception:
-        return False
-    return False
-
-
-def zip_has_valid_logs(zip_path: str, max_members_to_check: int = 200, max_bytes_per_member: int = 2_000_000) -> bool:
-    """
-    Return True if 'zip_path' contains at least one .log/.logs/.txt member
-    that includes a line starting with 'SubNetwork'.
+    Internal ZIP validator: True if ZIP contains at least one .log/.logs/.txt member with a line starting with 'SubNetwork'.
 
     Notes:
-    - First we do a fast metadata-only check to avoid reading GBs from the ZIP.
-    - Then we do a bounded content scan (only a limited number of members and bytes).
+    - Avoids extraction.
+    - Uses a bounded content scan: only a limited number of members and bytes.
+    - Uses infolist() to avoid building a huge namelist() in memory for very large ZIPs.
     """
-    if not zip_has_log_members_fast(zip_path):
-        return False
-
     zip_path_fs = to_long_path(zip_path)
-
     try:
         with zipfile.ZipFile(zip_path_fs, "r") as zf:
-            members = [m for m in zf.namelist() if m and not m.endswith("/") and m.lower().endswith((".log", ".logs", ".txt"))]
+            members: List[str] = []
+            for info in zf.infolist():
+                name = info.filename
+                if not name or name.endswith("/"):
+                    continue
+                if name.lower().endswith((".log", ".logs", ".txt")):
+                    members.append(name)
+
             if not members:
                 return False
 
@@ -420,7 +393,32 @@ def zip_has_valid_logs(zip_path: str, max_members_to_check: int = 200, max_bytes
     return False
 
 
-def folder_has_valid_logs(folder: str) -> bool:
+def has_valid_plain_logs(folder_fs: str, recursive: bool = False) -> bool:
+    """
+    Internal plain-files check: True if folder contains at least one .log/.logs/.txt file with a line starting by 'SubNetwork'.
+    Does NOT consider ZIP content.
+    """
+    try:
+        log_files = find_log_files(folder_fs, recursive=recursive)
+    except Exception:
+        return False
+
+    for fpath in log_files:
+        try:
+            fpath_fs = to_long_path(fpath)
+            with open(fpath_fs, "r", encoding="utf-8", errors="ignore") as fh:
+                for line in fh:
+                    stripped = line.lstrip("\ufeff").lstrip()
+                    if stripped.startswith("SubNetwork"):
+                        return True
+        except Exception:
+            # If a file cannot be opened or read, skip and continue
+            continue
+
+    return False
+
+
+def folder_or_zip_has_valid_logs(folder: str) -> bool:
     """
     Return True if 'folder' contains at least one .log / .logs / .txt file
     with a line starting by 'SubNetwork'.
@@ -433,18 +431,27 @@ def folder_has_valid_logs(folder: str) -> bool:
       contain a .zip file whose internal .log/.logs/.txt files include 'SubNetwork'.
       (ZIP content is inspected without extracting.)
     """
-    if _folder_has_valid_logs_plain(folder, recursive=False):
+    folder_fs = to_long_path(folder) if folder else folder
+    if not folder_fs or not os.path.isdir(folder_fs):
+        return False
+
+    if has_valid_plain_logs(folder_fs, recursive=False):
         return True
 
     try:
-        folder_fs = to_long_path(folder)
-        for zp in _find_zip_files(folder_fs):
-            if zip_has_valid_logs(zp):
+        for name in os.listdir(folder_fs):
+            if not name.lower().endswith(".zip"):
+                continue
+            zip_path = os.path.join(folder_fs, name)
+            if not os.path.isfile(zip_path):
+                continue
+            if zip_has_subnetwork_logs(zip_path):
                 return True
     except Exception:
         return False
 
     return False
+
 
 
 def extract_tokens_dynamic(name: str) -> List[str]:
@@ -609,52 +616,57 @@ def _find_first_dir_with_valid_logs(root_folder: str) -> Optional[str]:
     """
     root_fs = to_long_path(root_folder)
 
-    if _folder_has_valid_logs_plain(root_fs, recursive=False):
+    if has_valid_plain_logs(root_fs, recursive=False):
         return root_fs
 
     for dirpath, _dirnames, _filenames in os.walk(root_fs):
-        if _folder_has_valid_logs_plain(dirpath, recursive=False):
+        if has_valid_plain_logs(dirpath, recursive=False):
             return dirpath
 
     return None
 
 
-def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzipped_logs__", prefer_existing_extract: bool = True) -> str:
+def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzipped_logs__", prefer_existing_extract: bool = True) -> LogsExtractionResult:
     """
     Ensure logs are available as real files on disk for processing.
 
     Behavior:
-    - If 'folder' already has valid logs (plain), return it.
+    - If 'folder' already has valid logs (plain), return LogsExtractionResult(process_dir=folder, is_extracted=False).
     - Else, if it contains a .zip with valid logs:
         * Extract it into: <folder>/<extraction_parent_dirname>/<zip_stem>/
-        * Return the first directory inside the extraction tree that contains valid logs.
-    - If nothing is found, return the original folder (caller may handle the error).
-
-    This function is idempotent when prefer_existing_extract=True.
+        * Return LogsExtractionResult(process_dir=<dir_with_logs>, extracted_root=<extract_root>, is_extracted=True, zip_path=<zip>).
+    - If nothing is found, return LogsExtractionResult(process_dir=folder, is_extracted=False).
     """
     folder_fs = to_long_path(folder)
 
     # 1) Direct logs
-    if _folder_has_valid_logs_plain(folder_fs, recursive=False):
-        return folder_fs
+    if has_valid_plain_logs(folder_fs, recursive=False):
+        return LogsExtractionResult(process_dir=folder_fs, is_extracted=False)
 
     # 2) ZIP logs (do NOT extract unless the ZIP is confirmed as relevant)
-    zip_files = _find_zip_files(folder_fs)
+    zip_files: List[str] = []
+    try:
+        for name in os.listdir(folder_fs):
+            if not name.lower().endswith(".zip"):
+                continue
+            zp = os.path.join(folder_fs, name)
+            if os.path.isfile(zp):
+                zip_files.append(zp)
+    except Exception:
+        zip_files = []
+
     if not zip_files:
-        return folder_fs
+        return LogsExtractionResult(process_dir=folder_fs, is_extracted=False)
 
     chosen_zip: Optional[str] = None
-    for zp in zip_files:
-        # Fast check first: skip huge ZIPs that clearly don't contain logs
-        if not zip_has_log_members_fast(zp):
-            continue
+    for zp in sorted(zip_files):
         # Deep check (bounded reads): confirm it really contains "SubNetwork" logs
-        if zip_has_valid_logs(zp):
+        if zip_has_subnetwork_logs(zp):
             chosen_zip = zp
             break
 
     if not chosen_zip:
-        return folder_fs
+        return LogsExtractionResult(process_dir=folder_fs, is_extracted=False)
 
     zip_stem = os.path.splitext(os.path.basename(chosen_zip))[0]
     extract_root = os.path.join(folder_fs, extraction_parent_dirname, zip_stem)
@@ -664,7 +676,7 @@ def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzip
     if prefer_existing_extract and os.path.isdir(extract_root_fs):
         found = _find_first_dir_with_valid_logs(extract_root_fs)
         if found:
-            return found
+            return LogsExtractionResult(process_dir=found, extracted_root=extract_root_fs, is_extracted=True, zip_path=chosen_zip)
 
     # Extract
     try:
@@ -672,10 +684,10 @@ def ensure_logs_available(folder: str, extraction_parent_dirname: str = "__unzip
         with zipfile.ZipFile(to_long_path(chosen_zip), "r") as zf:
             zf.extractall(path=extract_root_fs)
     except Exception:
-        return folder_fs
+        return LogsExtractionResult(process_dir=folder_fs, is_extracted=False)
 
     found = _find_first_dir_with_valid_logs(extract_root_fs)
-    return found or extract_root_fs
+    return LogsExtractionResult(process_dir=(found or extract_root_fs), extracted_root=extract_root_fs, is_extracted=True, zip_path=chosen_zip)
 
 
 def write_compared_folders_file(output_dir: str, pre_dir: str, post_dir: str, filename: str = "FoldersCompared.txt") -> Optional[str]:

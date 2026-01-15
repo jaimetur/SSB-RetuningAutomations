@@ -12,6 +12,8 @@
   - #### 🚨 Breaking Changes:
   
   - #### 🚀 Enhancements:
+    - Added a post-processing cleanup step that deletes the extracted ZIP logs folder after processing, while leaving the original ZIP file untouched.
+    - Kept cleanup failure-safe (best-effort): any deletion errors are swallowed to avoid breaking the main execution flow.
 
   - #### 🐛 Bug fixes:
    - Minor bug fixing.
