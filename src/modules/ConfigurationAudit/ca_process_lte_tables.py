@@ -4,7 +4,7 @@ import pandas as pd
 from src.utils.utils_frequency import resolve_column_case_insensitive, parse_int_frequency
 
 # ----------------------------- LTE GUtranSyncSignalFrequency (OLD/NEW SSB + LowMidBand/mmWave) -----------------------------
-def process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new):
+def process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, nodes_pre=None, nodes_post=None):
     try:
         if df_gu_sync_signal_freq is not None and not df_gu_sync_signal_freq.empty:
             node_col = resolve_column_case_insensitive(df_gu_sync_signal_freq, ["NodeId"])
@@ -158,7 +158,7 @@ def process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_o
         )
 
 # ----------------------------- LTE GUtranFreqRelation (OLD/NEW SSB) -----------------------------
-def process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu):
+def process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu, nodes_pre=None, nodes_post=None):
     try:
         if df_gu_freq_rel is not None and not df_gu_freq_rel.empty:
             node_col = resolve_column_case_insensitive(df_gu_freq_rel, ["NodeId"])
@@ -391,7 +391,7 @@ def process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
         )
 
 # ------------------------------------- GUtranCellRelation --------------------------------------------
-def process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row):
+def process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row, nodes_pre=None, nodes_post=None):
     try:
         if df_gu_cell_rel is not None and not df_gu_cell_rel.empty:
             node_col = resolve_column_case_insensitive(df_gu_cell_rel, ["NodeId"])

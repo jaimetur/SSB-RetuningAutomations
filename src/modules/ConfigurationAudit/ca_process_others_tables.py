@@ -7,7 +7,7 @@ from src.utils.utils_frequency import resolve_column_case_insensitive, extract_s
 
 
 # ----------------------------- EndcDistrProfile gUtranFreqRef -----------------------------
-def process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row):
+def process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row, nodes_pre=None, nodes_post=None):
     try:
         if df_endc_distr_profile is not None and not df_endc_distr_profile.empty:
             node_col_edp = resolve_column_case_insensitive(df_endc_distr_profile, ["NodeId"])
@@ -98,7 +98,7 @@ def process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post,
         )
 
 # ----------------------------- FreqPrioNR (RATFreqPrioId on N77 only) -----------------------------
-def process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row):
+def process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row, nodes_pre=None, nodes_post=None):
     try:
         if df_freq_prio_nr is not None and not df_freq_prio_nr.empty:
             node_col = resolve_column_case_insensitive(df_freq_prio_nr, ["NodeId"])
@@ -289,8 +289,7 @@ def process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row):
         )
 
 # ----------------------------- CARDINALITY LIMITS -----------------------------
-def process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel):
-
+def process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel, nodes_pre=None, nodes_post=None):
     # Max 64 NRFrequency per node
     try:
         if df_nr_freq is not None and not df_nr_freq.empty:

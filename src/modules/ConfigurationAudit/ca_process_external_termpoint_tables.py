@@ -6,7 +6,7 @@ from src.utils.utils_dataframe import ensure_column_after
 from src.utils.utils_frequency import resolve_column_case_insensitive
 
 # ----------------------------- NEW: ExternalNRCellCU (same value as NRCellRelation old/new counts) -----------------------------
-def process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, _extract_freq_from_nrfrequencyref, _extract_nrnetwork_tail, nodes_pre, nodes_post):
+def process_external_nr_cell_cu(df_external_nr_cell_cu, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, extract_freq_from_nrfrequencyref, extract_nrnetwork_tail, nodes_pre=None, nodes_post=None):
 
     def _normalize_state_local(value: object) -> str:
         """
@@ -43,7 +43,7 @@ def process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_s
                 # -------------------------------------------------
                 # Frequency (was: GNodeB_SSB_Source)
                 # -------------------------------------------------
-                work["Frequency"] = work[freq_col].map(lambda v: _extract_freq_from_nrfrequencyref(v) if isinstance(v, str) and v.strip() else "")
+                work["Frequency"] = work[freq_col].map(lambda v: extract_freq_from_nrfrequencyref(v) if isinstance(v, str) and v.strip() else "")
 
                 old_ssb = str(n77_ssb_pre)
                 new_ssb = str(n77_ssb_post)
@@ -138,7 +138,7 @@ def process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_s
                     mask_final = mask_pre & mask_target
 
                     # Safely extract NR network tail
-                    nr_tail_series = work[freq_col].map(lambda v: _extract_nrnetwork_tail(v) if isinstance(v, str) and v.strip() else "")
+                    nr_tail_series = work[freq_col].map(lambda v: extract_nrnetwork_tail(v) if isinstance(v, str) and v.strip() else "")
 
                     if "Correction_Cmd" not in work.columns:
                         work["Correction_Cmd"] = ""
@@ -160,7 +160,7 @@ def process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_s
 
 
 # ----------------------------- NEW: ExternalGUtranCell (old/new counts + OUT_OF_SERVICE row counts) -----------------------------
-def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, _normalize_state, df_term_point_to_gnb, rows, module_name, nodes_pre, nodes_post):
+def process_external_gutran_cell(df_external_gutran_cell, extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, normalize_state, df_term_point_to_gnb, nodes_pre=None, nodes_post=None):
     try:
         if df_external_gutran_cell is not None and not df_external_gutran_cell.empty:
             # NEW: Always work on a full copy (same pattern as NR)
@@ -182,7 +182,7 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
                 # -------------------------------------------------
                 # Frequency (was: GNodeB_SSB_Source)
                 # -------------------------------------------------
-                work["Frequency"] = work[ref_col].map(_extract_ssb_from_gutran_sync_ref)
+                work["Frequency"] = work[ref_col].map(extract_ssb_from_gutran_sync_ref)
 
                 old_ssb = n77_ssb_pre
                 new_ssb = n77_ssb_post
@@ -194,7 +194,7 @@ def process_external_gutran_cell(df_external_gutran_cell, _extract_ssb_from_gutr
                 add_row("ExternalGUtranCell", "LTE Frequency Audit", f"External cells to new N77 SSB ({new_ssb}) (from ExternalGUtranCell)", count_new)
 
                 if status_col:
-                    work["_status_norm_"] = work[status_col].map(_normalize_state)
+                    work["_status_norm_"] = work[status_col].map(normalize_state)
                     mask_oos = work["_status_norm_"] == "OUT_OF_SERVICE"
 
                     count_old_oos = int(((work["Frequency"] == old_ssb) & mask_oos).sum())
@@ -418,7 +418,7 @@ def process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr
 
 
 # ----------------------------- NEW: TermPointToGNB (X2 Termpoint Audit, LTE -> NR) -----------------------------
-def process_termpoint_to_gnb(df_term_point_to_gnb, _normalize_state, _normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre):
+def process_termpoint_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre, nodes_pre=None, nodes_post=None):
     try:
         # Initialize locals to avoid UnboundLocalError if early branches happen
         work = None
@@ -452,23 +452,23 @@ def process_termpoint_to_gnb(df_term_point_to_gnb, _normalize_state, _normalize_
                 work["_tp_key_"] = work[node_col] + "|" + work[ext_gnb_col]
 
                 if admin_col:
-                    work["_admin_norm_"] = work[admin_col].map(_normalize_state)
+                    work["_admin_norm_"] = work[admin_col].map(normalize_state)
                     count_admin_locked = int(work.loc[work["_admin_norm_"] == "LOCKED", "_tp_key_"].nunique())
                 else:
                     count_admin_locked = 0
 
                 if oper_col:
-                    work["_oper_norm_"] = work[oper_col].map(_normalize_state)
+                    work["_oper_norm_"] = work[oper_col].map(normalize_state)
                     count_oper_disabled = int(work.loc[work["_oper_norm_"] == "DISABLED", "_tp_key_"].nunique())
                 else:
                     count_oper_disabled = 0
 
                 if ip_col:
-                    work["_ip_norm_"] = work[ip_col].map(_normalize_ip)
+                    work["_ip_norm_"] = work[ip_col].map(normalize_ip)
 
                     # Match either the literal combined form "0.0.0.0/::" or any representation containing "0.0.0.0" or "::"
                     def _is_zero_ip(v: object) -> bool:
-                        s = _normalize_ip(v)
+                        s = normalize_ip(v)
                         if not s:
                             return False
                         return s == "0.0.0.0/::" or s == "::" or ("0.0.0.0" in s)
@@ -540,7 +540,7 @@ def process_termpoint_to_gnb(df_term_point_to_gnb, _normalize_state, _normalize_
 
 
 # ----------------------------- NEW: TermPointToENodeB (X2 Termpoint Audit, NR -> LTE) -----------------------------
-def process_term_point_to_enodeb(df_term_point_to_enodeb, _normalize_state, add_row):
+def process_term_point_to_enodeb(df_term_point_to_enodeb, normalize_state, add_row, nodes_pre=None, nodes_post=None):
     try:
         if df_term_point_to_enodeb is not None and not df_term_point_to_enodeb.empty:
             node_col = resolve_column_case_insensitive(df_term_point_to_enodeb, ["NodeId"])
@@ -558,13 +558,13 @@ def process_term_point_to_enodeb(df_term_point_to_enodeb, _normalize_state, add_
                 work["_tp_key_"] = work[node_col] + "|" + work[ext_enb_col]
 
                 if admin_col:
-                    work["_admin_norm_"] = work[admin_col].map(_normalize_state)
+                    work["_admin_norm_"] = work[admin_col].map(normalize_state)
                     count_admin_locked = int(work.loc[work["_admin_norm_"] == "LOCKED", "_tp_key_"].nunique())
                 else:
                     count_admin_locked = 0
 
                 if oper_col:
-                    work["_oper_norm_"] = work[oper_col].map(_normalize_state)
+                    work["_oper_norm_"] = work[oper_col].map(normalize_state)
                     count_oper_disabled = int(work.loc[work["_oper_norm_"] == "DISABLED", "_tp_key_"].nunique())
                 else:
                     count_oper_disabled = 0

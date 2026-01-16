@@ -278,34 +278,34 @@ def build_summary_audit(
             return ""
         return str(value).strip()
 
-
     # ============================ MAIN CODE ================================
-    # NR Tables
-    process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
-    process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr)
-    process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post)
-    process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set)
-    process_nr_cell_relation(df_nr_cell_rel, extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row)
-
-    # LTE Tables
-    process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new)
-    process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu)
-    process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row)
-
-    # Externals & Termpoints tables
+    # Load node identifiers from SummaryAudit (Pre / Post) once, reused by all processors
     nodes_id_pre, nodes_name_pre = load_nodes_names_and_id_from_summary_audit(rows, stage="Pre", module_name=module_name)
     nodes_id_post, nodes_name_post = load_nodes_names_and_id_from_summary_audit(rows, stage="Post", module_name=module_name)
 
-    process_external_nr_cell_cu(df_external_nr_cell_cu, rows, module_name, n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, extract_freq_from_nrfrequencyref, extract_nr_network_tail, nodes_id_pre, nodes_id_post)
-    process_external_gutran_cell(df_external_gutran_cell, extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, normalize_state, df_term_point_to_gnb, rows, module_name, nodes_id_pre, nodes_id_post)
+    # NR Tables
+    process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, nodes_id_pre, nodes_id_post)
+    process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr, nodes_id_pre, nodes_id_post)
+    process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post, nodes_id_pre, nodes_id_post)
+    process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set, nodes_id_pre, nodes_id_post)
+    process_nr_cell_relation(df_nr_cell_rel, extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row, nodes_id_pre, nodes_id_post)
+
+    # LTE Tables
+    process_gu_sync_signal_freq(df_gu_sync_signal_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, nodes_id_pre, nodes_id_post)
+    process_gu_freq_rel(df_gu_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_gu, nodes_id_pre, nodes_id_post)
+    process_gu_cell_relation(df_gu_cell_rel, n77_ssb_pre, n77_ssb_post, add_row, nodes_id_pre, nodes_id_post)
+
+    # Externals & Termpoints tables
+    process_external_nr_cell_cu(df_external_nr_cell_cu,  n77_ssb_pre, n77_ssb_post, add_row, df_term_point_to_gnodeb, extract_freq_from_nrfrequencyref, extract_nr_network_tail, nodes_id_pre, nodes_id_post)
+    process_external_gutran_cell(df_external_gutran_cell, extract_ssb_from_gutran_sync_ref, n77_ssb_pre, n77_ssb_post, add_row, normalize_state, df_term_point_to_gnb, nodes_id_pre, nodes_id_post)
     process_termpoint_to_gnodeb(df_term_point_to_gnodeb, add_row, df_external_nr_cell_cu, n77_ssb_post, n77_ssb_pre, nodes_id_pre, nodes_id_post)
-    process_termpoint_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre)
-    process_term_point_to_enodeb(df_term_point_to_enodeb, normalize_state, add_row)
+    process_termpoint_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip, add_row, df_external_gutran_cell, n77_ssb_post, n77_ssb_pre, nodes_id_pre, nodes_id_post)
+    process_term_point_to_enodeb(df_term_point_to_enodeb, normalize_state, add_row, nodes_id_pre, nodes_id_post)
 
     # Other Tables
-    process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row)
-    process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row)
-    process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel)
+    process_endc_distr_profile(df_endc_distr_profile, n77_ssb_pre, n77_ssb_post, n77b_ssb, add_row, nodes_id_pre, nodes_id_post)
+    process_freq_prio_nr(df_freq_prio_nr, n77_ssb_pre, n77_ssb_post, add_row, nodes_id_pre, nodes_id_post)
+    process_cardinalities(df_nr_freq, add_row, df_nr_freq_rel, df_gu_sync_signal_freq, df_gu_freq_rel, nodes_id_pre, nodes_id_post)
 
     # Profiles Tables (optional)
     if profiles_audit:
@@ -470,7 +470,7 @@ def build_summary_audit(
 
         df = df.sort_values(by=["_order_"], kind="stable").drop(columns="_order_").reset_index(drop=True)
 
-        # Build NR param mismatching dataframe
+    # Build NR param mismatching dataframe
     df_param_mismatch_nr = pd.DataFrame(param_mismatch_rows_nr, columns=param_mismatch_columns_nr)
     if df_param_mismatch_nr.empty:
         df_param_mismatch_nr = pd.DataFrame(columns=param_mismatch_columns_nr)

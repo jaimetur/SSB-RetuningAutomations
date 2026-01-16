@@ -533,17 +533,29 @@ class ConfigurationAudit:
             # Re-inject modified audit tables back into table_entries
             # ------------------------------------------------------------------
             with log_phase_timer("PHASE 4.3: Re-inject modified tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+                reinject_map = {
+                    "NRCellDU": df_nr_cell_du,
+                    "NRFreq": df_nr_freq,
+                    "NRFreqRelation": df_nr_freq_rel,
+                    "NRCellRelation": df_nr_cell_rel,
+                    "FreqPrioNR": df_freq_prio_nr,
+                    "GUSyncSignalFrequency": df_gu_sync_signal_freq,
+                    "GUFreqRelation": df_gu_freq_rel,
+                    "GUtranCellRelation": df_gu_cell_rel,
+                    "NRSectorCarrier": df_nr_sector_carrier,
+                    "EndcDistrProfile": df_endc_distr_profile,
+                    "NRCellCU": df_nr_cell_cu,
+                    "EUtranFreqRelation": df_eutran_freq_rel,
+                    "ExternalNRCellCU": df_external_nr_cell_cu,
+                    "ExternalGUtranCell": df_external_gutran_cell,
+                    "TermPointToGNodeB": df_term_point_to_gnodeb,
+                    "TermPointToGNB": df_term_point_to_gnb,
+                    "TermPointToENodeB": df_term_point_to_enodeb,
+                }
                 for entry in table_entries:
                     sheet_name = str(entry.get("sheet_candidate", "")).strip()
-
-                    if sheet_name == "ExternalNRCellCU":
-                        entry["df"] = df_external_nr_cell_cu
-                    elif sheet_name == "TermPointToGNodeB":
-                        entry["df"] = df_term_point_to_gnodeb
-                    elif sheet_name == "ExternalGUtranCell":
-                        entry["df"] = df_external_gutran_cell
-                    elif sheet_name == "TermPointToGNB":
-                        entry["df"] = df_term_point_to_gnb
+                    if sheet_name in reinject_map:
+                        entry["df"] = reinject_map[sheet_name]
 
             # =====================================================================
             #                PHASE 5: Write the Excel file

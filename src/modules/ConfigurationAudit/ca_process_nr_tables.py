@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import re
 import pandas as pd
 
 from src.utils.utils_frequency import resolve_column_case_insensitive, parse_int_frequency, is_n77_from_string
@@ -6,7 +7,7 @@ from src.utils.utils_frequency import extract_ssb_from_profile_ref, detect_profi
 
 
 # ----------------------------- NRCellDU (N77 detection + allowed SSB + LowMidBand/mmWave) -----------------------------
-def process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set):
+def process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_n77_ssb_post_set, nodes_pre=None, nodes_post=None):
     try:
         if df_nr_cell_du is not None and not df_nr_cell_du.empty:
             node_col = resolve_column_case_insensitive(df_nr_cell_du, ["NodeId"])
@@ -125,7 +126,7 @@ def process_nr_cell_du(df_nr_cell_du, add_row, allowed_n77_ssb_pre_set, allowed_
 
 
 # ----------------------------- NRFrequency (OLD/NEW SSB on N77 rows) -----------------------------
-def process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new):
+def process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, nodes_pre=None, nodes_post=None):
     try:
         if df_nr_freq is not None and not df_nr_freq.empty:
             node_col = resolve_column_case_insensitive(df_nr_freq, ["NodeId"])
@@ -176,7 +177,7 @@ def process_nr_freq(df_nr_freq, has_value, add_row, is_old, n77_ssb_pre, is_new,
 
 
 # ----------------------------- NRFreqRelation (OLD/NEW SSB on NR rows) -----------------------------
-def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr):
+def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n77_ssb_post, series_only_not_old_not_new, param_mismatch_rows_nr, nodes_pre=None, nodes_post=None):
     try:
         if df_nr_freq_rel is not None and not df_nr_freq_rel.empty:
             node_col = resolve_column_case_insensitive(df_nr_freq_rel, ["NodeId"])
@@ -483,7 +484,7 @@ def process_nr_freq_rel(df_nr_freq_rel, is_old, add_row, n77_ssb_pre, is_new, n7
 
 
 # ----------------------------- NRSectorCarrier (N77 + allowed ARCFN) -----------------------------
-def process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post):
+def process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_pre_set, all_n77_arfcn_in_pre, allowed_n77_arfcn_post_set, all_n77_arfcn_in_post, nodes_pre=None, nodes_post=None):
     try:
         if df_nr_sector_carrier is not None and not df_nr_sector_carrier.empty:
             node_col = resolve_column_case_insensitive(df_nr_sector_carrier, ["NodeId"])
@@ -544,34 +545,74 @@ def process_nr_sector_carrier(df_nr_sector_carrier, add_row, allowed_n77_arfcn_p
 
 
 # ------------------------------------- NRCellRelations --------------------------------------------
-def process_nr_cell_relation(df_nr_cell_rel, _extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row):
+def process_nr_cell_relation(df_nr_cell_rel, _extract_freq_from_nrfreqrelationref, n77_ssb_pre, n77_ssb_post, add_row, nodes_pre=None, nodes_post=None):
     try:
         if df_nr_cell_rel is not None and not df_nr_cell_rel.empty:
             node_col = resolve_column_case_insensitive(df_nr_cell_rel, ["NodeId"])
             freq_col = resolve_column_case_insensitive(df_nr_cell_rel, ["nRFreqRelationRef", "NRFreqRelationRef"])
-
-            # # Helper embedded inside the main function
-            # def _extract_freq_from_nrfreqrelationref_local(value: object) -> int | None:
-            #     """Extract NRFreqRelation integer from NRCellRelation reference string."""
-            #     return _extract_freq_from_nrfreqrelationref(value)
+            nrcellref_col = resolve_column_case_insensitive(df_nr_cell_rel, ["nRCellRef", "NRCellRef"])
 
             if node_col and freq_col:
-                work = df_nr_cell_rel[[node_col, freq_col]].copy()
+                work = df_nr_cell_rel.copy()
                 work[node_col] = work[node_col].astype(str).str.strip()
-                work["_freq_int_"] = work[freq_col].map(_extract_freq_from_nrfreqrelationref)
 
-                # Use your variables for pre/post frequencies
-                old_ssb = n77_ssb_pre
-                new_ssb = n77_ssb_post
+                # -------------------------------------------------
+                # Frequency (extract from nRFreqRelationRef)
+                # -------------------------------------------------
+                work["Frequency"] = work[freq_col].map(lambda v: _extract_freq_from_nrfreqrelationref(v) if isinstance(v, str) and v.strip() else "")
 
-                count_old = int((work["_freq_int_"] == old_ssb).sum())
-                count_new = int((work["_freq_int_"] == new_ssb).sum())
+                old_ssb = int(n77_ssb_pre)
+                new_ssb = int(n77_ssb_post)
+
+                freq_as_int = pd.to_numeric(work["Frequency"], errors="coerce")
+                count_old = int((freq_as_int == old_ssb).sum())
+                count_new = int((freq_as_int == new_ssb).sum())
 
                 add_row("NRCellRelation", "NR Frequency Audit", f"NR cellRelations to old N77 SSB ({old_ssb}) (from NRCellRelation table)", count_old)
                 add_row("NRCellRelation", "NR Frequency Audit", f"NR cellRelations to new N77 SSB ({new_ssb}) (from NRCellRelation table)", count_new)
+
+                # -------------------------------------------------
+                # ExternalGNBCUCPFunction / ExternalNRCellCU (extract from nRCellRef)
+                # -------------------------------------------------
+                def _extract_kv_from_ref(ref_value: object, key: str) -> str:
+                    """Extract 'key=value' from a comma-separated reference string like '...,ExternalNRCellCU=...,ExternalGNBCUCPFunction=..., ...'."""
+                    text = str(ref_value or "")
+                    m = re.search(rf"{re.escape(key)}=([^,]+)", text)
+                    return m.group(1).strip() if m else ""
+
+                if nrcellref_col:
+                    work["ExternalGNBCUCPFunction"] = work[nrcellref_col].map(lambda v: _extract_kv_from_ref(v, "ExternalGNBCUCPFunction"))
+                    work["ExternalNRCellCU"] = work[nrcellref_col].map(lambda v: _extract_kv_from_ref(v, "ExternalNRCellCU"))
+                else:
+                    if "ExternalGNBCUCPFunction" not in work.columns:
+                        work["ExternalGNBCUCPFunction"] = ""
+                    if "ExternalNRCellCU" not in work.columns:
+                        work["ExternalNRCellCU"] = ""
+
+                # -------------------------------------------------
+                # GNodeB_SSB_Target (same logic as ExternalNRCellCU)
+                # -------------------------------------------------
+                nodes_without_retune_ids = {str(v) for v in (nodes_pre or [])}
+                nodes_with_retune_ids = {str(v) for v in (nodes_post or [])}
+
+                def _detect_gnodeb_target(ext_gnb: object) -> str:
+                    val = str(ext_gnb) if ext_gnb is not None else ""
+                    if any(n in val for n in nodes_without_retune_ids):
+                        return "SSB-Pre"
+                    if any(n in val for n in nodes_with_retune_ids):
+                        return "SSB-Post"
+                    return "Unknown"
+
+                work["GNodeB_SSB_Target"] = work["ExternalGNBCUCPFunction"].map(_detect_gnodeb_target)
+
+                # -------------------------------------------------
+                # Write back preserving original columns + new ones
+                # -------------------------------------------------
+                df_nr_cell_rel.loc[:, work.columns] = work
             else:
                 add_row("NRCellRelation", "NR Frequency Audit", "NRCellRelation table present but NodeId / nRFreqRelationRef column missing", "N/A")
         else:
             add_row("NRCellRelation", "NR Frequency Audit", "NRCellRelation table", "Table not found or empty")
     except Exception as ex:
         add_row("NRCellRelation", "NR Frequency Audit", "Error while checking NRCellRelation", f"ERROR: {ex}")
+
