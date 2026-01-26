@@ -539,7 +539,7 @@ class ConfigurationAudit:
                     "NRFreqRelation": df_nr_freq_rel,
                     "NRCellRelation": df_nr_cell_rel,
                     "FreqPrioNR": df_freq_prio_nr,
-                    "GUSyncSignalFrequency": df_gu_sync_signal_freq,
+                    "GUtranSyncSignalFrequency": df_gu_sync_signal_freq,
                     "GUFreqRelation": df_gu_freq_rel,
                     "GUtranCellRelation": df_gu_cell_rel,
                     "NRSectorCarrier": df_nr_sector_carrier,
@@ -584,6 +584,7 @@ class ConfigurationAudit:
                     _log_info(f"PHASE 5.0: ExcelWriter OPEN starting → tmp: '{pretty_path(tmp_excel_path)}'")
 
                     writer = None
+                    writer_closed = False
                     try:
                         writer = pd.ExcelWriter(tmp_excel_path_long, engine="openpyxl")
                         t_open1 = time.perf_counter()
@@ -701,6 +702,7 @@ class ConfigurationAudit:
                         # _log_info(f"PHASE 5.X: gc.collect() took {time.perf_counter() - t_gc0:.3f}s")
 
                         writer.close()  # <-- this is where openpyxl can take minutes
+                        writer_closed = True
 
                         t_close1 = time.perf_counter()
 
@@ -709,7 +711,7 @@ class ConfigurationAudit:
                     finally:
                         # Safety close (avoid leaked handles if something fails mid-write)
                         try:
-                            if writer is not None:
+                            if writer is not None and not writer_closed:
                                 # If already closed, this is a no-op / may raise; ignore.
                                 writer.close()
                         except Exception:
