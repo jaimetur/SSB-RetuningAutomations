@@ -34,6 +34,7 @@
         - NR_disc (frequency-based) from NRCellRelation.
         - GU_disc (frequency-based) from GUtranCellRelation.
         - External/Termpoints commands (they already come from the single Audit Excel)
+    - Merge Excel sheets for the same MO instead add (1), (2)… in 'ConfigurationAudit' module.
 
   - #### 🐛 Bug fixes:
     - Minor bug fixing.

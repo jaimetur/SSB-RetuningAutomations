@@ -440,6 +440,27 @@ def process_termpoint_to_gnb(df_term_point_to_gnb, normalize_state, normalize_ip
             ip_col = resolve_column_case_insensitive(work, ["usedIpAddress", "UsedIpAddress"])
             avail_col = resolve_column_case_insensitive(work, ["availabilityStatus", "AvailabilityStatus"])
 
+            # -------------------------------------------------
+            # GNodeB_SSB_Target (same logic as ExternalGUtranCell)
+            # -------------------------------------------------
+            nodes_without_retune_ids = {str(v) for v in (nodes_pre or [])}
+            nodes_with_retune_ids = {str(v) for v in (nodes_post or [])}
+
+            def _detect_gnodeb_target(ext_gnb: object) -> str:
+                val = str(ext_gnb) if ext_gnb is not None else ""
+                if any(n in val for n in nodes_without_retune_ids):
+                    return "SSB-Pre"
+                if any(n in val for n in nodes_with_retune_ids):
+                    return "SSB-Post"
+                return "Unknown"
+
+            if ext_gnb_col:
+                work["GNodeB_SSB_Target"] = work[ext_gnb_col].map(_detect_gnodeb_target)
+            else:
+                if "GNodeB_SSB_Target" not in work.columns:
+                    work["GNodeB_SSB_Target"] = "Unknown"
+
+
             if not node_col or not ext_gnb_col:
                 add_row("TermPointToGNB", "X2 Termpoint Audit", "TermPointToGNB table present but required columns missing (NodeId/ExternalGNBCUCPFunctionId/admin/oper/ip)", "N/A")
                 return

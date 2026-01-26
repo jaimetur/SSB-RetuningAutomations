@@ -737,28 +737,57 @@ def build_correction_command_termpoint_to_gnodeb(ext_gnb: str, ssb_post: int, ss
 
 
 
-def build_correction_command_termpoint_to_gnb(ext_gnb: str, ssb_post: object, ssb_pre: object) -> str:
+def build_correction_command_termpoint_to_gnb(df: pd.DataFrame, old_ssb: str, new_ssb: str) -> pd.DataFrame:
     """
-    Build correction command for TermPointToGNB (LTE -> NR).
-    Safely returns empty string if ext_gnb is missing.
-    """
-    if not ext_gnb:
-        return ""
+    Build the correction command for TermpointToGNB rows needing update.
 
-    return (
-        "confb+\n"
-        "lt all\n"
-        "alt\n"
-        f"hget ExternalGNodeBFunction={ext_gnb},ExternalGUtranCell gUtranSyncSignalFrequencyRef {ssb_post}\n"
-        f"hget ExternalGNodeBFunction={ext_gnb},ExternalGUtranCell gUtranSyncSignalFrequencyRef {ssb_pre}\n"
-        f"get ExternalGNodeBFunction={ext_gnb},TermpointToGNB\n"
-        f"bl ExternalGNodeBFunction={ext_gnb},TermpointToGNB\n"
-        "wait 5\n"
-        f"deb ExternalGNodeBFunction={ext_gnb},TermpointToGNB\n"
-        "wait 10\n"
-        "lt all\n"
-        f"get ExternalGNodeBFunction={ext_gnb},TermpointToGNB\n"
-        f"hget ExternalGNodeBFunction={ext_gnb},ExternalGUtranCell gUtranSyncSignalFrequencyRef {ssb_post}\n"
-        f"hget ExternalGNodeBFunction={ext_gnb},ExternalGUtranCell gUtranSyncSignalFrequencyRef {ssb_pre}\n"
-        "alt"
-    )
+    Update (per requirements):
+      - Keep the structure identical to existing TermPointToGNB command style.
+      - Remove the two hget lines that used old/new SSB values.
+      - Add a single hget line using a hardcoded '64' suffix (as requested).
+      - Replace the second 'lt all' with 'lt ExternalGNodeBFunction' (matches the desired pattern).
+
+    Notes:
+      - old_ssb/new_ssb are kept in the signature for backward compatibility with the caller,
+        but the new command uses a hardcoded 64 token.
+    """
+    out = df.copy()
+    if out.empty:
+        if "Correction_Cmd" not in out.columns:
+            out["Correction_Cmd"] = ""
+        return out
+
+    required_cols = ["ExternalGNodeBFunctionId", "TermPointToGNBId", "EUtranCellFDDId"]
+    for c in required_cols:
+        if c not in out.columns:
+            out[c] = ""
+
+    def _cmd(ext_gnb: object, tp: object, eutra: object) -> str:
+        ext_gnb_s = str(ext_gnb).strip()
+        tp_s = str(tp).strip()
+        eutra_s = str(eutra).strip()
+        if not ext_gnb_s or not tp_s:
+            return ""
+
+        # NOTE: '64' is hardcoded by requirement.
+        hardcoded_token = "64"
+
+        cmd = []
+        cmd.append("confb+")
+        cmd.append("lt all")
+        cmd.append("alt")
+        cmd.append(f"hget ExternalGNodeBFunction={ext_gnb_s},ExternalGUtranCell gUtranSyncSignalFrequencyRef {hardcoded_token}")
+        cmd.append(f"get ExternalGNodeBFunction={ext_gnb_s},TermpointToGNB")
+        cmd.append(f"bl ExternalGNodeBFunction={ext_gnb_s},TermpointToGNB")
+        cmd.append("wait 5")
+        cmd.append(f"deb ExternalGNodeBFunction={ext_gnb_s},TermpointToGNB")
+        cmd.append("wait 10")
+        cmd.append("lt ExternalGNodeBFunction")
+        cmd.append(f"get ExternalGNodeBFunction={ext_gnb_s},TermpointToGNB")
+        cmd.append(f"hget ExternalGNodeBFunction={ext_gnb_s},ExternalGUtranCell gUtranSyncSignalFrequencyRef {hardcoded_token}")
+        cmd.append("alt")
+
+        return "\n".join(cmd)
+
+    out["Correction_Cmd"] = out.apply(lambda r: _cmd(r.get("ExternalGNodeBFunctionId", ""), r.get("TermPointToGNBId", ""), r.get("EUtranCellFDDId", "")), axis=1)
+    return out

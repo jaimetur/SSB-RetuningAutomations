@@ -256,6 +256,8 @@ class ConsistencyChecks:
 
         # NEW: load node numeric identifiers from POST Configuration Audit (SummaryAudit sheet)
         nodes_id_pre, nodes_name_pre = load_nodes_names_and_id_from_summary_audit(audit_post_excel, stage="Pre", module_name=module_name)
+        nodes_id_post, nodes_name_post = load_nodes_names_and_id_from_summary_audit(audit_post_excel, stage="Post", module_name=module_name)
+
 
         results: Dict[str, Dict[str, pd.DataFrame]] = {}
 
@@ -379,6 +381,57 @@ class ConsistencyChecks:
                         # If regex construction fails (rare), do not modify any masks
                         pass
 
+
+                    # NEW: classify frequency discrepancies into SSB-Post vs Unknown based on destination target ids
+                    def _extract_kv_from_ref(ref_value: object, key: str) -> str:
+                        text = str(ref_value or "")
+                        m = re.search(rf"{re.escape(key)}=([^,]+)", text)
+                        return m.group(1).strip() if m else ""
+
+                    def _detect_gnodeb_target(ext_id: object) -> str:
+                        val = str(ext_id) if ext_id is not None else ""
+                        if nodes_id_pre and any(n in val for n in nodes_id_pre):
+                            return "SSB-Pre"
+                        if nodes_id_post and any(n in val for n in nodes_id_post):
+                            return "SSB-Post"
+                        return "Unknown"
+
+                    gnodeb_target_series = pd.Series("Unknown", index=pre_common.index)
+                    ext_gnb_series = pd.Series("", index=pre_common.index)
+                    ext_cell_series = pd.Series("", index=pre_common.index)
+
+                    if table_name == "NRCellRelation":
+                        ref_col = None
+                        for cand in ["nRCellRef", "NRCellRef", "neighborCellRef"]:
+                            if cand in post_common.columns:
+                                ref_col = cand
+                                break
+                            if cand in pre_common.columns:
+                                ref_col = cand
+                                break
+
+                        if ref_col:
+                            ref_series = (post_common[ref_col] if ref_col in post_common.columns else pre_common[ref_col]).reindex(pre_common.index)
+                            ext_gnb_series = ref_series.map(lambda v: _extract_kv_from_ref(v, "ExternalGNBCUCPFunction"))
+                            ext_cell_series = ref_series.map(lambda v: _extract_kv_from_ref(v, "ExternalNRCellCU"))
+                            gnodeb_target_series = ext_gnb_series.map(_detect_gnodeb_target)
+
+                    elif table_name == "GUtranCellRelation":
+                        ref_col = None
+                        for cand in ["neighborCellRef", "nCellRef", "NCellRef"]:
+                            if cand in post_common.columns:
+                                ref_col = cand
+                                break
+                            if cand in pre_common.columns:
+                                ref_col = cand
+                                break
+
+                        if ref_col:
+                            ref_series = (post_common[ref_col] if ref_col in post_common.columns else pre_common[ref_col]).reindex(pre_common.index)
+                            ext_gnb_series = ref_series.map(lambda v: _extract_kv_from_ref(v, "ExternalGNodeBFunction"))
+                            ext_cell_series = ref_series.map(lambda v: _extract_kv_from_ref(v, "ExternalGUtranCell"))
+                            gnodeb_target_series = ext_gnb_series.map(_detect_gnodeb_target)
+
             combined_mask = (freq_rule_mask | any_diff_mask).reindex(pre_common.index, fill_value=False)
             discrepancy_keys = [k for k, m in zip(pre_common.index, combined_mask) if m and k in set(common_idx)]
 
@@ -426,6 +479,7 @@ class ConsistencyChecks:
                     if table_name == "GUtranCellRelation"
                     else ["NodeId", "NRCellCUId", "NRCellRelationId"]
                 )
+
                 for rc in required_cols:
                     val = ""
                     if rc in post_common.columns:
@@ -433,6 +487,15 @@ class ConsistencyChecks:
                     elif rc in pre_common.columns:
                         val = pre_common.loc[k, rc]
                     row[rc] = val
+
+                if table_name == "NRCellRelation":
+                    row["ExternalGNBCUCPFunction"] = ext_gnb_series.loc[k] if k in ext_gnb_series.index else ""
+                    row["ExternalNRCellCU"] = ext_cell_series.loc[k] if k in ext_cell_series.index else ""
+                    row["GNodeB_SSB_Target"] = gnodeb_target_series.loc[k] if k in gnodeb_target_series.index else "Unknown"
+                elif table_name == "GUtranCellRelation":
+                    row["ExternalGNodeBFunction"] = ext_gnb_series.loc[k] if k in ext_gnb_series.index else ""
+                    row["ExternalGUtranCell"] = ext_cell_series.loc[k] if k in ext_cell_series.index else ""
+                    row["GNodeB_SSB_Target"] = gnodeb_target_series.loc[k] if k in gnodeb_target_series.index else "Unknown"
 
                 difflist = diff_cols_per_row.get(k, [])
 
@@ -518,14 +581,16 @@ class ConsistencyChecks:
             new_in_post_clean = self._filter_rows_by_freq_list(new_in_post_clean)
             missing_in_post_clean = self._filter_rows_by_freq_list(missing_in_post_clean)
 
-
             # Pair stats
+            freq_diff_series = freq_rule_mask.reindex(pre_common.index).astype(bool)
             pair_stats = pd.DataFrame(
                 {
                     "Freq_Pre": pre_freq_base.reindex(pre_common.index).fillna("").replace("", "<empty>"),
                     "Freq_Post": post_freq_base.reindex(pre_common.index).fillna("").replace("", "<empty>"),
                     "ParamDiff": any_diff_mask.reindex(pre_common.index).astype(bool),
-                    "FreqDiff": freq_rule_mask.reindex(pre_common.index).astype(bool),
+                    "FreqDiff": freq_diff_series,
+                    "FreqDiff_SSBPost": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() != "Unknown"),
+                    "FreqDiff_Unknown": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() == "Unknown"),
                 },
                 index=pre_common.index,
             )
@@ -754,7 +819,9 @@ class ConsistencyChecks:
                     meta = bucket.get("meta", {})
                     pair_stats = bucket.get("pair_stats", pd.DataFrame())
                     params_disc = int(pair_stats["ParamDiff"].sum()) if not pair_stats.empty else 0
-                    freq_disc = int(pair_stats["FreqDiff"].sum()) if not pair_stats.empty else 0
+                    freq_disc = int(pair_stats["FreqDiff_SSBPost"].sum()) if not pair_stats.empty and "FreqDiff_SSBPost" in pair_stats.columns else (int(pair_stats["FreqDiff"].sum()) if not pair_stats.empty else 0)
+                    ssb_unknown = int(pair_stats["FreqDiff_Unknown"].sum()) if not pair_stats.empty and "FreqDiff_Unknown" in pair_stats.columns else 0
+
                     summary_rows.append({
                         "Table": name,
                         "KeyColumns": ", ".join(meta.get("key_cols", [])),
@@ -762,7 +829,8 @@ class ConsistencyChecks:
                         "Relations_Pre": meta.get("pre_rows", 0),
                         "Relations_Post": meta.get("post_rows", 0),
                         "Parameters_Discrepancies": params_disc,
-                        "Frequency_Discrepancies": freq_disc,
+                        "Freq_Discrepancies": freq_disc,
+                        "SSB_Unknown": ssb_unknown,
                         "New_Relations": len(bucket.get("new_in_post", pd.DataFrame())),
                         "Missing_Relations": len(bucket.get("missing_in_post", pd.DataFrame())),
                         "SourceFile_Pre": pretty_path(meta.get("pre_source_file", "")),
@@ -772,9 +840,10 @@ class ConsistencyChecks:
             summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(
                 columns=[
                     "Table", "KeyColumns", "FreqColumn", "Relations_Pre", "Relations_Post",
-                    "Parameters_Discrepancies", "Frequency_Discrepancies", "New_Relations", "Missing_Relations",
+                    "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations",
                     "SourceFile_Pre", "SourceFile_Post"  # NEW
                 ]
+
             )
 
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
@@ -815,7 +884,9 @@ class ConsistencyChecks:
                     if not pair_stats.empty:
                         grp = pair_stats.groupby(["Freq_Pre", "Freq_Post"], dropna=False)
                         params_by_pair = grp["ParamDiff"].sum().astype(int).to_dict()
-                        freq_by_pair = grp["FreqDiff"].sum().astype(int).to_dict()
+                        freq_by_pair = (grp["FreqDiff_SSBPost"].sum().astype(int).to_dict() if "FreqDiff_SSBPost" in pair_stats.columns else grp["FreqDiff"].sum().astype(int).to_dict())
+                        unknown_by_pair = (grp["FreqDiff_Unknown"].sum().astype(int).to_dict() if "FreqDiff_Unknown" in pair_stats.columns else {})
+
                         pairs_present = set(grp.size().index.tolist())
                     else:
                         params_by_pair, freq_by_pair, pairs_present = {}, {}, set()
@@ -847,6 +918,7 @@ class ConsistencyChecks:
                             "Relations_Post": int(post_counts.get(fpost, 0)),
                             "Parameters_Discrepancies": int(params_by_pair.get((fpre, fpost), 0)),
                             "Freq_Discrepancies": int(freq_by_pair.get((fpre, fpost), 0)),
+                            "SSB_Unknown": int(unknown_by_pair.get((fpre, fpost), 0)),
                             "New_Relations": int(new_by_pair.get((fpre, fpost), 0)),
                             "Missing_Relations": int(miss_by_pair.get((fpre, fpost), 0)),
                         })
@@ -858,7 +930,7 @@ class ConsistencyChecks:
                 detailed_df = pd.DataFrame(
                     columns=[
                         "Table", "KeyColumns", "FreqColumn", "Freq_Pre", "Freq_Post",
-                        "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies",
+                        "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown",
                         "New_Relations", "Missing_Relations"
                     ]
                 )

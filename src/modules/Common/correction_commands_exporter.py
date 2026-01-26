@@ -166,9 +166,13 @@ def _reorder_cmds_del_first(cmds: List[object]) -> List[str]:
     """
     Given a list of command blocks (strings), returns a new list of blocks where:
       - all extracted 'del ...' lines are placed first (one per line)
-      - followed by the remaining blocks (without those del lines)
+      - then blocks containing 'set External...' (kept as full blocks, not line-splitted)
+      - followed by the remaining blocks (typically 'crn ...' creations and other scripts)
     """
+    set_external_re = re.compile(r"^\s*set\s+External", re.IGNORECASE | re.MULTILINE)
+
     del_lines_all: List[str] = []
+    set_external_blocks: List[str] = []
     rest_blocks: List[str] = []
 
     for c in cmds:
@@ -176,15 +180,21 @@ def _reorder_cmds_del_first(cmds: List[object]) -> List[str]:
         if del_lines:
             del_lines_all.extend(del_lines)
         if rest:
-            rest_blocks.append(rest)
+            if set_external_re.search(rest):
+                set_external_blocks.append(rest)
+            else:
+                rest_blocks.append(rest)
 
     out: List[str] = []
     if del_lines_all:
         out.extend(del_lines_all)
+    if set_external_blocks:
+        out.extend(set_external_blocks)
     if rest_blocks:
         out.extend(rest_blocks)
 
     return out
+
 
 
 # ----------------------------------------------------------------------
@@ -458,24 +468,30 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
     base_dir = os.path.join(output_dir, base_folder_name)
 
     ext_nr_base = os.path.join(base_dir, "ExternalNRCellCU")
-    ext_gu_base = os.path.join(base_dir, "ExternalGUtranCell")
-    tp_gnb_dir = os.path.join(base_dir, "TermPointToGNB")
-    tp_gnodeb_base = os.path.join(base_dir, "TermPointToGNodeB")
-
     ext_nr_ssbpost_dir = os.path.join(ext_nr_base, "SSB-Post")
     ext_nr_unknown_dir = os.path.join(ext_nr_base, "Unknown")
+
+    ext_gu_base = os.path.join(base_dir, "ExternalGUtranCell")
     ext_gu_ssbpost_dir = os.path.join(ext_gu_base, "SSB-Post")
     ext_gu_unknown_dir = os.path.join(ext_gu_base, "Unknown")
 
-    # NEW: TermPointToGNodeB subfolders (Punto 2 de la slide)
+    tp_gnb_dir = os.path.join(base_dir, "TermPointToGNB")
+    tp_gnb_ssbpost_dir = os.path.join(tp_gnb_dir, "SSBPost")
+    tp_gnb_unknown_dir = os.path.join(tp_gnb_dir, "Unknown")
+
+    tp_gnodeb_base = os.path.join(base_dir, "TermPointToGNodeB")
     tp_gnodeb_ssbpost_dir = os.path.join(tp_gnodeb_base, "SSB-Post")
     tp_gnodeb_unknown_dir = os.path.join(tp_gnodeb_base, "Unknown")
 
     os.makedirs(ext_nr_ssbpost_dir, exist_ok=True)
     os.makedirs(ext_nr_unknown_dir, exist_ok=True)
+
     os.makedirs(ext_gu_ssbpost_dir, exist_ok=True)
     os.makedirs(ext_gu_unknown_dir, exist_ok=True)
-    os.makedirs(tp_gnb_dir, exist_ok=True)
+
+    os.makedirs(tp_gnb_ssbpost_dir, exist_ok=True)
+    os.makedirs(tp_gnb_unknown_dir, exist_ok=True)
+
     os.makedirs(tp_gnodeb_ssbpost_dir, exist_ok=True)
     os.makedirs(tp_gnodeb_unknown_dir, exist_ok=True)
 
@@ -483,6 +499,8 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
 
     # -----------------------------
     # ExternalNRCellCU - SSB-Post / Unknown
+    # - Export to two subfolders inside ExternalNRCellCU
+    # - If a NodeId has both targets, grouping is done within each filtered subset
     # -----------------------------
     generated += _export_grouped_commands_from_sheet(
         audit_excel=audit_post_excel,
@@ -505,6 +523,8 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
 
     # -----------------------------
     # ExternalGUtranCell - SSB-Post / Unknown
+    # - Export to two subfolders inside ExternalGUtranCell
+    # - If a NodeId has both targets, grouping is done within each filtered subset
     # -----------------------------
     generated += _export_grouped_commands_from_sheet(
         audit_excel=audit_post_excel,
@@ -550,15 +570,26 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
     )
 
     # -----------------------------
-    # TermPointToGNB
+    # TermPointToGNB - SSBPost / Unknown (same behavior as ExternalGUtranCell)
+    # - Export to two subfolders inside TermPointToGNB
+    # - If a NodeId has both targets, grouping is done within each filtered subset
     # -----------------------------
     generated += _export_grouped_commands_from_sheet(
         audit_excel=audit_post_excel,
         sheet_name="TermPointToGNB",
-        output_dir=tp_gnb_dir,
+        output_dir=tp_gnb_ssbpost_dir,
         command_column="Correction_Cmd",
-        filename_suffix="TermPointToGNB",
-    )
+        filter_column="GNodeB_SSB_Target",
+        filter_values=["SSB-Post"],
+        filename_suffix="TermPointToGNB")
+    generated += _export_grouped_commands_from_sheet(
+        audit_excel=audit_post_excel,
+        sheet_name="TermPointToGNB",
+        output_dir=tp_gnb_unknown_dir,
+        command_column="Correction_Cmd",
+        filter_column="GNodeB_SSB_Target",
+        filter_values=["Unknown", "Unkwnow"],
+        filename_suffix="TermPointToGNB")
 
     if generated:
         print(f"[Correction Commands] Generated {generated} extra Correction_Cmd files from POST Configuration Audit in: '{pretty_path(base_dir)}'")

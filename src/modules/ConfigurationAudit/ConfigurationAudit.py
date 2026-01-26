@@ -297,6 +297,52 @@ class ConfigurationAudit:
                 table_entries.sort(key=entry_sort_key)
 
             # =====================================================================
+            #           PHASE 2.1: Merge repeated MO tables into one sheet
+            # =====================================================================
+            with log_phase_timer("PHASE 2.1: Merge repeated MO tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+                merged_entries: List[Dict[str, object]] = []
+                by_mo: Dict[str, Dict[str, object]] = {}
+
+                for entry in table_entries:
+                    mo_name = str(entry.get("sheet_candidate", "")).strip()
+                    if not mo_name:
+                        merged_entries.append(entry)
+                        continue
+
+                    if mo_name not in by_mo:
+                        entry["log_files"] = [str(entry.get("log_file", "")).strip()]
+                        entry["notes_list"] = [str(entry.get("note", "")).strip()] if str(entry.get("note", "")).strip() else []
+                        by_mo[mo_name] = entry
+                        merged_entries.append(entry)
+                        continue
+
+                    base = by_mo[mo_name]
+                    base_df = base.get("df", pd.DataFrame())
+                    new_df = entry.get("df", pd.DataFrame())
+
+                    try:
+                        base["df"] = pd.concat([base_df, new_df], ignore_index=True, sort=False)
+                    except Exception:
+                        base["df"] = base_df
+
+                    lf = str(entry.get("log_file", "")).strip()
+                    if lf:
+                        base.setdefault("log_files", [])
+                        base["log_files"].append(lf)
+
+                    note = str(entry.get("note", "")).strip()
+                    if note:
+                        base.setdefault("notes_list", [])
+                        if note not in base["notes_list"]:
+                            base["notes_list"].append(note)
+
+                    base["note"] = " | ".join([n for n in base.get("notes_list", []) if n])
+                    base["tables_in_log"] = max(int(base.get("tables_in_log", 0)), int(entry.get("tables_in_log", 0)))
+
+                table_entries = merged_entries
+
+
+            # =====================================================================
             #                PHASE 3: Assign unique sheet names
             # =====================================================================
             with log_phase_timer("PHASE 3: Assign unique sheet names", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
@@ -336,13 +382,15 @@ class ConfigurationAudit:
                     df: pd.DataFrame = entry["df"]
                     summary_rows.append(
                         {
-                            "File": entry["log_file"],
+                            # "File": entry["log_file"],
+                            "File": ", ".join(entry.get("log_files", [entry["log_file"]])),
                             "Sheet": entry["final_sheet"],
                             "Rows": int(len(df)),
                             "Columns": int(df.shape[1]),
                             "Separator": separator_str,
                             "Encoding": encoding_str,
-                            "LogFile": entry["log_file"],
+                            # "LogFile": entry["log_file"],
+                            "LogFile": ", ".join(entry.get("log_files", [entry["log_file"]])),
                             "LogPath": pretty_path(input_dir),
                             "TablesInLog": entry["tables_in_log"],
                         }
@@ -740,9 +788,9 @@ class ConfigurationAudit:
             _log_info(f"Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")
 
             # =====================================================================
-            #                PHASE 5.8: Export Correction Commands (ConfigurationAudit)
+            #                PHASE 6: Export Correction Commands (ConfigurationAudit)
             # =====================================================================
-            with log_phase_timer("PHASE 5.8: Export Correction Commands", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 6: Export Correction Commands", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 correction_cmd_sources = {}
                 if df_nr_cell_rel is not None and not df_nr_cell_rel.empty:
                     correction_cmd_sources["NR_disc"] = df_nr_cell_rel
@@ -754,9 +802,9 @@ class ConfigurationAudit:
 
 
             # =====================================================================
-            #                PHASE 6: Generate PPT textual summary
+            #                PHASE 7: Generate PPT textual summary
             # =====================================================================
-            with log_phase_timer("PHASE 6: Generate PPT summary", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 7: Generate PPT summary", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 try:
                     ppt_path = generate_ppt_summary(summary_audit_df, excel_path, module_name)
                     if ppt_path:
