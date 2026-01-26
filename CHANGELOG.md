@@ -44,7 +44,7 @@
 ---
 
 ## Release: v0.5.7
-- ### Release Date: 2026-01-26
+- ### Release Date: 2026-01-23
 
 - ### Main Changes:
   
@@ -55,12 +55,12 @@
   - #### 🚀 Enhancements:
 
   - #### 🐛 Bug fixes:
-   - Fixed duplicates entries in Excel sheets of `ConfigurationAudit` module when one MO is splitted in different log files. Now the tool merge all the logs files and creates only one sheet per MO.
-   - Fixed bug in `is_n77_from_string()` function causing bad parsing of values like `653952-30-20-0-1`, `auto_647328`etc...
-   - Fixed re-injection of `GUtranSyncSignalFrequency` MO in `ConfigurationAudit` module. Previously the MO re-injected was `GUSyncSignalFrequency` which does not exist.
-   - Fixed potential bug closing Excel file twice in `ConfigurationAudit` module.
-   - Fixed potential bug in `n77b_ssb_arfcn` field from Class `ConfigurationAudit` that may cause the constructor fail.
-   - Minor bug fixing.
+    - Fixed duplicates entries in Excel sheets of `ConfigurationAudit` module when one MO is splitted in different log files. Now the tool merge all the logs files and creates only one sheet per MO.
+    - Fixed bug in `is_n77_from_string()` function causing bad parsing of values like `653952-30-20-0-1`, `auto_647328`etc...
+    - Fixed re-injection of `GUtranSyncSignalFrequency` MO in `ConfigurationAudit` module. Previously the MO re-injected was `GUSyncSignalFrequency` which does not exist.
+    - Fixed potential bug closing Excel file twice in `ConfigurationAudit` module.
+    - Fixed potential bug in `n77b_ssb_arfcn` field from Class `ConfigurationAudit` that may cause the constructor fail.
+    - Minor bug fixing.
     
   - #### 📚 Documentation: 
     - Updated documentation with latest changes.
