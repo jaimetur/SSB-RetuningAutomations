@@ -216,6 +216,8 @@ class ConfigurationAudit:
             # =====================================================================
             #                PHASE 1: Parse all log/txt files
             # =====================================================================
+            _log_info("PHASE 1: Parse all log/txt files (this phase can take somm time)...")
+
             with log_phase_timer("PHASE 1: Parse all log/txt files", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 for i, path in enumerate(log_files, start=1):
                     file_start = time.perf_counter()
@@ -367,9 +369,13 @@ class ConfigurationAudit:
                 }
 
             # =====================================================================
-            #                PHASE 4: Build the Summary sheet
+            #                PHASE 4: SummaryAudit
             # =====================================================================
-            with log_phase_timer("PHASE 4: Build Summary rows", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            _log_info(f"PHASE 4: SummaryAudit (this phase can take somm time)...")
+            # =====================================================================
+            #                PHASE 4.1: Build SummaryAudit sheet
+            # =====================================================================
+            with log_phase_timer("PHASE 4.1: Build Summary rows", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 summary_rows: List[Dict[str, object]] = []
                 for entry in table_entries:
                     note = str(entry.get("note", ""))
@@ -412,9 +418,9 @@ class ConfigurationAudit:
                     )
 
             # =====================================================================
-            #        PHASE 4.1: Prepare pivot tables for extra summary sheets
+            #        PHASE 4.2: Prepare pivot tables for extra summary sheets
             # =====================================================================
-            with log_phase_timer("PHASE 4.1: Prepare pivot tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 4.2: Prepare pivot tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 # Local Helper to add columns LowMidBand/mmWave to Summary NR_CellDU
                 def add_lowmid_mmwave_to_nr_celldu(pivot_df: pd.DataFrame) -> pd.DataFrame:
                     """
@@ -560,9 +566,10 @@ class ConfigurationAudit:
                         profiles_tables[table_name] = concat_or_empty(mo_collectors.get(table_name, []))
 
             # =====================================================================
-            #                PHASE 4.2: Build SummaryAudit
+            #                PHASE 4.3: Build SummaryAudit
             # =====================================================================
-            with log_phase_timer("PHASE 4.2: Build SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 4.3: Build SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+                _log_info(f"PHASE 4.3: Build SummaryAudit (this phase can take somm time)...")
                 summary_audit_df, param_mismatch_nr_df, param_mismatch_gu_df = build_summary_audit(
                     df_nr_cell_du=df_nr_cell_du,
                     df_nr_freq=df_nr_freq,
@@ -601,7 +608,7 @@ class ConfigurationAudit:
             # ------------------------------------------------------------------
             # Re-inject modified audit tables back into table_entries
             # ------------------------------------------------------------------
-            with log_phase_timer("PHASE 4.3: Re-inject modified tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
+            with log_phase_timer("PHASE 4.4: Re-inject modified tables", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 reinject_map = {
                     "NRCellDU": df_nr_cell_du,
                     "NRFrequency": df_nr_freq,
@@ -774,17 +781,10 @@ class ConfigurationAudit:
                                             cell.font = Font(color="0563C1", underline="single")
 
                         # ------------------------------------------------------------------
-                        # PHASE 5.5: CLOSE / FINALIZE workbook (THIS IS THE LIKELY 7 min)
+                        # PHASE 5.5: CLOSE / FINALIZE workbook
                         # ------------------------------------------------------------------
-                        _log_info("PHASE 5.5: ExcelWriter CLOSE starting (finalize workbook / write zip parts)...")
+                        _log_info("PHASE 5.5: ExcelWriter CLOSE starting (this phase can take somm time)...")
                         t_close0 = time.perf_counter()
-
-                        # Optional: force a GC before close to reduce memory spikes / pauses
-                        # (Leave enabled only for diagnosis; keep disabled if no benefit)
-                        # import gc
-                        # t_gc0 = time.perf_counter()
-                        # gc.collect()
-                        # _log_info(f"PHASE 5.X: gc.collect() took {time.perf_counter() - t_gc0:.3f}s")
 
                         writer.close()  # <-- this is where openpyxl can take minutes
                         writer_closed = True
