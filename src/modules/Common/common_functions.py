@@ -12,6 +12,7 @@ from src.utils.utils_io import to_long_path
 def load_nodes_names_and_id_from_summary_audit(
     audit_excel: Optional[object],
     stage: Optional[str] = "Pre",
+    print_lists: Optional[bool] = False,
     module_name: Optional[str] = "",
 ) -> tuple[set[str], set[str]]:
     """
@@ -118,8 +119,9 @@ def load_nodes_names_and_id_from_summary_audit(
             if m:
                 nodes_id.add(m.group(1))
 
-    print(f"{module_name} [INFO] Nodes with {stage}-SSB (complete node names): {sorted(nodes_names)}")
-    print(f"{module_name} [INFO] Nodes with {stage}-SSB (numeric identifiers): {sorted(nodes_id)}")
+    if print_lists:
+        print(f"{module_name} [INFO] Nodes with {stage}-SSB (complete node names): {sorted(nodes_names)}")
+        print(f"{module_name} [INFO] Nodes with {stage}-SSB (numeric identifiers): {sorted(nodes_id)}")
 
     return nodes_id, nodes_names
 
