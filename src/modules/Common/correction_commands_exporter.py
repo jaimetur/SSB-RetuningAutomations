@@ -728,6 +728,6 @@ def export_all_sheets_with_correction_cmd(audit_post_excel: str, output_dir: str
 
             total_files += 1
 
-    print(f"[Correction Commands] Generated {total_files} sheet-based Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+    print(f"[Correction Commands] Generated {total_files} others sheet-based Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
     return total_files
 
