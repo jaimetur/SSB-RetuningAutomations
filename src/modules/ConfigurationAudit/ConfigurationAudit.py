@@ -816,7 +816,9 @@ class ConfigurationAudit:
                 finally:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
 
-            _log_info(f"Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")
+            t_close2 = time.perf_counter()
+            _log_info(f"PHASE 5: Wrote Excel with {len(table_entries)} sheet(s) in {format_duration_hms(t_close2 - t_open0)} ({t_close2 - t_open0:.3f}s)")
+            _log_info(f"PHASE 5: Wrote Excel with {len(table_entries)} sheet(s) in: '{pretty_path(excel_path)}'")
 
             # =====================================================================
             #                PHASE 6: Export Correction Commands (ConfigurationAudit)
@@ -848,6 +850,6 @@ class ConfigurationAudit:
 
             overall_elapsed = time.perf_counter() - overall_start
             if show_phase_timings:
-                _log_info(f"TOTAL ConfigurationAudit.run took {overall_elapsed:.3f}s")
+                _log_info(f"TOTAL ConfigurationAudit.run took {format_duration_hms(overall_elapsed)} ({overall_elapsed:.3f}s)")
 
         return excel_path
