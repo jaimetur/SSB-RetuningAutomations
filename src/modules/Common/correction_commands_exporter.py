@@ -548,49 +548,49 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
         if not (isinstance(sheet_dfs, dict) and sheet_dfs) and (not audit_post_excel or not os.path.isfile(audit_post_excel)):
             return 0
 
-        generated = 0
+        total_files = 0
 
         # -----------------------------
         # ExternalNRCellCU - SSB-Post / Unknown
         # - Export to two subfolders inside ExternalNRCellCU
         # - If a NodeId has both targets, grouping is done within each filtered subset
         # -----------------------------
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalNRCellCU")
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalNRCellCU")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalNRCellCU")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalNRCellCU")
 
         # -----------------------------
         # ExternalGUtranCell - SSB-Post / Unknown
         # - Export to two subfolders inside ExternalGUtranCell
         # - If a NodeId has both targets, grouping is done within each filtered subset
         # -----------------------------
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalGUtranCell")
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalGUtranCell")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalGUtranCell")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalGUtranCell")
 
         # -----------------------------
         # TermPointToGNodeB - SSB-Post / Unknown  (Bullets 2 & 3 from new requirements slide)
         # - Bullet 2: export to two subfolders
         # - Bullet 3: if a NodeId has both targets, grouping is done within each filtered subset
         # -----------------------------
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNodeB")
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNodeB")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNodeB")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNodeB")
 
         # -----------------------------
         # TermPointToGNB - SSBPost / Unknown (same behavior as ExternalGUtranCell)
         # - Export to two subfolders inside TermPointToGNB
         # - If a NodeId has both targets, grouping is done within each filtered subset
         # -----------------------------
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNB")
-        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNB")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNB")
+        total_files += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNB")
 
-        if generated >0:
+        if total_files >0:
             if export_to_zip and zip_file is not None:
-                print(f"[Correction Commands] Generated {generated} Termpoints/Externals Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path or '')}'")
+                print(f"[Correction Commands] Generated {total_files} Termpoints/Externals Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path or '')}'")
             else:
-                print(f"[Correction Commands] Generated {generated} Termpoints/Externals Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+                print(f"[Correction Commands] Generated {total_files} Termpoints/Externals Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
         else:
             print(f"[Correction Commands] No Termpoints/Externals Correction_Cmd files generated from Configuration Audit.")
 
-        return generated
+        return total_files
 
     finally:
         try:
@@ -717,6 +717,16 @@ def export_all_sheets_with_correction_cmd(audit_post_excel: str, output_dir: str
 
                 total_files += 1
 
+        if total_files>0:
+            if export_to_zip and zip_path:
+                print(f"[Correction Commands] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path)}'")
+            else:
+                print(f"[Correction Commands] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+        else:
+            print(f"[Correction Commands] No Other_MOs (sheet-based) Correction_Cmd files generated from Configuration Audit.")
+
+        return total_files
+
     finally:
         try:
             if zip_file is not None:
@@ -724,15 +734,7 @@ def export_all_sheets_with_correction_cmd(audit_post_excel: str, output_dir: str
         except Exception:
             pass
 
-    if total_files>0:
-        if export_to_zip and zip_path:
-            print(f"[Correction Commands] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path)}'")
-        else:
-            print(f"[Correction Commands] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
-    else:
-        print(f"[Correction Commands] No Other_MOs (sheet-based) Correction_Cmd files generated from Configuration Audit.")
 
-    return total_files
 
 
 
