@@ -832,7 +832,7 @@ class ConfigurationAudit:
                     export_all_sheets_with_correction_cmd(excel_path_long, base_output_dir_long, base_folder_name=correction_cmd_folder_name, sheet_dfs=sheet_dfs_map, export_to_zip=True,
                                                           exclude_sheets={"Summary", "SummaryAudit", "Summary Param Mismatch NR", "Summary Param Mismatch GU", "ExternalNRCellCU", "ExternalGUtranCell", "TermPointToGNodeB", "TermPointToGNB"})
             else:
-                _log_info("PHASE 6: Export Correction Commands skipped (export_correction_cmd=False).")
+                _log_info("PHASE 6: Export Correction Commands skipped (export_correction_cmd=False or is a Pre-Audit).")
 
             # =====================================================================
             #                PHASE 7: Generate PPT textual summary
