@@ -216,7 +216,7 @@ class ConfigurationAudit:
             # =====================================================================
             #                PHASE 1: Parse all log/txt files
             # =====================================================================
-            _log_info("PHASE 1: Parse all log/txt files (this phase can take somm time)...")
+            _log_info("PHASE 1: Parse all log/txt files (this phase can take some time)...")
 
             with log_phase_timer("PHASE 1: Parse all log/txt files", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                 for i, path in enumerate(log_files, start=1):
@@ -371,7 +371,7 @@ class ConfigurationAudit:
             # =====================================================================
             #                PHASE 4: SummaryAudit
             # =====================================================================
-            _log_info(f"PHASE 4: SummaryAudit (this phase can take somm time)...")
+            _log_info(f"PHASE 4: SummaryAudit (this phase can take some time)...")
             # =====================================================================
             #                PHASE 4.1: Build SummaryAudit sheet
             # =====================================================================
@@ -569,7 +569,7 @@ class ConfigurationAudit:
             #                PHASE 4.3: Build SummaryAudit
             # =====================================================================
             with log_phase_timer("PHASE 4.3: Build SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
-                _log_info(f"PHASE 4.3: Build SummaryAudit (this phase can take somm time)...")
+                _log_info(f"PHASE 4.3: Build SummaryAudit (this phase can take some time)...")
                 summary_audit_df, param_mismatch_nr_df, param_mismatch_gu_df = build_summary_audit(
                     df_nr_cell_du=df_nr_cell_du,
                     df_nr_freq=df_nr_freq,
@@ -783,7 +783,7 @@ class ConfigurationAudit:
                         # ------------------------------------------------------------------
                         # PHASE 5.5: CLOSE / FINALIZE workbook
                         # ------------------------------------------------------------------
-                        _log_info("PHASE 5.5: ExcelWriter CLOSE starting (this phase can take somm time)...")
+                        _log_info("PHASE 5.5: ExcelWriter CLOSE starting (this phase can take some time)...")
                         t_close0 = time.perf_counter()
 
                         writer.close()  # <-- this is where openpyxl can take minutes
