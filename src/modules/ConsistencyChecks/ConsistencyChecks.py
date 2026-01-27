@@ -425,7 +425,14 @@ class ConsistencyChecks:
                             ext_cell_series = ref_series.map(lambda v: _extract_kv_from_ref(v, "ExternalGUtranCell"))
                             gnodeb_target_series = ext_gnb_series.map(_detect_gnodeb_target)
 
+            # Exclude frequency-only mismatches for relations whose destination is still SSB-Pre (no retuning)
+            try:
+                freq_rule_mask = freq_rule_mask & (gnodeb_target_series.astype(str).str.strip() != "SSB-Pre")
+            except Exception:
+                pass
+
             combined_mask = (freq_rule_mask | any_diff_mask).reindex(pre_common.index, fill_value=False)
+
             discrepancy_keys = [k for k, m in zip(pre_common.index, combined_mask) if m and k in set(common_idx)]
 
             # Build discrepancies
@@ -582,7 +589,7 @@ class ConsistencyChecks:
                     "Freq_Post": post_freq_base.reindex(pre_common.index).fillna("").replace("", "<empty>"),
                     "ParamDiff": any_diff_mask.reindex(pre_common.index).astype(bool),
                     "FreqDiff": freq_diff_series,
-                    "FreqDiff_SSBPost": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() != "Unknown"),
+                    "FreqDiff_SSBPost": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() == "SSB-Post"),
                     "FreqDiff_Unknown": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() == "Unknown"),
                 },
                 index=pre_common.index,
@@ -661,7 +668,24 @@ class ConsistencyChecks:
 
             print(f"\n{module_name} === {table_name} ===")
             print(f"{module_name} Key: {key_cols} | Freq column: {freq_col}")
+
+            freq_disc_count = 0
+            param_disc_count = 0
+            try:
+                if not pair_stats.empty:
+                    if "ParamDiff" in pair_stats.columns:
+                        param_disc_count = int(pd.to_numeric(pair_stats["ParamDiff"], errors="coerce").fillna(0).astype(int).sum())
+                    if "FreqDiff_SSBPost" in pair_stats.columns and "FreqDiff_Unknown" in pair_stats.columns:
+                        freq_disc_count = int(pd.to_numeric(pair_stats["FreqDiff_SSBPost"], errors="coerce").fillna(0).astype(int).sum() + pd.to_numeric(pair_stats["FreqDiff_Unknown"], errors="coerce").fillna(0).astype(int).sum())
+                    elif "FreqDiff" in pair_stats.columns:
+                        freq_disc_count = int(pd.to_numeric(pair_stats["FreqDiff"], errors="coerce").fillna(0).astype(int).sum())
+            except Exception:
+                freq_disc_count = 0
+                param_disc_count = 0
+
             print(f"{module_name} - Discrepancies: {len(discrepancies)}")
+            print(f"{module_name}   - Param Discrepancies: {param_disc_count}")
+            print(f"{module_name}   - Frequency Discrepancies: {freq_disc_count}")
             print(f"{module_name} - New Relations in Post: {len(new_in_post_clean)}")
             print(f"{module_name} - Missing Relations in Post: {len(missing_in_post_clean)}")
 
@@ -670,10 +694,9 @@ class ConsistencyChecks:
                 to_skip_relations = rel_series[rel_series.str.contains(pattern_nodes, regex=True, na=False)]
                 if not to_skip_relations.empty:
                     skipped_count = len(to_skip_relations)
-                    print(
-                        f"{module_name} - Relations skipped due to destination node being in the no-retuning buffer ({table_name}): "
-                        f"{skipped_count} -> {sorted(to_skip_relations.unique())}"
-                    )
+                    print(f"{module_name} - Relations skipped due to destination node being in the no-retuning buffer ({table_name}): {skipped_count} ")
+                    # Below line show the list of all skipped relations (it can be huge, better keep below line commented).
+                    # print(f"{module_name} - Relations skipped List: {sorted(to_skip_relations.unique())}")
 
         return results
 
@@ -769,6 +792,21 @@ class ConsistencyChecks:
             )
 
         print("[Consistency Checks] Using PRE and POST ConfigurationAudit SummaryAudit sheets for SummaryAuditComparisson.")
+
+        # Add numeric difference column at the end: Value_Pre - Value_Post
+        try:
+            vpre = pd.to_numeric(merged.get("Value_Pre"), errors="coerce")
+            vpost = pd.to_numeric(merged.get("Value_Post"), errors="coerce")
+            merged["Value_Diff"] = vpre - vpost
+        except Exception:
+            merged["Value_Diff"] = pd.NA
+
+        try:
+            cols = [c for c in merged.columns if c != "Value_Diff"] + ["Value_Diff"]
+            merged = merged[cols]
+        except Exception:
+            pass
+
         return merged
 
     # ----------------------------- OUTPUT TO EXCEL ----------------------------- #
@@ -812,8 +850,9 @@ class ConsistencyChecks:
                     meta = bucket.get("meta", {})
                     pair_stats = bucket.get("pair_stats", pd.DataFrame())
                     params_disc = int(pair_stats["ParamDiff"].sum()) if not pair_stats.empty else 0
-                    freq_disc = int(pair_stats["FreqDiff_SSBPost"].sum()) if not pair_stats.empty and "FreqDiff_SSBPost" in pair_stats.columns else (int(pair_stats["FreqDiff"].sum()) if not pair_stats.empty else 0)
                     ssb_unknown = int(pair_stats["FreqDiff_Unknown"].sum()) if not pair_stats.empty and "FreqDiff_Unknown" in pair_stats.columns else 0
+                    freq_post = int(pair_stats["FreqDiff_SSBPost"].sum()) if not pair_stats.empty and "FreqDiff_SSBPost" in pair_stats.columns else (int(pair_stats["FreqDiff"].sum()) if not pair_stats.empty else 0)
+                    freq_disc = int(freq_post + ssb_unknown)
 
                     summary_rows.append({
                         "Table": name,
@@ -877,8 +916,9 @@ class ConsistencyChecks:
                     if not pair_stats.empty:
                         grp = pair_stats.groupby(["Freq_Pre", "Freq_Post"], dropna=False)
                         params_by_pair = grp["ParamDiff"].sum().astype(int).to_dict()
-                        freq_by_pair = (grp["FreqDiff_SSBPost"].sum().astype(int).to_dict() if "FreqDiff_SSBPost" in pair_stats.columns else grp["FreqDiff"].sum().astype(int).to_dict())
+                        freq_post_by_pair = (grp["FreqDiff_SSBPost"].sum().astype(int).to_dict() if "FreqDiff_SSBPost" in pair_stats.columns else grp["FreqDiff"].sum().astype(int).to_dict())
                         unknown_by_pair = (grp["FreqDiff_Unknown"].sum().astype(int).to_dict() if "FreqDiff_Unknown" in pair_stats.columns else {})
+                        freq_by_pair = {k: int(freq_post_by_pair.get(k, 0)) + int(unknown_by_pair.get(k, 0)) for k in set(freq_post_by_pair) | set(unknown_by_pair)}
 
                         pairs_present = set(grp.size().index.tolist())
                     else:
@@ -941,22 +981,35 @@ class ConsistencyChecks:
                 gu_missing_df = enforce_gu_columns(b.get("missing_in_post"))
                 gu_new_df = enforce_gu_columns(b.get("new_in_post"))
 
+                freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                if "DiffColumns" in gu_disc_df.columns:
+                    mask_freq_only = gu_disc_df["DiffColumns"].astype(str).str.strip().eq(freq_only_text)
+                else:
+                    mask_freq_only = pd.Series(False, index=gu_disc_df.index)
+
+                gu_freq_disc_df = gu_disc_df[mask_freq_only].copy()
+                gu_param_disc_df = gu_disc_df[~mask_freq_only].copy()
+
                 # Build correction commands using external helpers (relations as main source)
                 gu_new_df = build_correction_command_gu_new_relations(gu_new_df, gu_rel_df)
                 gu_missing_df = build_correction_command_gu_missing_relations(gu_missing_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
-                gu_disc_cmd_df = build_correction_command_gu_discrepancies(gu_disc_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                gu_freq_disc_cmd_df = build_correction_command_gu_discrepancies(gu_freq_disc_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                gu_param_disc_cmd_df = build_correction_command_gu_discrepancies(gu_param_disc_df, gu_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
 
                 correction_cmd_sources["GU_missing"] = gu_missing_df
                 correction_cmd_sources["GU_new"] = gu_new_df
-                correction_cmd_sources["GU_disc"] = gu_disc_cmd_df
+                correction_cmd_sources["GU_freq_disc"] = gu_freq_disc_cmd_df
+                correction_cmd_sources["GU_param_disc"] = gu_param_disc_cmd_df
 
                 gu_rel_df.to_excel(writer, sheet_name="GU_relations", index=False)
-                gu_disc_cmd_df.to_excel(writer, sheet_name="GU_disc", index=False)
+                gu_param_disc_cmd_df.to_excel(writer, sheet_name="GU_param_disc", index=False)
+                gu_freq_disc_cmd_df.to_excel(writer, sheet_name="GU_freq_disc", index=False)
                 gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
-                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_disc", index=False)
+                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_param_disc", index=False)
+                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_freq_disc", index=False)
                 empty_gu_missing_df = build_correction_command_gu_missing_relations(enforce_gu_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
                 empty_gu_new_df = build_correction_command_gu_new_relations(enforce_gu_columns(pd.DataFrame()), None)
                 empty_gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
@@ -970,21 +1023,34 @@ class ConsistencyChecks:
                 nr_missing_df = enforce_nr_columns(b.get("missing_in_post"))
                 nr_new_df = enforce_nr_columns(b.get("new_in_post"))
 
+                freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                if "DiffColumns" in nr_disc_df.columns:
+                    mask_freq_only = nr_disc_df["DiffColumns"].astype(str).str.strip().eq(freq_only_text)
+                else:
+                    mask_freq_only = pd.Series(False, index=nr_disc_df.index)
+
+                nr_freq_disc_df = nr_disc_df[mask_freq_only].copy()
+                nr_param_disc_df = nr_disc_df[~mask_freq_only].copy()
+
                 nr_new_df = build_correction_command_nr_new_relations(nr_new_df, nr_rel_df)
                 nr_missing_df = build_correction_command_nr_missing_relations(nr_missing_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
-                nr_disc_cmd_df = build_correction_command_nr_discrepancies(nr_disc_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                nr_freq_disc_cmd_df = build_correction_command_nr_discrepancies(nr_freq_disc_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
+                nr_param_disc_cmd_df = build_correction_command_nr_discrepancies(nr_param_disc_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
 
                 correction_cmd_sources["NR_missing"] = nr_missing_df
                 correction_cmd_sources["NR_new"] = nr_new_df
-                correction_cmd_sources["NR_disc"] = nr_disc_cmd_df
+                correction_cmd_sources["NR_freq_disc"] = nr_freq_disc_cmd_df
+                correction_cmd_sources["NR_param_disc"] = nr_param_disc_cmd_df
 
                 nr_rel_df.to_excel(writer, sheet_name="NR_relations", index=False)
-                nr_disc_cmd_df.to_excel(writer, sheet_name="NR_disc", index=False)
+                nr_param_disc_cmd_df.to_excel(writer, sheet_name="NR_param_disc", index=False)
+                nr_freq_disc_cmd_df.to_excel(writer, sheet_name="NR_freq_disc", index=False)
                 nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
-                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_disc", index=False)
+                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_param_disc", index=False)
+                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_freq_disc", index=False)
                 empty_nr_missing_df = build_correction_command_nr_missing_relations(enforce_nr_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
                 empty_nr_new_df = build_correction_command_nr_new_relations(enforce_nr_columns(pd.DataFrame()), None)
                 empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
@@ -1007,4 +1073,19 @@ class ConsistencyChecks:
             ws_comp = writer.sheets.get("SummaryAuditComparisson")
             if ws_comp is not None:
                 apply_alternating_category_row_fills(ws_comp, value_header="Value_Post")
+
+            # Add a backlink in A1 of every sheet to Summary_CellRelation (main tab)
+            try:
+                for ws_name, ws in writer.sheets.items():
+                    if ws_name == "Summary_CellRelation":
+                        continue
+                    cell = ws["A1"]
+                    cell.hyperlink = "#'Summary_CellRelation'!A1"
+                    try:
+                        cell.font = cell.font.copy(color="0000FF", underline="single")
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
 

@@ -17,7 +17,8 @@
 
   - #### 🌟 New Features:
     - Merge Excel sheets for the same MO instead add (1), (2)… in 'ConfigurationAudit' module.
-    - Added a hyperlink in cell A1 on every sheet to jump back to SummaryAudit.
+    - Added a hyperlink in cell A1 on every sheet from `ConfigurationAudit` Excel to jump back to `SummaryAudit`.
+    - Added a hyperlink in cell A1 on every sheet from `ConsistencyCheck` Excel to jump back to `Summary_CellRelation`.
     - Now the execution log is also available in output folder for an easier way to identify which log belong to each execution.
 
   - #### 🚀 Enhancements:
@@ -29,6 +30,9 @@
       - Stop exporting External/Termpoints from ConsistencyChecks (to prevent duplicates). External/Termpoints moved to ConfigurationAudit export. 
       - Avoid to execute `ConfigurationAudit` module if any previous Configuration Audit have been found on the selected folder (applies for both, PRE and POST folders).
       - If no previous Configuration Audit is found on input folders, then execute it but pass the dataframe generated in memory to `ConsistencyCheck` module instead of forze it to read the Excel file from disk (slow). 
+      - `SummaryAuditComparisson` sheet now includes a new column `diff` with the difference between `Value_Pre`and `Value_Post` columns.
+      - `Summary_CellRelation` now distinguish between `Param_Discrepancies` and `Frequency_Discrepancies` and `SSB-Unknown`(those relations with Freq_Pre=Freq_Post but nodes not found in retuned list).
+      - Now sheets GU_disc and NR_disc are divided into two sheets called GU_param_disc/GU_freq_disc for GU and NR_param_disc/NR_freq_disc for NR to distinguish between Param/Frequency discrepancies.
     - ConfigurationAudit module:
       - ConfigurationAudit must keep using the normal export folder (`Correction_Cmd`). 
       - Avoid printing “Consistency Checks …” messages when the export is executed by ConfigurationAudit. 
@@ -74,7 +78,7 @@
   - #### 🚀 Enhancements:
 
   - #### 🐛 Bug fixes:
-    - Fixed duplicates entries in Excel sheets of `ConfigurationAudit` module when one MO is splitted in different log files. Now the tool merge all the logs files and creates only one sheet per MO.
+    - Fixed duplicates entries in Excel sheets of `ConfigurationAudit` module when one MO is separated in different log files. Now the tool merge all the logs files and creates only one sheet per MO.
     - Fixed bug in `is_n77_from_string()` function causing bad parsing of values like `653952-30-20-0-1`, `auto_647328`etc...
     - Fixed re-injection of `GUtranSyncSignalFrequency` MO in `ConfigurationAudit` module. Previously the MO re-injected was `GUSyncSignalFrequency` which does not exist.
     - Fixed potential bug closing Excel file twice in `ConfigurationAudit` module.

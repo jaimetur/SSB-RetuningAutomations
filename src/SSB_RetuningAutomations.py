@@ -1101,7 +1101,8 @@ def run_consistency_checks(
     def main_logic(market_pairs: Dict[str, Tuple[str, str]]) -> None:
         # ----------------------------- SHARED PER-MARKET EXECUTION ----------------------------- #
         for market_label, (pre_dir, post_dir) in sorted(market_pairs.items()):
-            market_tag = f"[Market: {market_label}]" if market_label != "GLOBAL" else ""
+            # market_tag = f"[Market: {market_label}]" if market_label != "GLOBAL" else ""
+            market_tag = f"[Market: {market_label}]"
             print(f"\n{module_name} [INFO] Processing Market: {market_label}")
             print("=" * 80)
             print(f"{module_name} {market_tag} [INFO] Processing PRE/POST pair:")
@@ -1290,6 +1291,7 @@ def run_consistency_checks(
                 print("-" * 80)
 
                 # --- Run ConsistencyChecks for this market ---
+                print(f"{module_name} {market_tag} [INFO] Running ConsistencyCheck for this market...")
                 try:
                     app = ConsistencyChecks(n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, freq_filter_list=cc_filter_list)
                 except TypeError:
