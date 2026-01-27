@@ -35,7 +35,10 @@
       - In ConfigurationAudit, `GUtranCellRelation` must generate Correction_Cmd ONLY based on frequency, using the SAME logic as GU_disc in ConsistencyChecks.
       - ConfigurationAudit must export ALL commands that do NOT require 2 audits, into Correction_Cmd/ (not _CC):
         - All MOs where a column `Correction_Cmd` is found in the Excel sheet will be exported as text file command.
-        - External/Termpoints commands (they already come from the single Audit Excel)
+        - External/Termpoints commands (they already come from the single Audit Excel).
+    - Export Correction Commands:
+      - Enhancements in the way that the Correction_Cmd is loaded (before it was read from final Excel file, now it is read from the dataframe already in memmory).
+      - Correction Commands files are now exported as ZIP files (by default) to reduce latency and avoid to write hundreds of files on disk.
 
   - #### 🐛 Bug fixes:
     - Stopped ConfigurationAudit from creating ConsistencyCheck-only folders (MissingRelations/ NewRelations/ RelationsDiscrepancies) under Correction_Cmd.

@@ -823,11 +823,14 @@ class ConfigurationAudit:
             # =====================================================================
             if export_correction_cmd:
                 with log_phase_timer("PHASE 6: Export Correction Commands", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
-                    # Export External / TermPoint commands (keeps existing folder structure)
-                    export_external_and_termpoint_commands(excel_path_long, base_output_dir_long, base_folder_name=correction_cmd_folder_name)
+                    sheet_dfs_map: dict[str, pd.DataFrame] = {str(e.get("final_sheet", "")).strip(): df for e in table_entries if not bool(e.get("skip_write", False)) and str(e.get("final_sheet", "")).strip() and isinstance((df := e.get("df")), pd.DataFrame)}
+
+                    # Export External / TermPoint commands (use in-memory DataFrames to avoid re-reading XLSX)
+                    export_external_and_termpoint_commands(excel_path_long, base_output_dir_long, base_folder_name=correction_cmd_folder_name, sheet_dfs=sheet_dfs_map, export_to_zip=True)
 
                     # Export any other sheet containing a 'Correction_Cmd' column (NRCellRelation, GUtranCellRelation, etc.)
-                    export_all_sheets_with_correction_cmd(excel_path_long, base_output_dir_long, base_folder_name=correction_cmd_folder_name, exclude_sheets={"Summary", "SummaryAudit", "Summary Param Mismatch NR", "Summary Param Mismatch GU", "ExternalNRCellCU", "ExternalGUtranCell", "TermPointToGNodeB", "TermPointToGNB"})
+                    export_all_sheets_with_correction_cmd(excel_path_long, base_output_dir_long, base_folder_name=correction_cmd_folder_name, sheet_dfs=sheet_dfs_map, export_to_zip=True,
+                                                          exclude_sheets={"Summary", "SummaryAudit", "Summary Param Mismatch NR", "Summary Param Mismatch GU", "ExternalNRCellCU", "ExternalGUtranCell", "TermPointToGNodeB", "TermPointToGNB"})
             else:
                 _log_info("PHASE 6: Export Correction Commands skipped (export_correction_cmd=False).")
 

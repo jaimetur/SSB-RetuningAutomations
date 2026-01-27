@@ -353,7 +353,7 @@ def export_cc_correction_cmd_texts(output_dir: str, dfs_by_category: Dict[str, p
 
 
 # ----------------------------- EXTERNAL/TERMPOINTS COMMANDS ----------------------------- #
-def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: str, base_folder_name: str = "Correction_Cmd") -> int:
+def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: str, base_folder_name: str = "Correction_Cmd", sheet_dfs: Optional[dict[str, pd.DataFrame]] = None, export_to_zip: bool = True) -> int:
     """
     Export correction commands coming from POST Configuration Audit Excel:
       - ExternalNRCellCU (SSB-Post)
@@ -375,140 +375,6 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
       - All 'del ...' commands are moved to the top of each node file.
     """
 
-    try:
-        xl_cached = pd.ExcelFile(audit_post_excel) if audit_post_excel and os.path.isfile(audit_post_excel) else None
-        sheet_map_cached = {s.lower(): s for s in (xl_cached.sheet_names if xl_cached else [])}
-    except Exception:
-        xl_cached = None
-        sheet_map_cached = {}
-
-    def _read_sheet_case_insensitive(audit_excel: str, sheet_name: str) -> Optional[pd.DataFrame]:
-        """
-        Read a sheet using case-insensitive matching. Returns None if not found or on error.
-        Uses a cached ExcelFile to avoid reopening/parsing the XLSX multiple times (major speedup).
-        """
-        if xl_cached is None:
-            return None
-
-        try:
-            real_sheet = sheet_map_cached.get(str(sheet_name).lower())
-            if not real_sheet:
-                return None
-            return xl_cached.parse(real_sheet)
-        except Exception:
-            return None
-
-    def _export_grouped_commands_from_sheet(
-            audit_excel: str,
-            sheet_name: str,
-            output_dir: str,
-            command_column: str = "Correction_Cmd",
-            node_column: str = "NodeId",
-            filter_column: Optional[str] = None,
-            filter_values: Optional[list[str]] = None,
-            filename_suffix: Optional[str] = None,
-    ) -> int:
-        """
-        Export Correction_Cmd grouped by NodeId from a given sheet into output_dir.
-        Returns how many files were generated.
-
-        Behavior:
-          - 'del ...' lines are moved to the top of each node file.
-          - For External* and TermPoint* blocks, we keep per-block order exactly as in Excel,
-            but hoist ONLY the first 3 lines and the last line once per node file.
-            (No special single-instance handling for 'wait' or 'lt all' after wait.)
-        """
-        df = _read_sheet_case_insensitive(audit_excel, sheet_name)
-        if df is None or df.empty:
-            return 0
-
-        # Allow backward compatibility with old column name
-        if command_column not in df.columns and "Correction Command" in df.columns:
-            command_column = "Correction Command"
-
-        if command_column not in df.columns:
-            return 0
-        if node_column not in df.columns:
-            return 0
-
-        # IMPORTANT: if caller requested a filter but column is missing, do not export to avoid mixing targets
-        if filter_column and filter_values is not None and filter_column not in df.columns:
-            return 0
-
-        if filter_column and filter_column in df.columns and filter_values is not None:
-            allowed = {str(v).strip() for v in filter_values}
-            df = df[df[filter_column].astype(str).str.strip().isin(allowed)]
-
-        if df.empty:
-            return 0
-
-        os.makedirs(output_dir, exist_ok=True)
-
-        work = df.copy()
-        work[node_column] = work[node_column].astype(str).str.strip()
-
-        suffix = filename_suffix if filename_suffix else str(sheet_name).strip()
-        generated_files = 0
-
-        for node_id, group in work.groupby(node_column):
-            node_str = str(node_id).strip()
-            if not node_str:
-                continue
-
-            # IMPORTANT: do NOT cast the whole column to str before dropna(), otherwise NaN becomes "nan"
-            raw_series = group[command_column]
-            raw_series = raw_series[raw_series.notna()]
-
-            cmds = (
-                raw_series
-                .astype(str)
-                .map(str.strip)
-                .loc[lambda s: (s != "") & (s.str.lower() != "nan") & (s.str.lower() != "none")]
-                .tolist()
-            )
-
-            if not cmds:
-                continue
-
-            # del first (and keep rest blocks after)
-            ordered_blocks = _reorder_cmds_del_first(cmds)
-            if not ordered_blocks:
-                continue
-
-            del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
-            rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
-
-            # NEW: HOIST only the first 3 lines and the last line ONCE per node
-            merged_rest = _merge_blocks_hoist_header_footer(rest_blocks, header_lines=3, footer_lines=1) if rest_blocks else ""
-
-            pieces: List[str] = []
-            if del_lines:
-                pieces.append("\n".join(del_lines).strip())
-            if merged_rest.strip():
-                pieces.append(merged_rest.strip())
-
-            merged_script = "\n\n".join([p for p in pieces if p.strip()]).strip()
-            if not merged_script:
-                continue
-
-            node_str_safe = _safe_filename_component(node_str, fallback="node")
-            suffix_safe = _safe_filename_component(suffix, fallback="cmd")
-            file_name = f"{node_str_safe}_{suffix_safe}.txt"
-
-            out_path = os.path.join(output_dir, file_name)
-            out_path_long = to_long_path(out_path)
-
-            with open(out_path_long, "w", encoding="utf-8") as f:
-                f.write(merged_script)
-
-            generated_files += 1
-
-        return generated_files
-
-
-    if not audit_post_excel or not os.path.isfile(audit_post_excel):
-        return 0
-
     base_dir = os.path.join(output_dir, base_folder_name)
 
     ext_nr_base = os.path.join(base_dir, "ExternalNRCellCU")
@@ -527,207 +393,340 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
     tp_gnodeb_ssbpost_dir = os.path.join(tp_gnodeb_base, "SSB-Post")
     tp_gnodeb_unknown_dir = os.path.join(tp_gnodeb_base, "Unknown")
 
-    os.makedirs(ext_nr_ssbpost_dir, exist_ok=True)
-    os.makedirs(ext_nr_unknown_dir, exist_ok=True)
-
-    os.makedirs(ext_gu_ssbpost_dir, exist_ok=True)
-    os.makedirs(ext_gu_unknown_dir, exist_ok=True)
-
-    os.makedirs(tp_gnb_ssbpost_dir, exist_ok=True)
-    os.makedirs(tp_gnb_unknown_dir, exist_ok=True)
-
-    os.makedirs(tp_gnodeb_ssbpost_dir, exist_ok=True)
-    os.makedirs(tp_gnodeb_unknown_dir, exist_ok=True)
-
-    generated = 0
-
-    # -----------------------------
-    # ExternalNRCellCU - SSB-Post / Unknown
-    # - Export to two subfolders inside ExternalNRCellCU
-    # - If a NodeId has both targets, grouping is done within each filtered subset
-    # -----------------------------
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="ExternalNRCellCU",
-        output_dir=ext_nr_ssbpost_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["SSB-Post"],
-        filename_suffix="ExternalNRCellCU",
-    )
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="ExternalNRCellCU",
-        output_dir=ext_nr_unknown_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["Unknown", "Unkwnow"],
-        filename_suffix="ExternalNRCellCU",
-    )
-
-    # -----------------------------
-    # ExternalGUtranCell - SSB-Post / Unknown
-    # - Export to two subfolders inside ExternalGUtranCell
-    # - If a NodeId has both targets, grouping is done within each filtered subset
-    # -----------------------------
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="ExternalGUtranCell",
-        output_dir=ext_gu_ssbpost_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["SSB-Post"],
-        filename_suffix="ExternalGUtranCell",
-    )
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="ExternalGUtranCell",
-        output_dir=ext_gu_unknown_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["Unknown", "Unkwnow"],
-        filename_suffix="ExternalGUtranCell",
-    )
-
-    # -----------------------------
-    # TermPointToGNodeB - SSB-Post / Unknown  (Bullets 2 & 3 from new requirements slide)
-    # - Bullet 2: export to two subfolders
-    # - Bullet 3: if a NodeId has both targets, grouping is done within each filtered subset
-    # -----------------------------
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="TermPointToGNodeB",
-        output_dir=tp_gnodeb_ssbpost_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["SSB-Post"],
-        filename_suffix="TermPointToGNodeB",
-    )
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="TermPointToGNodeB",
-        output_dir=tp_gnodeb_unknown_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["Unknown", "Unkwnow"],
-        filename_suffix="TermPointToGNodeB",
-    )
-
-    # -----------------------------
-    # TermPointToGNB - SSBPost / Unknown (same behavior as ExternalGUtranCell)
-    # - Export to two subfolders inside TermPointToGNB
-    # - If a NodeId has both targets, grouping is done within each filtered subset
-    # -----------------------------
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="TermPointToGNB",
-        output_dir=tp_gnb_ssbpost_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["SSB-Post"],
-        filename_suffix="TermPointToGNB")
-    generated += _export_grouped_commands_from_sheet(
-        audit_excel=audit_post_excel,
-        sheet_name="TermPointToGNB",
-        output_dir=tp_gnb_unknown_dir,
-        command_column="Correction_Cmd",
-        filter_column="GNodeB_SSB_Target",
-        filter_values=["Unknown", "Unkwnow"],
-        filename_suffix="TermPointToGNB")
-
-    if generated:
-        print(f"[Correction Commands] Generated {generated} Termpoints/Externals Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
-
-    return generated
-
-
-def export_all_sheets_with_correction_cmd(audit_post_excel: str, output_dir: str, base_folder_name: str = "Correction_Cmd", exclude_sheets: Optional[set[str]] = None) -> int:
-    """
-    Export Correction_Cmd values from ANY sheet in the Excel containing a 'Correction_Cmd' column.
-    This is intended for ConfigurationAudit (NRCellRelation, GUtranCellRelation, etc.).
-
-    Folder layout:
-      <output_dir>/Correction_Cmd/<SheetName>/<NodeId>_<SheetName>.txt
-    """
-    if not audit_post_excel or not os.path.isfile(audit_post_excel):
-        return 0
-
-    exclude = {s.strip().lower() for s in (exclude_sheets or set())}
+    zip_file = None
+    zip_path = None
 
     try:
-        xl = pd.ExcelFile(audit_post_excel)
-        sheet_names = list(xl.sheet_names)
-    except Exception:
-        return 0
+        # If we export to zip, create it inside the base_dir and avoid duplicating base folder inside the zip
+        if export_to_zip:
+            import zipfile
+            os.makedirs(base_dir, exist_ok=True)
+            zip_path = to_long_path(os.path.join(base_dir, "Termpoints_Externals.zip"))
+            zip_file = zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED)
+
+        # If we export to filesystem, ensure directories exist
+        if not export_to_zip:
+            os.makedirs(ext_nr_ssbpost_dir, exist_ok=True)
+            os.makedirs(ext_nr_unknown_dir, exist_ok=True)
+            os.makedirs(ext_gu_ssbpost_dir, exist_ok=True)
+            os.makedirs(ext_gu_unknown_dir, exist_ok=True)
+            os.makedirs(tp_gnb_ssbpost_dir, exist_ok=True)
+            os.makedirs(tp_gnb_unknown_dir, exist_ok=True)
+            os.makedirs(tp_gnodeb_ssbpost_dir, exist_ok=True)
+            os.makedirs(tp_gnodeb_unknown_dir, exist_ok=True)
+
+        # Prepare cached Excel reader only if needed (no in-memory DFs provided)
+        xl_cached = None
+        sheet_map_cached = {}
+        if not (isinstance(sheet_dfs, dict) and sheet_dfs):
+            try:
+                xl_cached = pd.ExcelFile(audit_post_excel) if audit_post_excel and os.path.isfile(audit_post_excel) else None
+                sheet_map_cached = {s.lower(): s for s in (xl_cached.sheet_names if xl_cached else [])}
+            except Exception:
+                xl_cached = None
+                sheet_map_cached = {}
+
+        def _read_sheet_case_insensitive(audit_excel: str, sheet_name: str) -> Optional[pd.DataFrame]:
+            """
+            Read a sheet using case-insensitive matching. Returns None if not found or on error.
+            Uses a cached ExcelFile to avoid reopening/parsing the XLSX multiple times (major speedup).
+            """
+            if isinstance(sheet_dfs, dict) and sheet_dfs:
+                for k, v in sheet_dfs.items():
+                    if str(k).strip().lower() == str(sheet_name).strip().lower():
+                        return v
+                return None
+
+            if xl_cached is None:
+                return None
+
+            try:
+                real_sheet = sheet_map_cached.get(str(sheet_name).lower())
+                if not real_sheet:
+                    return None
+                return xl_cached.parse(real_sheet)
+            except Exception:
+                return None
+
+        def _write_node_output(target_dir: str, file_name: str, text: str) -> None:
+            if export_to_zip and zip_file is not None:
+                arcname = f"{target_dir}/{file_name}"
+                zip_file.writestr(arcname, text + "\n")
+                return
+            out_path = to_long_path(os.path.join(base_dir, target_dir, file_name))
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(text)
+
+        def _export_grouped_commands_from_sheet(audit_excel: str, sheet_name: str, output_dir: str, command_column: str = "Correction_Cmd", node_column: str = "NodeId", filter_column: Optional[str] = None, filter_values: Optional[list[str]] = None, filename_suffix: Optional[str] = None) -> int:
+            """
+            Export Correction_Cmd grouped by NodeId from a given sheet into output_dir.
+            Returns how many files were generated.
+
+            Behavior:
+              - 'del ...' lines are moved to the top of each node file.
+              - For External* and TermPoint* blocks, we keep per-block order exactly as in Excel,
+                but hoist ONLY the first 3 lines and the last line once per node file.
+                (No special single-instance handling for 'wait' or 'lt all' after wait.)
+            """
+            df = _read_sheet_case_insensitive(audit_excel, sheet_name)
+            if df is None or df.empty:
+                return 0
+
+            # Allow backward compatibility with old column name
+            if command_column not in df.columns and "Correction Command" in df.columns:
+                command_column = "Correction Command"
+
+            if command_column not in df.columns:
+                return 0
+            if node_column not in df.columns:
+                return 0
+
+            # IMPORTANT: if caller requested a filter but column is missing, do not export to avoid mixing targets
+            if filter_column and filter_values is not None and filter_column not in df.columns:
+                return 0
+
+            if filter_column and filter_column in df.columns and filter_values is not None:
+                allowed = {str(v).strip() for v in filter_values}
+                df = df[df[filter_column].astype(str).str.strip().isin(allowed)]
+
+            if df.empty:
+                return 0
+
+            work = df.copy()
+            work[node_column] = work[node_column].astype(str).str.strip()
+
+            suffix = filename_suffix if filename_suffix else str(sheet_name).strip()
+            generated_files = 0
+
+            # If exporting to zip, compute relative dir inside zip (no base folder duplication)
+            rel_dir = os.path.relpath(output_dir, base_dir).replace("\\", "/")
+
+            for node_id, group in work.groupby(node_column):
+                node_str = str(node_id).strip()
+                if not node_str:
+                    continue
+
+                # IMPORTANT: do NOT cast the whole column to str before dropna(), otherwise NaN becomes "nan"
+                raw_series = group[command_column]
+                raw_series = raw_series[raw_series.notna()]
+
+                cmds = raw_series.astype(str).map(str.strip).loc[lambda s: (s != "") & (s.str.lower() != "nan") & (s.str.lower() != "none")].tolist()
+                if not cmds:
+                    continue
+
+                # del first (and keep rest blocks after)
+                ordered_blocks = _reorder_cmds_del_first(cmds)
+                if not ordered_blocks:
+                    continue
+
+                del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
+                rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
+
+                # NEW: HOIST only the first 3 lines and the last line ONCE per node
+                merged_rest = _merge_blocks_hoist_header_footer(rest_blocks, header_lines=3, footer_lines=1) if rest_blocks else ""
+
+                pieces: List[str] = []
+                if del_lines:
+                    pieces.append("\n".join(del_lines).strip())
+                if merged_rest.strip():
+                    pieces.append(merged_rest.strip())
+
+                merged_script = "\n\n".join([p for p in pieces if p.strip()]).strip()
+                if not merged_script:
+                    continue
+
+                node_str_safe = _safe_filename_component(node_str, fallback="node")
+                suffix_safe = _safe_filename_component(suffix, fallback="cmd")
+                file_name = f"{node_str_safe}_{suffix_safe}.txt"
+
+                _write_node_output(rel_dir, file_name, merged_script)
+                generated_files += 1
+
+            return generated_files
+
+        if not (isinstance(sheet_dfs, dict) and sheet_dfs) and (not audit_post_excel or not os.path.isfile(audit_post_excel)):
+            return 0
+
+        generated = 0
+
+        # -----------------------------
+        # ExternalNRCellCU - SSB-Post / Unknown
+        # - Export to two subfolders inside ExternalNRCellCU
+        # - If a NodeId has both targets, grouping is done within each filtered subset
+        # -----------------------------
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalNRCellCU")
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalNRCellCU", output_dir=ext_nr_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalNRCellCU")
+
+        # -----------------------------
+        # ExternalGUtranCell - SSB-Post / Unknown
+        # - Export to two subfolders inside ExternalGUtranCell
+        # - If a NodeId has both targets, grouping is done within each filtered subset
+        # -----------------------------
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="ExternalGUtranCell")
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="ExternalGUtranCell", output_dir=ext_gu_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="ExternalGUtranCell")
+
+        # -----------------------------
+        # TermPointToGNodeB - SSB-Post / Unknown  (Bullets 2 & 3 from new requirements slide)
+        # - Bullet 2: export to two subfolders
+        # - Bullet 3: if a NodeId has both targets, grouping is done within each filtered subset
+        # -----------------------------
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNodeB")
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNodeB", output_dir=tp_gnodeb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNodeB")
+
+        # -----------------------------
+        # TermPointToGNB - SSBPost / Unknown (same behavior as ExternalGUtranCell)
+        # - Export to two subfolders inside TermPointToGNB
+        # - If a NodeId has both targets, grouping is done within each filtered subset
+        # -----------------------------
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_ssbpost_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["SSB-Post"], filename_suffix="TermPointToGNB")
+        generated += _export_grouped_commands_from_sheet(audit_excel=audit_post_excel, sheet_name="TermPointToGNB", output_dir=tp_gnb_unknown_dir, command_column="Correction_Cmd", filter_column="GNodeB_SSB_Target", filter_values=["Unknown", "Unkwnow"], filename_suffix="TermPointToGNB")
+
+        if generated:
+            if export_to_zip and zip_file is not None:
+                print(f"[Correction Commands] Generated {generated} Termpoints/Externals Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path or '')}'")
+            else:
+                print(f"[Correction Commands] Generated {generated} Termpoints/Externals Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+
+        return generated
+
+    finally:
+        try:
+            if zip_file is not None:
+                zip_file.close()
+        except Exception:
+            pass
+
+
+
+def export_all_sheets_with_correction_cmd(audit_post_excel: str, output_dir: str, base_folder_name: str = "Correction_Cmd", exclude_sheets: Optional[set[str]] = None, sheet_dfs: Optional[dict[str, pd.DataFrame]] = None, export_to_zip: bool = True) -> int:
+    """
+    Export Correction_Cmd values from ANY sheet containing a 'Correction_Cmd' column.
+    Intended for ConfigurationAudit (NRCellRelation, GUtranCellRelation, etc.).
+
+    Folder layout (export_to_zip=False):
+      <output_dir>/Correction_Cmd/<SheetName>/<NodeId>_<SheetName>.txt
+
+    ZIP layout (export_to_zip=True):
+      <output_dir>/Correction_Cmd/Correction_Cmd.zip
+      Entries:
+        <SheetName>/<NodeId>_<SheetName>.txt
+
+    Optimization:
+      - If sheet_dfs is provided, use those DataFrames directly (no Excel re-read).
+      - If sheet_dfs is None, fallback to reading from Excel (legacy behavior).
+      - ZIP output reduces filesystem latency (especially on synced drives like Google Drive).
+    """
+    exclude = {s.strip().lower() for s in (exclude_sheets or set())}
 
     base_dir = os.path.join(output_dir, base_folder_name)
     os.makedirs(base_dir, exist_ok=True)
 
     total_files = 0
+    zip_file = None
+    zip_path = None
 
-    for sheet in sheet_names:
-        if str(sheet).strip().lower() in exclude:
-            continue
-
+    # Determine sheet sources
+    dfs_source: dict[str, pd.DataFrame] = {}
+    if isinstance(sheet_dfs, dict) and sheet_dfs:
+        dfs_source = sheet_dfs
+    else:
+        if not audit_post_excel or not os.path.isfile(audit_post_excel):
+            return 0
         try:
-            df = xl.parse(sheet)
+            xl = pd.ExcelFile(audit_post_excel)
+            for sheet in list(xl.sheet_names):
+                try:
+                    df = xl.parse(sheet)
+                except Exception:
+                    continue
+                if df is None or df.empty:
+                    continue
+                dfs_source[str(sheet)] = df
         except Exception:
-            continue
+            return 0
 
-        if df is None or df.empty:
-            continue
-        if "Correction_Cmd" not in df.columns or "NodeId" not in df.columns:
-            continue
+    try:
+        if export_to_zip:
+            import zipfile
+            zip_path = to_long_path(os.path.join(base_dir, f"{base_folder_name}.zip"))
+            zip_file = zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED)
 
-        work = df.copy()
-        work["NodeId"] = work["NodeId"].astype(str).str.strip()
-
-        raw_series = work["Correction_Cmd"]
-        raw_series = raw_series[raw_series.notna()]
-
-        if raw_series.empty:
-            continue
-
-        sheet_dir = os.path.join(base_dir, str(sheet).strip())
-        os.makedirs(sheet_dir, exist_ok=True)
-
-        for node_id, group in work.groupby("NodeId"):
-            node_str = str(node_id).strip()
-            if not node_str:
+        for sheet, df in dfs_source.items():
+            if str(sheet).strip().lower() in exclude:
                 continue
 
-            raw_cmds = [cmd for cmd in group["Correction_Cmd"] if str(cmd).strip()]
-            if not raw_cmds:
+            if df is None or df.empty:
+                continue
+            if "Correction_Cmd" not in df.columns or "NodeId" not in df.columns:
                 continue
 
-            ordered_blocks = _reorder_cmds_del_first(raw_cmds)
-            if not ordered_blocks:
+            work = df.copy()
+            work["NodeId"] = work["NodeId"].astype(str).str.strip()
+
+            raw_series = work["Correction_Cmd"]
+            raw_series = raw_series[raw_series.notna()]
+            if raw_series.empty:
                 continue
 
-            del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
-            rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
+            sheet_name = str(sheet).strip()
+            sheet_dir = os.path.join(base_dir, sheet_name)
+            if not export_to_zip:
+                os.makedirs(sheet_dir, exist_ok=True)
 
-            pieces: List[str] = []
-            if del_lines:
-                pieces.append("\n".join(del_lines).strip())
-            if rest_blocks:
-                pieces.append("\n\n".join(rest_blocks).strip())
+            # Group and export
+            for node_id, group in work.groupby("NodeId"):
+                node_str = str(node_id).strip()
+                if not node_str:
+                    continue
 
-            final_text = "\n\n".join([p for p in pieces if p.strip()]).strip()
-            if not final_text:
-                continue
+                raw_cmds = [cmd for cmd in group["Correction_Cmd"] if str(cmd).strip()]
+                if not raw_cmds:
+                    continue
 
-            node_str_safe = _safe_filename_component(node_str, fallback="node")
-            sheet_safe = _safe_filename_component(str(sheet).strip(), fallback="sheet")
-            file_name = f"{node_str_safe}_{sheet_safe}.txt"
+                ordered_blocks = _reorder_cmds_del_first(raw_cmds)
+                if not ordered_blocks:
+                    continue
 
-            file_path = to_long_path(os.path.join(sheet_dir, file_name))
+                del_lines = [b for b in ordered_blocks if _DEL_LINE_RE.match(b)]
+                rest_blocks = [b for b in ordered_blocks if not _DEL_LINE_RE.match(b)]
 
-            with open(file_path, "w", encoding="utf-8") as f:
-                f.write(final_text)
+                pieces: List[str] = []
+                if del_lines:
+                    pieces.append("\n".join(del_lines).strip())
+                if rest_blocks:
+                    pieces.append("\n\n".join(rest_blocks).strip())
 
-            total_files += 1
+                final_text = "\n\n".join([p for p in pieces if p.strip()]).strip()
+                if not final_text:
+                    continue
 
-    print(f"[Correction Commands] Generated {total_files} others sheet-based Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+                node_str_safe = _safe_filename_component(node_str, fallback="node")
+                sheet_safe = _safe_filename_component(sheet_name, fallback="sheet")
+                file_name = f"{node_str_safe}_{sheet_safe}.txt"
+
+                if export_to_zip and zip_file is not None:
+                    arcname = f"{sheet_name}/{file_name}"
+                    zip_file.writestr(arcname, final_text + "\n")
+                else:
+                    file_path = to_long_path(os.path.join(sheet_dir, file_name))
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(final_text)
+
+                total_files += 1
+
+    finally:
+        try:
+            if zip_file is not None:
+                zip_file.close()
+        except Exception:
+            pass
+
+    if export_to_zip and zip_path:
+        print(f"[Correction Commands] Generated {total_files} others sheet-based Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path)}'")
+    else:
+        print(f"[Correction Commands] Generated {total_files} others sheet-based Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+
     return total_files
+
 
