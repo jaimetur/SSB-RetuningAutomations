@@ -22,7 +22,7 @@
     - Now the execution log is also available in output folder for an easier way to identify which log belong to each execution.
 
   - #### 🚀 Enhancements:
-    - ConsistencyChecks module:
+    - **ConsistencyChecks module:**
       - ConsistencyChecks must export to `Correction_Cmd_CC` folder instead of `Correction_Cmd`. 
       - In ConsistencyChecks, export ONLY neighbor-relation commands (because they require comparing 2 audits):
         - NR_new / NR_missing / NR_disc
@@ -33,7 +33,8 @@
       - `SummaryAuditComparisson` sheet now includes a new column `diff` with the difference between `Value_Pre`and `Value_Post` columns.
       - `Summary_CellRelation` now distinguish between `Param_Discrepancies` and `Frequency_Discrepancies` and `SSB-Unknown`(those relations with Freq_Pre=Freq_Post but nodes not found in retuned list).
       - Now sheets GU_disc and NR_disc are divided into two sheets called GU_param_disc/GU_freq_disc for GU and NR_param_disc/NR_freq_disc for NR to distinguish between Param/Frequency discrepancies.
-    - ConfigurationAudit module:
+      - Enhanced Summary info in log to distiguish between Param/Frequency discrepancies.
+    - **ConfigurationAudit module:**
       - ConfigurationAudit must keep using the normal export folder (`Correction_Cmd`). 
       - Avoid printing “Consistency Checks …” messages when the export is executed by ConfigurationAudit. 
       - In ConfigurationAudit, the `NRCellRelation` sheet must generate Correction_Cmd ONLY based on frequency (not parameter-comparison mismatches). 
@@ -45,10 +46,10 @@
       - ConfigurationAudit must export ALL commands that do NOT require 2 audits, into Correction_Cmd/ (not _CC):
         - All MOs where a column `Correction_Cmd` is found in the Excel sheet will be exported as text file command.
         - External/Termpoints commands (they already come from the single Audit Excel).
-    - Export Correction Commands:
+      - Disabled (by default) printing list of nodes that have already been retuned and nodes that still have not been retuned.
+    - **Export Correction Commands:**
       - Enhancements in the way that the Correction_Cmd is loaded (before it was read from final Excel file, now it is read from the dataframe already in memory).
       - Correction Commands files are now exported as ZIP files (by default) to reduce latency and avoid to write hundreds of files on disk.
-    - Disabled (by default) printing list of nodes that have already been retuned and nodes that still have not been retuned.
 
   - #### 🐛 Bug fixes:
     - Stopped ConfigurationAudit from creating ConsistencyCheck-only folders (MissingRelations/ NewRelations/ RelationsDiscrepancies) under Correction_Cmd.
