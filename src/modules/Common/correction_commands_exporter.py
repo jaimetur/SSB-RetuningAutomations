@@ -232,7 +232,7 @@ def _reorder_cmds_del_first(cmds: List[object]) -> List[str]:
 # ----------------------------------------------------------------------
 #  EXPORT CORRECTION COMMNANDS TO TEXT FILES
 # ----------------------------------------------------------------------
-def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.DataFrame], base_folder_name: str = "Correction_Cmd", export_to_zip: bool = True, module_name: str = "") -> int:
+def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.DataFrame], base_folder_name: str = "Correction_Cmd", export_to_zip: bool = True, module_name: str = "", market_tag: str = "GLOBAL") -> int:
     """
     Export Correction_Cmd values to text files grouped by NodeId and category.
 
@@ -348,11 +348,11 @@ def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.Dat
 
         if total_files > 0:
             if export_to_zip and zip_file is not None:
-                print(f"{module_name} [INFO] Generated {total_files} Correction Commands files in ZIP: '{pretty_path(zip_path or '')}'")
+                print(f"{module_name} {market_tag} [INFO] Generated {total_files} Correction Commands files in ZIP: '{pretty_path(zip_path or '')}'")
             else:
-                print(f"{module_name} [INFO] Generated {total_files} Correction Commands files in: '{pretty_path(base_dir)}'")
+                print(f"{module_name} {market_tag} [INFO] Generated {total_files} Correction Commands files in: '{pretty_path(base_dir)}'")
         else:
-            print(f"\n{module_name} [INFO] No relations Correction Commands files generated.")
+            print(f"\n{module_name} {market_tag} [INFO] No relations Correction Commands files generated.")
 
         return total_files
 

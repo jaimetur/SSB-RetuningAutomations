@@ -1175,16 +1175,32 @@ def run_consistency_checks(
                         return None
 
                 def _find_latest_audit_folder(search_root: str) -> Optional[str]:
-                    # Search for previous audit folders inside PRE/POST root folder and pick the newest one.
+                    # Search for previous ConfigurationAudit folders inside PRE/POST root folder and pick the newest one WITH a valid ConfigurationAudit_*.xlsx inside.
                     try:
                         if not search_root or not os.path.isdir(search_root):
                             return None
+
+                        def _has_valid_configurationaudit_excel(audit_dir: str) -> bool:
+                            # A "valid" audit folder must contain at least one non-empty ConfigurationAudit_*.xlsx file.
+                            try:
+                                for fn in os.listdir(audit_dir):
+                                    if not str(fn).startswith("ConfigurationAudit_"):
+                                        continue
+                                    if not str(fn).lower().endswith(".xlsx"):
+                                        continue
+                                    fp = os.path.join(audit_dir, fn)
+                                    if os.path.isfile(fp) and os.path.getsize(fp) > 0:
+                                        return True
+                                return False
+                            except Exception:
+                                return False
+
                         candidates: List[Tuple[datetime, float, str]] = []
                         for name in os.listdir(search_root):
                             full = os.path.join(search_root, name)
                             if not os.path.isdir(full):
                                 continue
-                            if not (str(name).startswith("ConfigurationAudit_") or str(name).startswith("ProfilesAudit_")):
+                            if not str(name).startswith("ConfigurationAudit_"):
                                 continue
                             ts = _try_parse_audit_folder_ts(str(name)) or datetime.min
                             try:
@@ -1192,10 +1208,18 @@ def run_consistency_checks(
                             except Exception:
                                 mt = 0.0
                             candidates.append((ts, mt, full))
+
                         if not candidates:
                             return None
+
                         candidates.sort(key=lambda x: (x[0], x[1]), reverse=True)
-                        return candidates[0][2]
+
+                        # Try newest first; if it doesn't contain a valid ConfigurationAudit_*.xlsx, fallback to previous by timestamp.
+                        for _ts, _mt, audit_dir in candidates:
+                            if _has_valid_configurationaudit_excel(audit_dir):
+                                return audit_dir
+
+                        return None
                     except Exception:
                         return None
 
@@ -1235,8 +1259,8 @@ def run_consistency_checks(
                             return None
                         os.makedirs(dst_output_dir, exist_ok=True)
 
-                        src_excel = _pick_latest_file_by_ext(src_audit_dir, ".xlsx", preferred_prefixes=["ConfigurationAudit_", "ProfilesAudit_"])
-                        if not src_excel:
+                        src_excel = _pick_latest_file_by_ext(src_audit_dir, ".xlsx", preferred_prefixes=["ConfigurationAudit_"])
+                        if not src_excel or not os.path.basename(src_excel).startswith("ConfigurationAudit_"):
                             return None
 
                         dst_excel = os.path.join(dst_output_dir, f"ConfigurationAudit_{dst_versioned_suffix}.xlsx")
@@ -1266,13 +1290,17 @@ def run_consistency_checks(
                 print("-" * 80)
                 print(f"{module_name} {market_tag} [INFO] Running Configuration Audit for PRE folder before consistency checks...")
                 pre_existing_audit_dir = _find_latest_audit_folder(pre_dir_fs)
+                pre_audit_excel = None
                 if pre_existing_audit_dir:
                     print(f"{module_name} {market_tag} [INFO] Reusing existing PRE Audit folder: '{pretty_path(pre_existing_audit_dir)}'")
                     pre_audit_excel = _copy_audit_artifacts_to_current_output(pre_existing_audit_dir, output_dir, audit_pre_suffix, copy_cmd_folders=False)
-                else:
+                    if not pre_audit_excel:
+                        print(f"{module_name} {market_tag} [WARNING] Existing PRE Audit folder is missing a valid ConfigurationAudit_*.xlsx. Running a new PRE Configuration Audit.")
+                if not pre_audit_excel:
                     pre_audit_excel = run_configuration_audit(input_dir=pre_dir_process_fs, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb,
                                                               allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
                                                               allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, versioned_suffix=audit_pre_suffix, market_label=market_label, external_output_dir=output_dir, export_correction_cmd=False)
+
                 if pre_audit_excel:
                     print(f"{module_name} {market_tag} [INFO] PRE Configuration Audit output: '{pretty_path(pre_audit_excel)}'")
                 else:
@@ -1281,10 +1309,13 @@ def run_consistency_checks(
                 print("-" * 80)
                 print(f"{module_name} {market_tag} [INFO] Running Configuration Audit for POST folder before consistency checks...")
                 post_existing_audit_dir = _find_latest_audit_folder(post_dir_fs)
+                post_audit_excel = None
                 if post_existing_audit_dir:
                     print(f"{module_name} {market_tag} [INFO] Reusing existing POST Audit folder: '{pretty_path(post_existing_audit_dir)}'")
                     post_audit_excel = _copy_audit_artifacts_to_current_output(post_existing_audit_dir, output_dir, audit_post_suffix, copy_cmd_folders=True)
-                else:
+                    if not post_audit_excel:
+                        print(f"{module_name} {market_tag} [WARNING] Existing POST Audit folder is missing a valid ConfigurationAudit_*.xlsx. Running a new POST Configuration Audit.")
+                if not post_audit_excel:
                     post_audit_excel = run_configuration_audit(input_dir=post_dir_process_fs, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb,
                                                                allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
                                                                allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, versioned_suffix=audit_post_suffix, market_label=market_label, external_output_dir=output_dir,
