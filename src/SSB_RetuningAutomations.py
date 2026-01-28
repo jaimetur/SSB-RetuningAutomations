@@ -127,6 +127,7 @@ CONFIG_KEY_ALLOWED_N77_ARFCN_PRE        = "allowed_n77_arfcn_pre_csv"
 CONFIG_KEY_ALLOWED_N77_SSB_POST         = "allowed_n77_ssb_post_csv"
 CONFIG_KEY_ALLOWED_N77_ARFCN_POST       = "allowed_n77_arfcn_post_csv"
 CONFIG_KEY_EXPORT_CORRECTION_CMD        = "export_correction_cmd"
+CONFIG_KEY_FAST_EXCEL_EXPORT            = "fast_excel_export"
 
 # Logic Map -> Key in config
 CFG_FIELD_MAP = {
@@ -147,6 +148,7 @@ CFG_FIELD_MAP = {
     "allowed_n77_ssb_post": CONFIG_KEY_ALLOWED_N77_SSB_POST,
     "allowed_n77_arfcn_post": CONFIG_KEY_ALLOWED_N77_ARFCN_POST,
     "export_correction_cmd": CONFIG_KEY_EXPORT_CORRECTION_CMD,
+    "fast_excel_export": CONFIG_KEY_FAST_EXCEL_EXPORT,
 }
 
 
@@ -179,6 +181,9 @@ class GuiResult:
     # ConfigurationAudit: export correction command files (slow)
     export_correction_cmd: bool
 
+    # Excel engine (xlsxwriter vs openpyxl)
+    fast_excel_export: bool = False
+
 
 
 def is_consistency_module(selected_text: str) -> bool:
@@ -210,6 +215,7 @@ def gui_config_dialog(
     default_allowed_n77_ssb_post_csv: str = DEFAULT_ALLOWED_N77_SSB_POST_CSV,
     default_allowed_n77_arfcn_post_csv: str = DEFAULT_ALLOWED_N77_ARFCN_POST_CSV,
     default_export_correction_cmd: bool = True,
+    default_fast_excel_export: bool = False,
 ) -> Optional[GuiResult]:
     """
     Single window with:
@@ -265,6 +271,7 @@ def gui_config_dialog(
     allowed_n77_ssb_post_var = tk.StringVar(value=normalize_csv_list(default_allowed_n77_ssb_post_csv))
     allowed_n77_arfcn_post_var = tk.StringVar(value=normalize_csv_list(default_allowed_n77_arfcn_post_csv))
     export_correction_cmd_var = tk.BooleanVar(value=bool(default_export_correction_cmd))
+    fast_excel_export_var = tk.BooleanVar(value=bool(default_fast_excel_export))
     result: Optional[GuiResult] = None
 
     pad = {'padx': 10, 'pady': 6}
@@ -406,8 +413,12 @@ def gui_config_dialog(
     # ConfigurationAudit Options
     export_correction_cmd_label = ttk.Label(right_frame, text="Configuration Audit Options:")
     export_correction_cmd_chk = ttk.Checkbutton(right_frame, text="Export Correction Cmd text files (slow)", variable=export_correction_cmd_var)
+    export_global_options_label = ttk.Label(right_frame, text="Global Options:")
+    fast_excel_export_chk = ttk.Checkbutton(right_frame, text="Fast Excel export (xlsxwriter)", variable=fast_excel_export_var)
     export_correction_cmd_label.grid(row=6, column=0, sticky="w", pady=(10, 0))
     export_correction_cmd_chk.grid(row=7, column=0, sticky="w")
+    export_global_options_label.grid(row=9, column=0, sticky="w", pady=(10, 0))
+    fast_excel_export_chk.grid(row=10, column=0, sticky="w")
 
     def refresh_export_correction_cmd_option(*_e):
         """Show the export option only when it is relevant (ConfigurationAudit / ConsistencyChecks)."""
@@ -417,9 +428,11 @@ def gui_config_dialog(
         if needs_export_option:
             export_correction_cmd_label.grid()
             export_correction_cmd_chk.grid()
+            fast_excel_export_chk.grid()
         else:
             export_correction_cmd_label.grid_remove()
             export_correction_cmd_chk.grid_remove()
+            fast_excel_export_chk.grid_remove()
 
     cmb.bind("<<ComboboxSelected>>", refresh_export_correction_cmd_option, add="+")
     refresh_export_correction_cmd_option()
@@ -528,6 +541,7 @@ def gui_config_dialog(
                 allowed_n77_ssb_post_csv=normalized_allowed_n77_ssb_post,
                 allowed_n77_arfcn_post_csv=normalized_allowed_n77_arfcn_post,
                 export_correction_cmd=bool(export_correction_cmd_var.get()),
+                fast_excel_export=bool(fast_excel_export_var.get()),
             )
         else:
             sel_input = input_var.get().strip()
@@ -553,6 +567,7 @@ def gui_config_dialog(
                 allowed_n77_ssb_post_csv=normalized_allowed_n77_ssb_post,
                 allowed_n77_arfcn_post_csv=normalized_allowed_n77_arfcn_post,
                 export_correction_cmd=bool(export_correction_cmd_var.get()),
+                fast_excel_export=bool(fast_excel_export_var.get()),
             )
         root.destroy()
 
@@ -619,6 +634,9 @@ def parse_args() -> argparse.Namespace:
     # ConfigurationAudit: export correction commands (text files)
     parser.add_argument("--export-correction-cmd", dest="export_correction_cmd", action=argparse.BooleanOptionalAction, default=True, help="Enable/disable exporting correction command text files during ConfigurationAudit (slow). For ConsistencyChecks, this controls the POST ConfigurationAudit export (PRE is always skipped).")
 
+    # Fast Excel exports
+    parser.add_argument("--fast-excel", dest="fast_excel_export", action=argparse.BooleanOptionalAction, default=False, help="Enable/disable fast Excel export using xlsxwriter engine (reduced formatting features if compared to openpyxl).")
+
     parser.add_argument("--no-gui", action="store_true", help="Disable GUI usage (only CLI).")
 
     args = parser.parse_args()
@@ -641,9 +659,12 @@ def run_configuration_audit(
     versioned_suffix: Optional[str] = None,
     market_label: Optional[str] = None,
     external_output_dir: Optional[str] = None,
-    profiles_audit: bool = True,                # <<< NEW (default now True because module 4 was removed and the logic have been incorporated to Default Configuration Audit)
-    export_correction_cmd: bool = True,           # <<< NEW: when called from ConsistencyChecks, disable for PRE and enable for POST
-    module_name_override: Optional[str] = None,    # <<< NEW
+    profiles_audit: bool = True,  # <<< NEW (default now True because module 4 was removed and the logic have been incorporated to Default Configuration Audit)
+    export_correction_cmd: bool = True,  # <<< NEW: when called from ConsistencyChecks, disable for PRE and enable for POST
+    fast_excel_export: bool = False,  # <<< NEW: use xlsxwriter engine (faster, reduced styling)
+    fast_excel_autofit_rows: int = 50,  # <<< NEW: limit rows used to estimate column widths (xlsxwriter only)
+    fast_excel_autofit_max_width: int = 60,  # <<< NEW: cap column width (xlsxwriter only)
+    module_name_override: Optional[str] = None,  # <<< NEW
 ) -> Optional[str]:
     """
     Run ConfigurationAudit on a folder or recursively on all its subfolders
@@ -877,7 +898,7 @@ def run_configuration_audit(
                     app = ConfigurationAudit(n77_ssb_pre=local_n77_ssb_pre, n77_ssb_post=local_n77_ssb_post)
 
         # Include output_dir in kwargs passed to ConfigurationAudit.run
-        kwargs = dict(module_name=module_name, versioned_suffix=file_versioned_suffix, tables_order=TABLES_ORDER, output_dir=output_dir, profiles_audit=profiles_audit, export_correction_cmd=export_correction_cmd, correction_cmd_folder_name="Correction_Cmd_CA", fast_excel_export=True, fast_excel_autofit_rows=50, fast_excel_autofit_max_width=60)
+        kwargs = dict(module_name=module_name, versioned_suffix=file_versioned_suffix, tables_order=TABLES_ORDER, output_dir=output_dir, profiles_audit=profiles_audit, export_correction_cmd=export_correction_cmd, correction_cmd_folder_name="Correction_Cmd_CA", fast_excel_export=fast_excel_export, fast_excel_autofit_rows=fast_excel_autofit_rows, fast_excel_autofit_max_width=fast_excel_autofit_max_width)
 
         # Provide ZIP context to ConfigurationAudit so Summary.LogPath can point to "<zip>/<log>"
         if resolved and resolved.zip_path:
@@ -1008,6 +1029,9 @@ def run_consistency_checks(
     allowed_n77_ssb_post_csv: Optional[str] = None,
     allowed_n77_arfcn_post_csv: Optional[str] = None,
     export_correction_cmd_post: bool = True,
+    fast_excel_export: bool = False,
+    fast_excel_autofit_rows: int = 50,
+    fast_excel_autofit_max_width: int = 60,
     mode: str = "",
 ) -> None:
     """
@@ -1394,7 +1418,8 @@ def run_consistency_checks(
                 if not pre_audit_excel:
                     pre_audit_excel = run_configuration_audit(input_dir=pre_dir_process_fs, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb,
                                                               allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
-                                                              allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, versioned_suffix=audit_pre_suffix, market_label=market_label, external_output_dir=output_dir, export_correction_cmd=False)
+                                                              allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, versioned_suffix=audit_pre_suffix, market_label=market_label, external_output_dir=output_dir,
+                                                              export_correction_cmd=False, fast_excel_export=fast_excel_export, fast_excel_autofit_rows=fast_excel_autofit_rows, fast_excel_autofit_max_width=fast_excel_autofit_max_width)
 
                 if pre_audit_excel:
                     print(f"{module_name} {market_tag} [INFO] PRE Configuration Audit output: '{pretty_path(pre_audit_excel)}'")
@@ -1414,7 +1439,7 @@ def run_consistency_checks(
                     post_audit_excel = run_configuration_audit(input_dir=post_dir_process_fs, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb,
                                                                allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
                                                                allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, versioned_suffix=audit_post_suffix, market_label=market_label, external_output_dir=output_dir,
-                                                               export_correction_cmd=export_correction_cmd_post)
+                                                               export_correction_cmd=export_correction_cmd_post, fast_excel_export=fast_excel_export, fast_excel_autofit_rows=fast_excel_autofit_rows, fast_excel_autofit_max_width=fast_excel_autofit_max_width)
 
                 if post_audit_excel:
                     print(f"{module_name} {market_tag} [INFO] POST Configuration Audit output: '{pretty_path(post_audit_excel)}'")
@@ -1465,7 +1490,7 @@ def run_consistency_checks(
                 else:
                     print(f"{module_name} {market_tag} [INFO] Frequencies not provided. Comparison will be skipped; only tables will be saved.")
 
-                app.save_outputs_excel(output_dir=output_dir, results=results, versioned_suffix=file_versioned_suffix, module_name=module_name, market_tag=market_tag, fast_excel_export=True, fast_excel_autofit_rows=50, fast_excel_autofit_max_width=60)
+                app.save_outputs_excel(output_dir=output_dir, results=results, versioned_suffix=file_versioned_suffix, module_name=module_name, market_tag=market_tag, fast_excel_export=fast_excel_export, fast_excel_autofit_rows=fast_excel_autofit_rows, fast_excel_autofit_max_width=fast_excel_autofit_max_width)
 
                 print(f"\n{module_name} {market_tag} [INFO] Outputs saved to: '{pretty_path(output_dir)}'")
                 if results:
@@ -1568,6 +1593,7 @@ def execute_module(
     allowed_n77_ssb_post_csv: str = "",
     allowed_n77_arfcn_post_csv: str = "",
     export_correction_cmd: bool = True,
+    fast_excel_export: bool = False,
     selected_module: str = "",
 ) -> None:
     """
@@ -1585,10 +1611,10 @@ def execute_module(
 
     try:
         if module_fn is run_consistency_checks:
-            module_fn(input_dir=input_dir, input_pre_dir=input_pre_dir, input_post_dir=input_post_dir, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb, ca_freq_filters_csv=ca_freq_filters_csv, cc_freq_filters_csv=cc_freq_filters_csv, allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv, allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, export_correction_cmd_post=export_correction_cmd, mode=selected_module)
+            module_fn(input_dir=input_dir, input_pre_dir=input_pre_dir, input_post_dir=input_post_dir, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb, ca_freq_filters_csv=ca_freq_filters_csv, cc_freq_filters_csv=cc_freq_filters_csv, allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv, allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, export_correction_cmd_post=export_correction_cmd, fast_excel_export=fast_excel_export, mode=selected_module)
 
         elif module_fn is run_configuration_audit:
-            module_fn(input_dir, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb, allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv, allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, export_correction_cmd=export_correction_cmd)
+            module_fn(input_dir, ca_freq_filters_csv=ca_freq_filters_csv, n77_ssb_pre=n77_ssb_pre, n77_ssb_post=n77_ssb_post, n77b_ssb=n77b_ssb, allowed_n77_ssb_pre_csv=allowed_n77_ssb_pre_csv, allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv, allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv, allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv, export_correction_cmd=export_correction_cmd, fast_excel_export=fast_excel_export)
 
         elif module_fn is run_final_cleanup:
             module_fn(input_dir, n77_ssb_pre, n77_ssb_post)
@@ -1683,6 +1709,7 @@ def main():
         "allowed_n77_ssb_post",
         "allowed_n77_arfcn_post",
         "export_correction_cmd",
+        "fast_excel_export",
     )
 
     # Global fallback last input
@@ -1706,6 +1733,7 @@ def main():
     persisted_allowed_ssb_post         = cfg["allowed_n77_ssb_post"]
     persisted_allowed_arfcn_post       = cfg["allowed_n77_arfcn_post"]
     persisted_export_correction_cmd    = parse_cfg_bool(cfg.get("export_correction_cmd", ""), default=True)
+    persisted_fast_excel_export        = parse_cfg_bool(cfg.get("fast_excel_export", ""), default=False)
 
 
     # Defaults per module (CLI > persisted per-module > global fallback > hardcode)
@@ -1732,6 +1760,7 @@ def main():
     default_allowed_n77_ssb_post_csv = normalize_csv_list(args.allowed_n77_ssb_post or persisted_allowed_ssb_post or DEFAULT_ALLOWED_N77_SSB_POST_CSV)
     default_allowed_n77_arfcn_post_csv = normalize_csv_list(args.allowed_n77_arfcn_post or persisted_allowed_arfcn_post or DEFAULT_ALLOWED_N77_ARFCN_POST_CSV)
     default_export_correction_cmd = persisted_export_correction_cmd
+    default_fast_excel_export = bool(getattr(args, "fast_excel", False)) if getattr(args, "fast_excel", None) is not None else persisted_fast_excel_export
 
     # ====================== MODE 1: GUI (NO ARGS) ===========================
     if no_args:
@@ -1760,6 +1789,7 @@ def main():
                 default_allowed_n77_ssb_post_csv=default_allowed_n77_ssb_post_csv,
                 default_allowed_n77_arfcn_post_csv=default_allowed_n77_arfcn_post_csv,
                 default_export_correction_cmd=default_export_correction_cmd,
+                default_fast_excel_export=default_fast_excel_export,
             )
             if sel is None:
                 raise SystemExit("[INFO] Cancelled.")
@@ -1798,6 +1828,7 @@ def main():
                 allowed_n77_ssb_post=sel.allowed_n77_ssb_post_csv,
                 allowed_n77_arfcn_post=sel.allowed_n77_arfcn_post_csv,
                 export_correction_cmd=("1" if sel.export_correction_cmd else "0"),
+                fast_excel_export=("1" if sel.fast_excel_export else "0"),
             )
 
             # Persist per-module input folders
@@ -1837,6 +1868,7 @@ def main():
             default_allowed_n77_ssb_post_csv = sel.allowed_n77_ssb_post_csv
             default_allowed_n77_arfcn_post_csv = sel.allowed_n77_arfcn_post_csv
             default_export_correction_cmd = sel.export_correction_cmd
+            default_fast_excel_export = sel.fast_excel_export
 
             try:
                 execute_module(
