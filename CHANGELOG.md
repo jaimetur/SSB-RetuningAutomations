@@ -20,6 +20,7 @@
     - Added a hyperlink in cell A1 on every sheet from `ConfigurationAudit` Excel to jump back to `SummaryAudit`.
     - Added a hyperlink in cell A1 on every sheet from `ConsistencyCheck` Excel to jump back to `Summary_CellRelation`.
     - Now the execution log is also available in output folder for an easier way to identify which log belong to each execution.
+    - Integrated new Excel Writter engine 'xlsxwriter' for a faster export to Excel. This engine can be activated using the new flag --fast-excel from CLI or using GUI.
 
   - #### 🚀 Enhancements:
     - **ConsistencyChecks module:**
@@ -53,6 +54,7 @@
     - **Export Correction Commands:**
       - Enhancements in the way that the Correction_Cmd is loaded (before it was read from final Excel file, now it is read from the dataframe already in memory).
       - Correction Commands files are now exported as ZIP files (by default) to reduce latency and avoid to write hundreds of files on disk.
+    - Unified style_headers_autofilter_and_autofit to apply styles to sheets from ConfigurationAudit and ConsistencyCheck.
 
   - #### 🐛 Bug fixes:
     - Stopped ConfigurationAudit from creating ConsistencyCheck-only folders (MissingRelations/ NewRelations/ RelationsDiscrepancies) under Correction_Cmd.

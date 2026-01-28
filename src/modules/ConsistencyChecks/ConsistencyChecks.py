@@ -9,7 +9,7 @@ import pandas as pd
 from src.modules.Common.correction_commands_builder import build_correction_command_gu_new_relations, build_correction_command_gu_missing_relations, build_correction_command_gu_discrepancies, build_correction_command_nr_new_relations, build_correction_command_nr_missing_relations, build_correction_command_nr_discrepancies
 from src.utils.utils_dataframe import select_latest_by_date, normalize_df, make_index_by_keys
 from src.utils.utils_datetime import extract_date
-from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit, apply_alternating_category_row_fills
+from src.utils.utils_excel import color_summary_tabs, style_headers_autofilter_and_autofit, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit_xlsxwriter
 from src.utils.utils_frequency import detect_freq_column, detect_key_columns, extract_gu_freq_base, extract_nr_freq_base, enforce_gu_columns, enforce_nr_columns
 from src.utils.utils_io import read_text_lines, to_long_path, pretty_path
 from src.utils.utils_parsing import find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork
@@ -882,7 +882,7 @@ class ConsistencyChecks:
         return merged
 
     # ----------------------------- OUTPUT TO EXCEL ----------------------------- #
-    def save_outputs_excel(self, output_dir: str, results: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None, versioned_suffix: Optional[str] = None, module_name: str = "", market_tag: str = "GLOBAL") -> None:
+    def save_outputs_excel(self, output_dir: str, results: Optional[Dict[str, Dict[str, pd.DataFrame]]] = None, versioned_suffix: Optional[str] = None, module_name: str = "", market_tag: str = "GLOBAL", fast_excel_export: bool = False, fast_excel_autofit_rows: int = 200, fast_excel_autofit_max_width: int = 60) -> None:
         import os
         import tempfile
         import shutil
@@ -922,6 +922,17 @@ class ConsistencyChecks:
             except Exception:
                 shutil.move(tmp_path, final_path)
 
+        def _pick_excel_engine() -> str:
+            if not fast_excel_export:
+                return "openpyxl"
+            try:
+                import xlsxwriter  # noqa: F401
+                return "xlsxwriter"
+            except Exception:
+                return "openpyxl"
+
+        excel_engine = _pick_excel_engine()
+
         tmp_dir_cc, tmp_excel_cc = _make_temp_xlsx_path(excel_cc_cell_relation_long)
         tmp_dir_cell, tmp_excel_cell = _make_temp_xlsx_path(excel_cell_relation_long)
 
@@ -932,8 +943,16 @@ class ConsistencyChecks:
             # -------------------------------------------------------------------
             #  Write ConsistencyChecks_CellRelations.xlsx (TEMP)
             # -------------------------------------------------------------------
-            print(f"{module_name} {market_tag} [INFO] Saving {pretty_path(excel_cc_cell_relation)} (temp -> final)...")
-            with pd.ExcelWriter(tmp_excel_cc_long, engine="openpyxl") as writer:
+            print(f"{module_name} {market_tag} [INFO] Saving {pretty_path(excel_cc_cell_relation)} (engine={excel_engine}, temp -> final)...")
+
+            written_sheet_dfs: Dict[str, pd.DataFrame] = {}
+
+            if excel_engine == "xlsxwriter":
+                writer_ctx = pd.ExcelWriter(tmp_excel_cc_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+            else:
+                writer_ctx = pd.ExcelWriter(tmp_excel_cc_long, engine="openpyxl")
+
+            with writer_ctx as writer:
                 # Summary
                 summary_rows = []
                 if results:
@@ -959,20 +978,15 @@ class ConsistencyChecks:
                             "SourceFile_Post": pretty_path(meta.get("post_source_file", "")),
                         })
 
-                summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(
-                    columns=[
-                        "Table", "KeyColumns", "FreqColumn", "Relations_Pre", "Relations_Post",
-                        "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations",
-                        "SourceFile_Pre", "SourceFile_Post"
-                    ]
-                )
-
+                summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(columns=["Table", "KeyColumns", "FreqColumn", "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations", "SourceFile_Pre", "SourceFile_Post"])
                 summary_df.to_excel(writer, sheet_name="Summary", index=False)
+                written_sheet_dfs["Summary"] = summary_df
 
                 # NEW: add SummaryAuditComparisson sheet if PRE/POST ConfigurationAudit SummaryAudit are available
                 comparison_df = self.summaryaudit_comparison(module_name=module_name, market_tag=market_tag)
                 if comparison_df is not None and not comparison_df.empty:
                     comparison_df.to_excel(writer, sheet_name="SummaryAuditComparisson", index=False)
+                    written_sheet_dfs["SummaryAuditComparisson"] = comparison_df
 
                 # Summary_CellRelation
                 detailed_rows = []
@@ -1041,54 +1055,46 @@ class ConsistencyChecks:
                                 "Missing_Relations": int(miss_by_pair.get((fpre, fpost), 0)),
                             })
 
-                if detailed_rows:
-                    detailed_df = pd.DataFrame(detailed_rows)
-                else:
-                    detailed_df = pd.DataFrame(
-                        columns=[
-                            "Table", "KeyColumns", "FreqColumn", "Freq_Pre", "Freq_Post",
-                            "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown",
-                            "New_Relations", "Missing_Relations"
-                        ]
-                    )
-
+                detailed_df = pd.DataFrame(detailed_rows) if detailed_rows else pd.DataFrame(columns=["Table", "KeyColumns", "FreqColumn", "Freq_Pre", "Freq_Post", "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations"])
                 detailed_df.to_excel(writer, sheet_name="Summary_CellRelation", index=False)
+                written_sheet_dfs["Summary_CellRelation"] = detailed_df
 
-                # Highlight rows where Freq_Pre or Freq_Post matches old or new SSB frequency (Pre/Post)
-                try:
-                    from openpyxl.styles import PatternFill
+                # Highlight rows where Freq_Pre or Freq_Post matches old or new SSB frequency (Pre/Post) - openpyxl only
+                if excel_engine == "openpyxl":
+                    try:
+                        from openpyxl.styles import PatternFill
 
-                    ws_main = writer.sheets.get("Summary_CellRelation")
-                    if ws_main is not None:
-                        headers = {ws_main.cell(row=1, column=c).value: c for c in range(1, ws_main.max_column + 1)}
-                        col_freq_pre = headers.get("Freq_Pre")
-                        col_freq_post = headers.get("Freq_Post")
-                        if col_freq_pre and col_freq_post:
-                            yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                        ws_main = writer.sheets.get("Summary_CellRelation")
+                        if ws_main is not None:
+                            headers = {ws_main.cell(row=1, column=c).value: c for c in range(1, ws_main.max_column + 1)}
+                            col_freq_pre = headers.get("Freq_Pre")
+                            col_freq_post = headers.get("Freq_Post")
+                            if col_freq_pre and col_freq_post:
+                                yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
 
-                            def _to_int_or_none(v):
-                                try:
-                                    if v is None:
+                                def _to_int_or_none(v):
+                                    try:
+                                        if v is None:
+                                            return None
+                                        s = str(v).strip()
+                                        if not s or s == "<empty>":
+                                            return None
+                                        return int(float(s))
+                                    except Exception:
                                         return None
-                                    s = str(v).strip()
-                                    if not s or s == "<empty>":
-                                        return None
-                                    return int(float(s))
-                                except Exception:
-                                    return None
 
-                            old_freq = _to_int_or_none(self.n77_ssb_pre)
-                            new_freq = _to_int_or_none(self.n77_ssb_post)
-                            target_freqs = {f for f in [old_freq, new_freq] if f is not None}
+                                old_freq = _to_int_or_none(self.n77_ssb_pre)
+                                new_freq = _to_int_or_none(self.n77_ssb_post)
+                                target_freqs = {f for f in [old_freq, new_freq] if f is not None}
 
-                            for r in range(2, ws_main.max_row + 1):
-                                vpre = _to_int_or_none(ws_main.cell(row=r, column=col_freq_pre).value)
-                                vpost = _to_int_or_none(ws_main.cell(row=r, column=col_freq_post).value)
-                                if (vpre in target_freqs) or (vpost in target_freqs):
-                                    for c in range(1, ws_main.max_column + 1):
-                                        ws_main.cell(row=r, column=c).fill = yellow_fill
-                except Exception:
-                    pass
+                                for r in range(2, ws_main.max_row + 1):
+                                    vpre = _to_int_or_none(ws_main.cell(row=r, column=col_freq_pre).value)
+                                    vpost = _to_int_or_none(ws_main.cell(row=r, column=col_freq_post).value)
+                                    if (vpre in target_freqs) or (vpost in target_freqs):
+                                        for c in range(1, ws_main.max_column + 1):
+                                            ws_main.cell(row=r, column=c).fill = yellow_fill
+                    except Exception:
+                        pass
 
                 # Collect all dataframes that contain Correction_Cmd to export them later
                 correction_cmd_sources: Dict[str, pd.DataFrame] = {}
@@ -1104,15 +1110,8 @@ class ConsistencyChecks:
                     freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
                     unknown_text = "SSB Target Unknown"
 
-                    if "DiffColumns" in gu_disc_df.columns:
-                        diff_txt = gu_disc_df["DiffColumns"].astype(str).str.strip()
-                    else:
-                        diff_txt = pd.Series("", index=gu_disc_df.index)
-
-                    if "GNodeB_SSB_Target" in gu_disc_df.columns:
-                        tgt_txt = gu_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
-                    else:
-                        tgt_txt = pd.Series("", index=gu_disc_df.index)
+                    diff_txt = gu_disc_df["DiffColumns"].astype(str).str.strip() if "DiffColumns" in gu_disc_df.columns else pd.Series("", index=gu_disc_df.index)
+                    tgt_txt = gu_disc_df["GNodeB_SSB_Target"].astype(str).str.strip() if "GNodeB_SSB_Target" in gu_disc_df.columns else pd.Series("", index=gu_disc_df.index)
 
                     mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
                     mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post") & (~tgt_txt.eq("Unknown"))
@@ -1133,20 +1132,37 @@ class ConsistencyChecks:
                     correction_cmd_sources["GU_freq_disc"] = gu_freq_disc_cmd_df
                     correction_cmd_sources["GU_param_disc"] = gu_param_disc_cmd_df
 
-                    gu_rel_df.to_excel(writer, sheet_name="GU_relations", index=False)
-                    gu_param_disc_cmd_df.to_excel(writer, sheet_name="GU_param_disc", index=False)
-                    gu_freq_disc_cmd_df.to_excel(writer, sheet_name="GU_freq_disc", index=False)
-                    gu_unknown_df.to_excel(writer, sheet_name="GU_unknown", index=False)
-                    gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
-                    gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
-
+                    gu_rel_df.to_excel(writer, sheet_name="GU_relations", index=False);
+                    written_sheet_dfs["GU_relations"] = gu_rel_df
+                    gu_param_disc_cmd_df.to_excel(writer, sheet_name="GU_param_disc", index=False);
+                    written_sheet_dfs["GU_param_disc"] = gu_param_disc_cmd_df
+                    gu_freq_disc_cmd_df.to_excel(writer, sheet_name="GU_freq_disc", index=False);
+                    written_sheet_dfs["GU_freq_disc"] = gu_freq_disc_cmd_df
+                    gu_unknown_df.to_excel(writer, sheet_name="GU_unknown", index=False);
+                    written_sheet_dfs["GU_unknown"] = gu_unknown_df
+                    gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False);
+                    written_sheet_dfs["GU_missing"] = gu_missing_df
+                    gu_new_df.to_excel(writer, sheet_name="GU_new", index=False);
+                    written_sheet_dfs["GU_new"] = gu_new_df
                 else:
-                    pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
-                    enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_param_disc", index=False)
-                    enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_freq_disc", index=False)
-                    enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_unknown", index=False)
-                    enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_missing", index=False)
-                    enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_new", index=False)
+                    df0 = pd.DataFrame();
+                    df0.to_excel(writer, sheet_name="GU_relations", index=False);
+                    written_sheet_dfs["GU_relations"] = df0
+                    df1 = enforce_gu_columns(pd.DataFrame());
+                    df1.to_excel(writer, sheet_name="GU_param_disc", index=False);
+                    written_sheet_dfs["GU_param_disc"] = df1
+                    df2 = enforce_gu_columns(pd.DataFrame());
+                    df2.to_excel(writer, sheet_name="GU_freq_disc", index=False);
+                    written_sheet_dfs["GU_freq_disc"] = df2
+                    df3 = enforce_gu_columns(pd.DataFrame());
+                    df3.to_excel(writer, sheet_name="GU_unknown", index=False);
+                    written_sheet_dfs["GU_unknown"] = df3
+                    df4 = enforce_gu_columns(pd.DataFrame());
+                    df4.to_excel(writer, sheet_name="GU_missing", index=False);
+                    written_sheet_dfs["GU_missing"] = df4
+                    df5 = enforce_gu_columns(pd.DataFrame());
+                    df5.to_excel(writer, sheet_name="GU_new", index=False);
+                    written_sheet_dfs["GU_new"] = df5
 
                 # NR sheets
                 if results and "NRCellRelation" in results:
@@ -1159,15 +1175,8 @@ class ConsistencyChecks:
                     freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
                     unknown_text = "SSB Target Unknown"
 
-                    if "DiffColumns" in nr_disc_df.columns:
-                        diff_txt = nr_disc_df["DiffColumns"].astype(str).str.strip()
-                    else:
-                        diff_txt = pd.Series("", index=nr_disc_df.index)
-
-                    if "GNodeB_SSB_Target" in nr_disc_df.columns:
-                        tgt_txt = nr_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
-                    else:
-                        tgt_txt = pd.Series("", index=nr_disc_df.index)
+                    diff_txt = nr_disc_df["DiffColumns"].astype(str).str.strip() if "DiffColumns" in nr_disc_df.columns else pd.Series("", index=nr_disc_df.index)
+                    tgt_txt = nr_disc_df["GNodeB_SSB_Target"].astype(str).str.strip() if "GNodeB_SSB_Target" in nr_disc_df.columns else pd.Series("", index=nr_disc_df.index)
 
                     mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
                     mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post") & (~tgt_txt.eq("Unknown"))
@@ -1187,22 +1196,37 @@ class ConsistencyChecks:
                     correction_cmd_sources["NR_freq_disc"] = nr_freq_disc_cmd_df
                     correction_cmd_sources["NR_param_disc"] = nr_param_disc_cmd_df
 
-                    nr_rel_df.to_excel(writer, sheet_name="NR_relations", index=False)
-                    nr_param_disc_cmd_df.to_excel(writer, sheet_name="NR_param_disc", index=False)
-                    nr_freq_disc_cmd_df.to_excel(writer, sheet_name="NR_freq_disc", index=False)
-                    nr_unknown_df.to_excel(writer, sheet_name="NR_unknown", index=False)
-                    nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
-                    nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
-
+                    nr_rel_df.to_excel(writer, sheet_name="NR_relations", index=False);
+                    written_sheet_dfs["NR_relations"] = nr_rel_df
+                    nr_param_disc_cmd_df.to_excel(writer, sheet_name="NR_param_disc", index=False);
+                    written_sheet_dfs["NR_param_disc"] = nr_param_disc_cmd_df
+                    nr_freq_disc_cmd_df.to_excel(writer, sheet_name="NR_freq_disc", index=False);
+                    written_sheet_dfs["NR_freq_disc"] = nr_freq_disc_cmd_df
+                    nr_unknown_df.to_excel(writer, sheet_name="NR_unknown", index=False);
+                    written_sheet_dfs["NR_unknown"] = nr_unknown_df
+                    nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False);
+                    written_sheet_dfs["NR_missing"] = nr_missing_df
+                    nr_new_df.to_excel(writer, sheet_name="NR_new", index=False);
+                    written_sheet_dfs["NR_new"] = nr_new_df
                 else:
-                    pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
-                    enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_param_disc", index=False)
-                    enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_freq_disc", index=False)
-                    enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_unknown", index=False)
-                    empty_nr_missing_df = enforce_nr_columns(pd.DataFrame())
-                    empty_nr_new_df = enforce_nr_columns(pd.DataFrame())
-                    empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
-                    empty_nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
+                    df0 = pd.DataFrame();
+                    df0.to_excel(writer, sheet_name="NR_relations", index=False);
+                    written_sheet_dfs["NR_relations"] = df0
+                    df1 = enforce_nr_columns(pd.DataFrame());
+                    df1.to_excel(writer, sheet_name="NR_param_disc", index=False);
+                    written_sheet_dfs["NR_param_disc"] = df1
+                    df2 = enforce_nr_columns(pd.DataFrame());
+                    df2.to_excel(writer, sheet_name="NR_freq_disc", index=False);
+                    written_sheet_dfs["NR_freq_disc"] = df2
+                    df3 = enforce_nr_columns(pd.DataFrame());
+                    df3.to_excel(writer, sheet_name="NR_unknown", index=False);
+                    written_sheet_dfs["NR_unknown"] = df3
+                    df4 = enforce_nr_columns(pd.DataFrame());
+                    df4.to_excel(writer, sheet_name="NR_missing", index=False);
+                    written_sheet_dfs["NR_missing"] = df4
+                    df5 = enforce_nr_columns(pd.DataFrame());
+                    df5.to_excel(writer, sheet_name="NR_new", index=False);
+                    written_sheet_dfs["NR_new"] = df5
 
                 # Export text files (outside GU/NR blocks)
                 if correction_cmd_sources:
@@ -1211,41 +1235,59 @@ class ConsistencyChecks:
                 # -------------------------------------------------------------------
                 #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
                 # -------------------------------------------------------------------
-                color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
-                style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
+                if excel_engine == "xlsxwriter":
+                    style_headers_autofilter_and_autofit_xlsxwriter(writer, sheet_dfs=written_sheet_dfs, freeze_header=True, align="left", max_autofit_rows=fast_excel_autofit_rows, max_col_width=fast_excel_autofit_max_width, enable_a1_hyperlinks=True, hyperlink_sheet="Summary_CellRelation")
 
-                ws_comp = writer.sheets.get("SummaryAuditComparisson")
-                if ws_comp is not None:
-                    apply_alternating_category_row_fills(ws_comp, value_header="Value_Post")
+                    # Hyperlink A1 -> Summary_CellRelation (xlsxwriter)
+                    try:
+                        link_fmt = writer.book.add_format({"font_color": "#0563C1", "underline": 1})
+                        for ws_name, ws in writer.sheets.items():
+                            if ws_name == "Summary_CellRelation":
+                                continue
+                            df_for_ws = written_sheet_dfs.get(ws_name)
+                            header_text = str(list(df_for_ws.columns)[0]) if df_for_ws is not None and hasattr(df_for_ws, "columns") and len(list(df_for_ws.columns)) > 0 else "A1"
+                            ws.write_url(0, 0, "internal:Summary_CellRelation!A1", link_fmt, header_text)
+                    except Exception:
+                        pass
+                else:
+                    color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
+                    style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left", enable_a1_hyperlink=True, hyperlink_sheet="Summary_CellRelation")
 
-                try:
-                    for ws_name, ws in writer.sheets.items():
-                        if ws_name == "Summary_CellRelation":
-                            continue
-                        cell = ws["A1"]
-                        cell.hyperlink = "#'Summary_CellRelation'!A1"
-                        try:
-                            cell.font = cell.font.copy(color="0000FF", underline="single")
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
+                    ws_comp = writer.sheets.get("SummaryAuditComparisson")
+                    if ws_comp is not None:
+                        apply_alternating_category_row_fills(ws_comp, value_header="Value_Post")
+
 
             _move_into_place(tmp_excel_cc_long, excel_cc_cell_relation_long)
 
             # -------------------------------------------------------------------
             #  Write CellRelations.xlsx (TEMP)
             # -------------------------------------------------------------------
-            print(f"{module_name} {market_tag} [INFO] Saving {pretty_path(excel_cell_relation)} (temp -> final)...")
-            with pd.ExcelWriter(tmp_excel_cell_long, engine="openpyxl") as writer:
-                if "GUtranCellRelation" in self.tables:
-                    self.tables["GUtranCellRelation"].to_excel(writer, sheet_name="GU_all", index=False)
-                if "NRCellRelation" in self.tables:
-                    self.tables["NRCellRelation"].to_excel(writer, sheet_name="NR_all", index=False)
+            print(f"{module_name} {market_tag} [INFO] Saving {pretty_path(excel_cell_relation)} (engine={excel_engine}, temp -> final)...")
 
-                    # -------------------------------------------------------------------
-                    #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
-                    # -------------------------------------------------------------------
+            written_sheet_dfs2: Dict[str, pd.DataFrame] = {}
+
+            if excel_engine == "xlsxwriter":
+                writer_ctx2 = pd.ExcelWriter(tmp_excel_cell_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+            else:
+                writer_ctx2 = pd.ExcelWriter(tmp_excel_cell_long, engine="openpyxl")
+
+            with writer_ctx2 as writer:
+                if "GUtranCellRelation" in self.tables:
+                    df_gu = self.tables["GUtranCellRelation"]
+                    df_gu.to_excel(writer, sheet_name="GU_all", index=False)
+                    written_sheet_dfs2["GU_all"] = df_gu
+                if "NRCellRelation" in self.tables:
+                    df_nr = self.tables["NRCellRelation"]
+                    df_nr.to_excel(writer, sheet_name="NR_all", index=False)
+                    written_sheet_dfs2["NR_all"] = df_nr
+
+                # -------------------------------------------------------------------
+                #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
+                # -------------------------------------------------------------------
+                if excel_engine == "xlsxwriter":
+                    style_headers_autofilter_and_autofit_xlsxwriter(writer, sheet_dfs=written_sheet_dfs2, freeze_header=True, align="left", max_autofit_rows=fast_excel_autofit_rows, max_col_width=fast_excel_autofit_max_width, enable_a1_hyperlinks=False, hyperlink_sheet="")
+                else:
                     style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
 
             _move_into_place(tmp_excel_cell_long, excel_cell_relation_long)
@@ -1262,3 +1304,4 @@ class ConsistencyChecks:
                     shutil.rmtree(tmp_dir_cell, ignore_errors=True)
             except Exception:
                 pass
+

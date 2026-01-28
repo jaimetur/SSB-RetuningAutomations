@@ -11,7 +11,7 @@ import pandas as pd
 
 from src.utils.utils_io import find_log_files, read_text_file, to_long_path, pretty_path
 from src.utils.utils_parsing import SUMMARY_RE, find_all_subnetwork_headers, extract_mo_from_subnetwork_line, parse_table_slice_from_subnetwork, parse_log_lines, find_subnetwork_header_index, extract_mo_name_from_previous_line, cap_rows
-from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit
+from src.utils.utils_excel import sanitize_sheet_name, unique_sheet_name, color_summary_tabs, apply_alternating_category_row_fills, style_headers_autofilter_and_autofit, style_headers_autofilter_and_autofit_xlsxwriter
 from src.utils.utils_sorting import natural_logfile_key
 from src.utils.utils_pivot import safe_pivot_count, safe_crosstab_count, apply_frequency_column_filter
 from src.utils.utils_dataframe import concat_or_empty
@@ -98,7 +98,10 @@ class ConfigurationAudit:
             source_zip_path: Optional[str] = None,  # <<< NEW: original ZIP path containing the logs (if input was a ZIP)
             extracted_root: Optional[str] = None,  # <<< NEW: temp extraction root folder (used to rebuild ZIP-based LogPath)
             export_correction_cmd: bool = True,
-            correction_cmd_folder_name: str = "Correction_Cmd_CA"
+            correction_cmd_folder_name: str = "Correction_Cmd_CA",
+            fast_excel_export: bool = False,
+            fast_excel_autofit_rows: int = 50,
+            fast_excel_autofit_max_width: int = 60
     ) -> str:
 
         """
@@ -662,7 +665,22 @@ class ConfigurationAudit:
                     writer = None
                     writer_closed = False
                     try:
-                        writer = pd.ExcelWriter(tmp_excel_path_long, engine="openpyxl")
+                        excel_engine = "openpyxl"
+                        if fast_excel_export:
+                            try:
+                                import xlsxwriter  # noqa: F401
+                                excel_engine = "xlsxwriter"
+                            except Exception:
+                                excel_engine = "openpyxl"
+
+                        if excel_engine == "xlsxwriter":
+                            writer = pd.ExcelWriter(tmp_excel_path_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+                        else:
+                            writer = pd.ExcelWriter(tmp_excel_path_long, engine="openpyxl")
+
+                        written_sheet_dfs: dict[str, pd.DataFrame] = {}
+                        _log_info(f"PHASE 5.0: Using Excel engine: {excel_engine}")
+
                         t_open1 = time.perf_counter()
                         _log_info(f"PHASE 5.0: ExcelWriter OPEN done in {format_duration_hms(t_open1 - t_open0)} ({t_open1 - t_open0:.3f}s)")
 
@@ -674,22 +692,27 @@ class ConfigurationAudit:
                         with log_phase_timer("PHASE 5.1: Write Summary + SummaryAudit", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                             # Write Summary first
                             pd.DataFrame(summary_rows).to_excel(writer, sheet_name="Summary", index=False)
+                            written_sheet_dfs["Summary"] = pd.DataFrame(summary_rows)
 
                             # SummaryAudit with high-level checks
                             summary_audit_df.to_excel(writer, sheet_name="SummaryAudit", index=False)
+                            written_sheet_dfs["SummaryAudit"] = summary_audit_df
 
                             # Apply alternating background colors by Category for SummaryAudit sheet
-                            wb = writer.book
+                            # NOTE: apply_alternating_category_row_fills is openpyxl-only (xlsxwriter Worksheet is not subscriptable)
                             ws_summary_audit = writer.sheets.get("SummaryAudit")
-                            if ws_summary_audit is not None:
+                            if excel_engine == "openpyxl" and ws_summary_audit is not None:
                                 apply_alternating_category_row_fills(ws_summary_audit, category_header="Category")
+
 
                             # New: separate NR / LTE param mismatching sheets
                             if not param_mismatch_nr_df.empty:
                                 param_mismatch_nr_df.to_excel(writer, sheet_name="Summary NR Param Mismatching", index=False)
+                                written_sheet_dfs["Summary NR Param Mismatching"] = param_mismatch_nr_df
 
                             if not param_mismatch_gu_df.empty:
                                 param_mismatch_gu_df.to_excel(writer, sheet_name="Summary LTE Param Mismatching", index=False)
+                                written_sheet_dfs["Summary LTE Param Mismatching"] = param_mismatch_gu_df
 
                         # ------------------------------------------------------------------
                         # PHASE 5.2: Write pivot summary sheets
@@ -697,11 +720,18 @@ class ConfigurationAudit:
                         with log_phase_timer("PHASE 5.2: Write pivot summary sheets", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
                             # Extra summary sheets
                             pivot_nr_cells_du.to_excel(writer, sheet_name="Summary NR_CellDU", index=False)
+                            written_sheet_dfs["Summary NR_CellDU"] = pivot_nr_cells_du
                             pivot_nr_sector_carrier.to_excel(writer, sheet_name="Summary NR_SectorCarrier", index=False)
+                            written_sheet_dfs["Summary NR_SectorCarrier"] = pivot_nr_sector_carrier
                             pivot_nr_freq.to_excel(writer, sheet_name="Summary NR_Frequency", index=False)
+                            written_sheet_dfs["Summary NR_Frequency"] = pivot_nr_freq
                             pivot_nr_freq_rel.to_excel(writer, sheet_name="Summary NR_FreqRelation", index=False)
+                            written_sheet_dfs["Summary NR_FreqRelation"] = pivot_nr_freq_rel
                             pivot_gu_sync_signal_freq.to_excel(writer, sheet_name="Summary GU_SyncSignalFrequency", index=False)
+                            written_sheet_dfs["Summary GU_SyncSignalFrequency"] = pivot_gu_sync_signal_freq
                             pivot_gu_freq_rel.to_excel(writer, sheet_name="Summary GU_FreqRelation", index=False)
+                            written_sheet_dfs["Summary GU_FreqRelation"] = pivot_gu_freq_rel
+
 
                         # ------------------------------------------------------------------
                         # PHASE 5.3: Write parsed MO tables
@@ -719,6 +749,7 @@ class ConfigurationAudit:
                                 written += 1
                                 sheet_start = time.perf_counter()
                                 entry["df"].to_excel(writer, sheet_name=entry["final_sheet"], index=False)
+                                written_sheet_dfs[str(entry["final_sheet"])] = entry["df"]
                                 sheet_elapsed = time.perf_counter() - sheet_start
 
                                 if show_phase_timings and sheet_elapsed >= float(slow_sheet_seconds_threshold):
@@ -732,54 +763,16 @@ class ConfigurationAudit:
                         # PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)
                         # ------------------------------------------------------------------
                         with log_phase_timer("PHASE 5.4: Style sheets (tabs, headers, autofit, hyperlinks)", log_fn=_log_info, show_start=show_phase_starts, show_end=False, show_timing=show_phase_timings, line_prefix="", start_level="INFO", end_level="INFO", timing_level="INFO"):
-                            # Color the 'Summary*' tabs in green
-                            color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
+                            if excel_engine == "xlsxwriter":
+                                style_headers_autofilter_and_autofit_xlsxwriter(writer, sheet_dfs=written_sheet_dfs, freeze_header=True, align="left", max_autofit_rows=fast_excel_autofit_rows, max_col_width=fast_excel_autofit_max_width, enable_a1_hyperlinks=True, hyperlink_sheet="SummaryAudit", category_sheet_map=candidate_to_final_sheet)
+                            else:
+                                # Color the 'Summary*' tabs in green
+                                color_summary_tabs(writer, prefix="Summary", rgb_hex="00B050")
 
-                            # Apply header color + auto-fit to all sheets
-                            # Optimization: default autofit only scans the first N rows (handled inside style_headers_autofilter_and_autofit)
-                            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
+                                # Apply header color + auto-fit to all sheets
+                                # Optimization: default autofit only scans the first N rows (handled inside style_headers_autofilter_and_autofit)
+                                style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left", enable_a1_hyperlink=True, hyperlink_sheet="SummaryAudit", category_sheet_map=candidate_to_final_sheet)
 
-                            # ------------------------------------------------------------------
-                            # Add A1 hyperlink to SummaryAudit in ALL sheets (keep cell value)
-                            # ------------------------------------------------------------------
-                            try:
-                                wb = writer.book
-                                if "SummaryAudit" in wb.sheetnames:
-                                    for ws in wb.worksheets:
-                                        if ws.title == "SummaryAudit":
-                                            continue
-                                        cell = ws["A1"]
-                                        cell.hyperlink = "#SummaryAudit!A1"
-                                        cell.font = Font(color="0563C1", underline="single")
-                            except Exception:
-                                pass
-
-
-                            # ------------------------------------------------------------------
-                            # Add hyperlinks from SummaryAudit.Category to corresponding sheets
-                            # ------------------------------------------------------------------
-                            ws_summary_audit = writer.sheets.get("SummaryAudit")
-                            if ws_summary_audit is not None:
-                                header = [cell.value for cell in ws_summary_audit[1]]
-                                try:
-                                    category_col_idx = header.index("Category") + 1
-                                except ValueError:
-                                    category_col_idx = None
-
-                                if category_col_idx:
-                                    for row in range(2, ws_summary_audit.max_row + 1):
-                                        cell = ws_summary_audit.cell(row=row, column=category_col_idx)
-                                        raw = str(cell.value).strip() if cell.value else ""
-                                        target_sheet = raw
-
-                                        # 1) If no exists a sheet with that name, try to resolve using the previous mapping
-                                        if target_sheet and target_sheet not in writer.book.sheetnames:
-                                            target_sheet = candidate_to_final_sheet.get(raw, raw)
-
-                                        # 2) If exists a sheet with that name, create hyperlink
-                                        if target_sheet and target_sheet in writer.book.sheetnames:
-                                            cell.hyperlink = f"#{target_sheet}!A1"
-                                            cell.font = Font(color="0563C1", underline="single")
 
                         # ------------------------------------------------------------------
                         # PHASE 5.5: CLOSE / FINALIZE workbook

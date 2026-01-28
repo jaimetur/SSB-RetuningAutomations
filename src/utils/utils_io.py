@@ -630,14 +630,15 @@ def pretty_path(path: str) -> str:
         return path[4:]
     return path
 
-def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True) -> None:
+def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True, start_marker: Optional[str] = None) -> None:
     """
     If sys.stdout is LoggerDual, mirror the current log file into the given output folder.
 
     IMPORTANT:
     - In batch mode we want ONE mirror per execution folder (not accumulating mirrors).
     - Optionally copy current log content into the mirror (default True to keep old behavior).
-      For per-execution logs in batch mode, pass copy_existing_log=False.
+    - If start_marker is provided, we copy ONLY the log content from the last occurrence of that marker.
+      This is the safest way to get a full per-execution log in batch mode without including previous runs.
     """
     try:
         out_dir_fs = to_long_path(output_dir) if output_dir else output_dir
@@ -674,7 +675,7 @@ def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True) ->
         except Exception:
             pass
 
-        # NEW: ensure only one mirror is active (needed for batch mode per-folder logs)
+        # Ensure only one mirror is active (needed for batch mode per-folder logs)
         try:
             if callable(clear_fn):
                 clear_fn()
@@ -688,11 +689,23 @@ def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True) ->
             pass
 
         if copy_existing_log:
-            # Copy current log content so the mirror contains the initial lines logged before adding the mirror
             try:
                 if os.path.isfile(log_path_fs):
-                    with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
-                        content = src_fh.read()
+                    content = ""
+                    if start_marker:
+                        try:
+                            marker = str(start_marker)
+                            with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
+                                full = src_fh.read()
+                            idx = full.rfind(marker)
+                            content = full[idx:] if idx >= 0 else full
+                        except Exception:
+                            with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
+                                content = src_fh.read()
+                    else:
+                        with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
+                            content = src_fh.read()
+
                     with open(mirror_path_fs, "w", encoding="utf-8") as dst_fh:
                         dst_fh.write(content)
             except Exception:
@@ -708,6 +721,7 @@ def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True) ->
         add_fn(mirror_path_fs)
     except Exception:
         return
+
 
 
 

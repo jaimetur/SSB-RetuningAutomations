@@ -805,6 +805,8 @@ def run_configuration_audit(
         Run ConfigurationAudit for a single folder that is already known
         to contain valid logs.
         """
+        start_marker = f"{module_name} [INFO] === START ConfigurationAudit: '{pretty_path(folder)}' ==="
+        print(start_marker)
         print(f"{module_name} [INFO] Running Audit…")
         print(f"{module_name} [INFO] Input folder: '{pretty_path(folder)}'")
         if ca_freq_filters_csv:
@@ -855,7 +857,7 @@ def run_configuration_audit(
             output_dir = os.path.join(folder_fs, f"{folder_prefix}_{folder_versioned_suffix}{suffix}")
 
         os.makedirs(output_dir, exist_ok=True)
-        attach_output_log_mirror(output_dir, copy_existing_log=False)
+        attach_output_log_mirror(output_dir, copy_existing_log=True, start_marker=start_marker)
         print(f"{module_name} [INFO] Output folder: '{pretty_path(output_dir)}'")
 
 
@@ -875,8 +877,7 @@ def run_configuration_audit(
                     app = ConfigurationAudit(n77_ssb_pre=local_n77_ssb_pre, n77_ssb_post=local_n77_ssb_post)
 
         # Include output_dir in kwargs passed to ConfigurationAudit.run
-        kwargs = dict(module_name=module_name, versioned_suffix=file_versioned_suffix, tables_order=TABLES_ORDER, output_dir=output_dir, profiles_audit=profiles_audit, export_correction_cmd=export_correction_cmd, correction_cmd_folder_name="Correction_Cmd_CA")
-
+        kwargs = dict(module_name=module_name, versioned_suffix=file_versioned_suffix, tables_order=TABLES_ORDER, output_dir=output_dir, profiles_audit=profiles_audit, export_correction_cmd=export_correction_cmd, correction_cmd_folder_name="Correction_Cmd_CA", fast_excel_export=True, fast_excel_autofit_rows=50, fast_excel_autofit_max_width=60)
 
         # Provide ZIP context to ConfigurationAudit so Summary.LogPath can point to "<zip>/<log>"
         if resolved and resolved.zip_path:
@@ -1464,7 +1465,7 @@ def run_consistency_checks(
                 else:
                     print(f"{module_name} {market_tag} [INFO] Frequencies not provided. Comparison will be skipped; only tables will be saved.")
 
-                app.save_outputs_excel(output_dir=output_dir, results=results, versioned_suffix=file_versioned_suffix, module_name=module_name, market_tag=market_tag)
+                app.save_outputs_excel(output_dir=output_dir, results=results, versioned_suffix=file_versioned_suffix, module_name=module_name, market_tag=market_tag, fast_excel_export=True, fast_excel_autofit_rows=50, fast_excel_autofit_max_width=60)
 
                 print(f"\n{module_name} {market_tag} [INFO] Outputs saved to: '{pretty_path(output_dir)}'")
                 if results:
