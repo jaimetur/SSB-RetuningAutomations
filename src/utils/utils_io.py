@@ -630,14 +630,14 @@ def pretty_path(path: str) -> str:
         return path[4:]
     return path
 
-def attach_output_log_mirror(output_dir: str) -> None:
+def attach_output_log_mirror(output_dir: str, copy_existing_log: bool = True) -> None:
     """
     If sys.stdout is LoggerDual, mirror the current log file into the given output folder.
-    This allows having the same live-updating log inside Logs/ and also inside the output folder.
 
     IMPORTANT:
-    - The mirror file is usually attached after some log lines were already written.
-    - To avoid missing the initial part of the log in the output folder, we first copy the current log content.
+    - In batch mode we want ONE mirror per execution folder (not accumulating mirrors).
+    - Optionally copy current log content into the mirror (default True to keep old behavior).
+      For per-execution logs in batch mode, pass copy_existing_log=False.
     """
     try:
         out_dir_fs = to_long_path(output_dir) if output_dir else output_dir
@@ -646,6 +646,7 @@ def attach_output_log_mirror(output_dir: str) -> None:
 
         logger_obj = sys.stdout
         add_fn = getattr(logger_obj, "add_mirror_file", None)
+        clear_fn = getattr(logger_obj, "clear_mirror_files", None)
         log_path = getattr(logger_obj, "log_path", "")
         if not callable(add_fn) or not log_path:
             return
@@ -673,20 +674,41 @@ def attach_output_log_mirror(output_dir: str) -> None:
         except Exception:
             pass
 
-        # Copy current log content so the mirror contains the initial lines logged before adding the mirror
+        # NEW: ensure only one mirror is active (needed for batch mode per-folder logs)
         try:
-            if os.path.isfile(log_path_fs):
-                os.makedirs(os.path.dirname(mirror_path_fs), exist_ok=True)
-                with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
-                    content = src_fh.read()
-                with open(mirror_path_fs, "w", encoding="utf-8") as dst_fh:
-                    dst_fh.write(content)
+            if callable(clear_fn):
+                clear_fn()
         except Exception:
             pass
+
+        # Ensure folder exists and decide whether to backfill the mirror
+        try:
+            os.makedirs(os.path.dirname(mirror_path_fs), exist_ok=True)
+        except Exception:
+            pass
+
+        if copy_existing_log:
+            # Copy current log content so the mirror contains the initial lines logged before adding the mirror
+            try:
+                if os.path.isfile(log_path_fs):
+                    with open(log_path_fs, "r", encoding="utf-8", errors="ignore") as src_fh:
+                        content = src_fh.read()
+                    with open(mirror_path_fs, "w", encoding="utf-8") as dst_fh:
+                        dst_fh.write(content)
+            except Exception:
+                pass
+        else:
+            # Start a clean per-execution mirror file
+            try:
+                with open(mirror_path_fs, "w", encoding="utf-8") as _dst_fh:
+                    _dst_fh.write("")
+            except Exception:
+                pass
 
         add_fn(mirror_path_fs)
     except Exception:
         return
+
 
 
 def _find_first_dir_with_valid_logs(root_folder: str) -> Optional[str]:

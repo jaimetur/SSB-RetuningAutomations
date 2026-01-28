@@ -207,6 +207,18 @@ class LoggerDual:
         except Exception:
             return False
 
+    def clear_mirror_files(self) -> None:
+        """Close and remove all mirror log files (best-effort)."""
+        try:
+            for _p, fh in self._mirror_logs:
+                try:
+                    fh.close()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        self._mirror_logs = []
+
     def _now_prefix(self) -> str:
         """Build a timestamp prefix for the log file."""
         return f"[{datetime.now().strftime(self.timestamp_format)}] "

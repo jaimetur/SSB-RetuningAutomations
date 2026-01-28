@@ -855,9 +855,9 @@ def run_configuration_audit(
             output_dir = os.path.join(folder_fs, f"{folder_prefix}_{folder_versioned_suffix}{suffix}")
 
         os.makedirs(output_dir, exist_ok=True)
+        attach_output_log_mirror(output_dir, copy_existing_log=False)
         print(f"{module_name} [INFO] Output folder: '{pretty_path(output_dir)}'")
 
-        attach_output_log_mirror(output_dir)
 
         # Progressive fallback in case the installed ConfigurationAudit has an older signature
         try:
@@ -1238,7 +1238,7 @@ def run_consistency_checks(
                     output_dir = os.path.join(post_dir_fs, f"ConsistencyChecks_{folder_versioned_suffix}")
                 os.makedirs(output_dir, exist_ok=True)
 
-                attach_output_log_mirror(output_dir)
+                attach_output_log_mirror(output_dir, copy_existing_log=False)
 
                 # NEW: write FoldersCompared.txt with the exact PRE/POST folders used
                 try:
