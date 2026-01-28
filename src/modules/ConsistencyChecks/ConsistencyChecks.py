@@ -775,7 +775,7 @@ class ConsistencyChecks:
                 return None
 
             try:
-                wanted = {"Category", "SubCategory", "Metric", "Value", "ExtraInfo"}
+                wanted = {"Category", "SubCategory", "Metric", "Value"}
                 df = pd.read_excel(x_path, sheet_name="SummaryAudit", usecols=lambda c: c in wanted, engine="openpyxl")
             except Exception as e:
                 print(f"{module_name} [WARNING] Could not read 'SummaryAudit' sheet from {label} audit Excel '{path}': {e}.")
@@ -791,6 +791,19 @@ class ConsistencyChecks:
         print(f"{module_name} Loading ConfigurationAudits to extract SummaryAudit sheets...")
         pre_df = pre_cached.copy() if pre_cached is not None else (_load_summary(pre_path, "PRE") if pre_path else None)
         post_df = post_cached.copy() if post_cached is not None else (_load_summary(post_path, "POST") if post_path else None)
+
+        # Keep ExtraInfo in SummaryAudit for other checks, but exclude it from SummaryAuditComparisson
+        cmp_cols = ["Category", "SubCategory", "Metric", "Value"]
+
+        if isinstance(pre_df, pd.DataFrame):
+            if "Value" not in pre_df.columns:
+                pre_df["Value"] = pd.NA
+            pre_df = pre_df.loc[:, [c for c in cmp_cols if c in pre_df.columns]].copy()
+
+        if isinstance(post_df, pd.DataFrame):
+            if "Value" not in post_df.columns:
+                post_df["Value"] = pd.NA
+            post_df = post_df.loc[:, [c for c in cmp_cols if c in post_df.columns]].copy()
 
         if pre_df is None and post_df is None:
             return None
@@ -872,7 +885,7 @@ class ConsistencyChecks:
         # -------------------------------------------------------------------
         #  Write ConsistencyChecks_CellRelations.xlsx
         # -------------------------------------------------------------------
-        print(f"{module_name} Saving {excel_cc_cell_relation}...")
+        print(f"{module_name} Saving {pretty_path(excel_cc_cell_relation)}...")
         with pd.ExcelWriter(excel_cc_cell_relation_long, engine="openpyxl") as writer:
             # Summary
             summary_rows = []
@@ -1191,7 +1204,7 @@ class ConsistencyChecks:
         # -------------------------------------------------------------------
         #  Write CellRelations.xlsx
         # -------------------------------------------------------------------
-        print(f"{module_name} Saving {excel_cell_relation}...")
+        print(f"{module_name} Saving {pretty_path(excel_cell_relation)}...")
 
         with pd.ExcelWriter(excel_cell_relation_long, engine="openpyxl") as writer:
             if "GUtranCellRelation" in self.tables:
