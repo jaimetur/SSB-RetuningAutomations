@@ -241,6 +241,7 @@ def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.Dat
 
     By default, outputs are written into a ZIP (same behavior as ConfigurationAudit exporters).
     """
+    import zipfile
 
     def _detect_layer_from_category(category: str) -> str:
         s = str(category or "").strip().upper()
@@ -269,7 +270,7 @@ def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.Dat
         def _write_text(target_dir: str, file_name: str, text: str) -> None:
             if export_to_zip and zip_file is not None:
                 target_dir_clean = str(target_dir).replace("\\", "/").strip("/")
-                arcname = f"{base_folder_name}/{target_dir_clean}/{file_name}" if target_dir_clean else f"{base_folder_name}/{file_name}"
+                arcname = f"{target_dir_clean}/{file_name}" if target_dir_clean else f"{file_name}"
                 zip_file.writestr(arcname.replace("\\", "/"), text)
                 return
 
@@ -347,11 +348,11 @@ def export_relations_commands(output_dir: str, dfs_by_category: Dict[str, pd.Dat
 
         if total_files > 0:
             if export_to_zip and zip_file is not None:
-                print(f"\n{module_name} [INFO] Generated {total_files} Correction_Cmd files in ZIP: '{pretty_path(zip_path or '')}'")
+                print(f"{module_name} [INFO] Generated {total_files} Correction Commands files in ZIP: '{pretty_path(zip_path or '')}'")
             else:
-                print(f"\n{module_name} [INFO] Generated {total_files} Correction_Cmd files in: '{pretty_path(base_dir)}'")
+                print(f"{module_name} [INFO] Generated {total_files} Correction Commands files in: '{pretty_path(base_dir)}'")
         else:
-            print(f"\n{module_name} [INFO] No relations Correction_Cmd files generated.")
+            print(f"\n{module_name} [INFO] No relations Correction Commands files generated.")
 
         return total_files
 
@@ -596,11 +597,11 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
 
         if total_files >0:
             if export_to_zip and zip_file is not None:
-                print(f"{module_name} [INFO] Generated {total_files} Termpoints/Externals Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path or '')}'")
+                print(f"{module_name} [INFO] Generated {total_files} Termpoints/Externals Correction Commands files from Configuration Audit in ZIP: '{pretty_path(zip_path or '')}'")
             else:
-                print(f"{module_name} [INFO] Generated {total_files} Termpoints/Externals Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+                print(f"{module_name} [INFO] Generated {total_files} Termpoints/Externals Correction Commands files from Configuration Audit in: '{pretty_path(base_dir)}'")
         else:
-            print(f"{module_name} [INFO] No Termpoints/Externals Correction_Cmd files generated from Configuration Audit.")
+            print(f"{module_name} [INFO] No Termpoints/Externals Correction Commands files generated from Configuration Audit.")
 
         return total_files
 
@@ -731,11 +732,11 @@ def export_all_sheets_with_correction_commands(audit_post_excel: str, output_dir
 
         if total_files>0:
             if export_to_zip and zip_path:
-                print(f"{module_name} [INFO] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in ZIP: '{pretty_path(zip_path)}'")
+                print(f"{module_name} [INFO] Generated {total_files} Other_MOs (sheet-based) Correction Commands files from Configuration Audit in ZIP: '{pretty_path(zip_path)}'")
             else:
-                print(f"{module_name} [INFO] Generated {total_files} Other_MOs (sheet-based) Correction_Cmd files from Configuration Audit in: '{pretty_path(base_dir)}'")
+                print(f"{module_name} [INFO] Generated {total_files} Other_MOs (sheet-based) Correction Commands files from Configuration Audit in: '{pretty_path(base_dir)}'")
         else:
-            print(f"{module_name} [INFO] No Other_MOs (sheet-based) Correction_Cmd files generated from Configuration Audit.")
+            print(f"{module_name} [INFO] No Other_MOs (sheet-based) Correction Commands files generated from Configuration Audit.")
 
         return total_files
 

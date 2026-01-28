@@ -826,7 +826,13 @@ def run_configuration_audit(
 
             if out and hasattr(app, "_last_summary_audit_df"):
                 try:
-                    CONFIG_AUDIT_SUMMARY_CACHE[out] = getattr(app, "_last_summary_audit_df")
+                    df_cached = getattr(app, "_last_summary_audit_df")
+                    CONFIG_AUDIT_SUMMARY_CACHE[out] = df_cached
+                    try:
+                        out_long = to_long_path(out)
+                        CONFIG_AUDIT_SUMMARY_CACHE[out_long] = df_cached
+                    except Exception:
+                        pass
                 except Exception:
                     pass
 
@@ -1311,21 +1317,25 @@ def run_consistency_checks(
 
                 results = None
                 if n77_ssb_pre and n77_ssb_post:
-                    pre_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(pre_audit_excel) if pre_audit_excel and "CONFIG_AUDIT_SUMMARY_CACHE" in globals() else None
-                    post_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(post_audit_excel) if post_audit_excel and "CONFIG_AUDIT_SUMMARY_CACHE" in globals() else None
-                    try:
-                        results = app.comparePrePost(n77_ssb_pre, n77_ssb_post, module_name, pre_audit_excel, post_audit_excel, audit_pre_summary_audit_df=pre_summary_df, audit_post_summary_audit_df=post_summary_df)
-                    except TypeError:
+                    pre_summary_df = None
+                    post_summary_df = None
+
+                    if pre_audit_excel and "CONFIG_AUDIT_SUMMARY_CACHE" in globals():
                         try:
-                            results = app.comparePrePost(n77_ssb_pre, n77_ssb_post, module_name, pre_audit_excel, post_audit_excel)
-                        except TypeError:
-                            try:
-                                results = app.comparePrePost(n77_ssb_pre, n77_ssb_post, module_name, post_audit_excel)
-                            except TypeError:
-                                try:
-                                    results = app.comparePrePost(n77_ssb_pre, n77_ssb_post, module_name)
-                                except TypeError:
-                                    results = app.comparePrePost(n77_ssb_pre, n77_ssb_post)
+                            pre_key = to_long_path(pre_audit_excel)
+                        except Exception:
+                            pre_key = pre_audit_excel
+                        pre_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(pre_key) or CONFIG_AUDIT_SUMMARY_CACHE.get(pre_audit_excel)
+
+                    if post_audit_excel and "CONFIG_AUDIT_SUMMARY_CACHE" in globals():
+                        try:
+                            post_key = to_long_path(post_audit_excel)
+                        except Exception:
+                            post_key = post_audit_excel
+                        post_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(post_key) or CONFIG_AUDIT_SUMMARY_CACHE.get(post_audit_excel)
+
+                    results = app.comparePrePost(n77_ssb_pre, n77_ssb_post, module_name, pre_audit_excel, post_audit_excel, audit_pre_summary_audit_df=pre_summary_df, audit_post_summary_audit_df=post_summary_df)
+
                 else:
                     print(f"{module_name} {market_tag} [INFO] Frequencies not provided. Comparison will be skipped; only tables will be saved.")
 

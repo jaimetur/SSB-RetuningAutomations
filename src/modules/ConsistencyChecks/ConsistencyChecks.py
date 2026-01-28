@@ -62,6 +62,10 @@ class ConsistencyChecks:
         self.audit_pre_excel: Optional[str] = None
         self.audit_post_excel: Optional[str] = None
 
+        # NEW: keep SummaryAudit DataFrames in memory to avoid re-loading Excel multiple times
+        self.audit_pre_summary_audit_df: Optional[pd.DataFrame] = None
+        self.audit_post_summary_audit_df: Optional[pd.DataFrame] = None
+
     # ------------------------------------------------------------------
     #  SHARED SMALL HELPERS (para reducir líneas en funciones repetidas)
     # ------------------------------------------------------------------
@@ -241,16 +245,36 @@ class ConsistencyChecks:
         self.audit_pre_excel = audit_pre_excel
         self.audit_post_excel = audit_post_excel
 
+        def _fast_load_summaryaudit_df(path: Optional[str], label: str) -> Optional[pd.DataFrame]:
+            if not path:
+                return None
+            try:
+                x_path = to_long_path(path)
+            except Exception:
+                x_path = path
+            if not os.path.isfile(x_path):
+                return None
+            try:
+                wanted = {"Category", "SubCategory", "Metric", "Value", "ExtraInfo"}
+                return pd.read_excel(x_path, sheet_name="SummaryAudit", usecols=lambda c: c in wanted, engine="openpyxl")
+            except Exception:
+                return None
+
+        # Cache SummaryAudit DataFrames (avoid reading the same Excel multiple times)
+        pre_summary_df = audit_pre_summary_audit_df if isinstance(audit_pre_summary_audit_df, pd.DataFrame) else _fast_load_summaryaudit_df(audit_pre_excel, "PRE")
+        post_summary_df = audit_post_summary_audit_df if isinstance(audit_post_summary_audit_df, pd.DataFrame) else _fast_load_summaryaudit_df(audit_post_excel, "POST")
+
+        self.audit_pre_summary_audit_df = pre_summary_df
+        self.audit_post_summary_audit_df = post_summary_df
+
         if not self.tables:
             # Soft fail: do not raise, just inform and return empty results
             print(f"{module_name} [WARNING] No tables loaded. Skipping comparison (likely missing Pre/Post folders).")
             return {}
 
         # NEW: load node numeric identifiers from nodes with Retuning frpm POST Configuration Audit (SummaryAudit sheet)
-        nodes_id_pre, nodes_name_pre = load_nodes_names_and_id_from_summary_audit(audit_post_summary_audit_df if audit_post_summary_audit_df is not None else audit_post_excel, stage="Pre", module_name=module_name)
-        nodes_id_post, nodes_name_post = load_nodes_names_and_id_from_summary_audit(audit_post_summary_audit_df if audit_post_summary_audit_df is not None else audit_post_excel, stage="Post", module_name=module_name)
-
-
+        nodes_id_pre, nodes_name_pre = load_nodes_names_and_id_from_summary_audit(post_summary_df if post_summary_df is not None else audit_post_excel, stage="Pre", module_name=module_name)
+        nodes_id_post, nodes_name_post = load_nodes_names_and_id_from_summary_audit(post_summary_df if post_summary_df is not None else audit_post_excel, stage="Post", module_name=module_name)
 
         results: Dict[str, Dict[str, pd.DataFrame]] = {}
 
@@ -509,7 +533,16 @@ class ConsistencyChecks:
                     is_freq_only_mismatch = False
 
                 if is_freq_only_mismatch:
-                    row["DiffColumns"] = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                    target_val = "Unknown"
+                    try:
+                        target_val = str(gnodeb_target_series.loc[k] if k in gnodeb_target_series.index else "Unknown").strip()
+                    except Exception:
+                        target_val = "Unknown"
+
+                    if target_val == "SSB-Post":
+                        row["DiffColumns"] = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                    else:
+                        row["DiffColumns"] = "SSB Target Unknown"
                 else:
                     row["DiffColumns"] = ", ".join(sorted(difflist))
 
@@ -591,6 +624,7 @@ class ConsistencyChecks:
                     "FreqDiff": freq_diff_series,
                     "FreqDiff_SSBPost": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() == "SSB-Post"),
                     "FreqDiff_Unknown": freq_diff_series & (gnodeb_target_series.astype(str).str.strip() == "Unknown"),
+
                 },
                 index=pre_common.index,
             )
@@ -670,22 +704,31 @@ class ConsistencyChecks:
             print(f"{module_name} Key: {key_cols} | Freq column: {freq_col}")
 
             freq_disc_count = 0
+            ssb_unknown_count = 0
             param_disc_count = 0
             try:
                 if not pair_stats.empty:
                     if "ParamDiff" in pair_stats.columns:
                         param_disc_count = int(pd.to_numeric(pair_stats["ParamDiff"], errors="coerce").fillna(0).astype(int).sum())
-                    if "FreqDiff_SSBPost" in pair_stats.columns and "FreqDiff_Unknown" in pair_stats.columns:
-                        freq_disc_count = int(pd.to_numeric(pair_stats["FreqDiff_SSBPost"], errors="coerce").fillna(0).astype(int).sum() + pd.to_numeric(pair_stats["FreqDiff_Unknown"], errors="coerce").fillna(0).astype(int).sum())
+                    if "FreqDiff_SSBPost" in pair_stats.columns:
+                        freq_disc_count = int(pd.to_numeric(pair_stats["FreqDiff_SSBPost"], errors="coerce").fillna(0).astype(int).sum())
                     elif "FreqDiff" in pair_stats.columns:
                         freq_disc_count = int(pd.to_numeric(pair_stats["FreqDiff"], errors="coerce").fillna(0).astype(int).sum())
+                    if "FreqDiff_Unknown" in pair_stats.columns:
+                        ssb_unknown_count = int(pd.to_numeric(pair_stats["FreqDiff_Unknown"], errors="coerce").fillna(0).astype(int).sum())
             except Exception:
                 freq_disc_count = 0
+                ssb_unknown_count = 0
                 param_disc_count = 0
 
-            print(f"{module_name} - Discrepancies: {len(discrepancies)}")
+            relations_with_discrepancies = int(len(discrepancies))
+            total_discrepancies = int(param_disc_count) + int(freq_disc_count) + int(ssb_unknown_count)
+
+            print(f"{module_name} - Total Discrepancies (one relation can have more that one type of discrepancy): {total_discrepancies}")
             print(f"{module_name}   - Param Discrepancies: {param_disc_count}")
-            print(f"{module_name}   - Frequency Discrepancies: {freq_disc_count}")
+            print(f"{module_name}   - Frequency Discrepancies (SSB-Post): {freq_disc_count}")
+            print(f"{module_name}   - SSB Unknown: {ssb_unknown_count}")
+            print(f"{module_name} - Relations with Discrepancies (uniques): {relations_with_discrepancies}")
             print(f"{module_name} - New Relations in Post: {len(new_in_post_clean)}")
             print(f"{module_name} - Missing Relations in Post: {len(missing_in_post_clean)}")
 
@@ -701,7 +744,7 @@ class ConsistencyChecks:
         return results
 
     # ----------------------------- SUMMARY AUDIT COMPARISSON ----------------------------- #
-    def summaryaudit_comparison(self) -> Optional[pd.DataFrame]:
+    def summaryaudit_comparison(self, module_name: str = "") -> Optional[pd.DataFrame]:
         """
         Build a comparison DataFrame from PRE and POST ConfigurationAudit SummaryAudit sheets.
 
@@ -715,7 +758,10 @@ class ConsistencyChecks:
         pre_path = self.audit_pre_excel
         post_path = self.audit_post_excel
 
-        if not pre_path or not post_path:
+        pre_cached = self.audit_pre_summary_audit_df if isinstance(self.audit_pre_summary_audit_df, pd.DataFrame) else None
+        post_cached = self.audit_post_summary_audit_df if isinstance(self.audit_post_summary_audit_df, pd.DataFrame) else None
+
+        if (pre_cached is None and not pre_path) and (post_cached is None and not post_path):
             return None
 
         def _load_summary(path: str, label: str) -> Optional[pd.DataFrame]:
@@ -725,27 +771,26 @@ class ConsistencyChecks:
                 x_path = path
 
             if not os.path.isfile(x_path):
-                print(f"[Consistency Checks] [WARNING] {label} SummaryAudit Excel not found: '{path}'. Skipping SummaryAuditComparisson for this side.")
+                print(f"{module_name} [WARNING] {label} SummaryAudit Excel not found: '{path}'. Skipping SummaryAuditComparisson for this side.")
                 return None
 
             try:
-                df = pd.read_excel(x_path, sheet_name="SummaryAudit")
+                wanted = {"Category", "SubCategory", "Metric", "Value", "ExtraInfo"}
+                df = pd.read_excel(x_path, sheet_name="SummaryAudit", usecols=lambda c: c in wanted, engine="openpyxl")
             except Exception as e:
-                print(f"[Consistency Checks] [WARNING] Could not read 'SummaryAudit' sheet from {label} audit Excel '{path}': {e}.")
+                print(f"{module_name} [WARNING] Could not read 'SummaryAudit' sheet from {label} audit Excel '{path}': {e}.")
                 return None
 
-            # Drop ExtraInfo if present
             if "ExtraInfo" in df.columns:
                 df = df.drop(columns=["ExtraInfo"])
-
-            # Ensure Value exists (some very old versions might differ)
             if "Value" not in df.columns:
                 df["Value"] = pd.NA
 
             return df
 
-        pre_df = _load_summary(pre_path, "PRE")
-        post_df = _load_summary(post_path, "POST")
+        print(f"{module_name} Loading ConfigurationAudits to extract SummaryAudit sheets...")
+        pre_df = pre_cached.copy() if pre_cached is not None else (_load_summary(pre_path, "PRE") if pre_path else None)
+        post_df = post_cached.copy() if post_cached is not None else (_load_summary(post_path, "POST") if post_path else None)
 
         if pre_df is None and post_df is None:
             return None
@@ -753,13 +798,14 @@ class ConsistencyChecks:
             # Only POST available: just rename its Value as Value_Post
             post_df = post_df.copy()
             post_df = post_df.rename(columns={"Value": "Value_Post"})
-            print("[Consistency Checks] Using only POST ConfigurationAudit SummaryAudit for SummaryAuditComparisson.")
+            print(f"{module_name} Using only 'SummaryAudit' from 'ConfigurationAudit POST' SummaryAudit to generate 'SummaryAuditComparisson' sheet...")
+
             return post_df
         if post_df is None:
             # Only PRE available: just rename its Value as Value_Pre
             pre_df = pre_df.copy()
             pre_df = pre_df.rename(columns={"Value": "Value_Pre"})
-            print("[Consistency Checks] Using only PRE ConfigurationAudit SummaryAudit for SummaryAuditComparisson.")
+            print(f"{module_name} Using only 'SummaryAudit' from 'ConfigurationAudit PRE' SummaryAudit to generate 'SummaryAuditComparisson' sheet...")
             return pre_df
 
         # NEW: copy before renaming to avoid side effects
@@ -791,7 +837,7 @@ class ConsistencyChecks:
                 sort=False,
             )
 
-        print("[Consistency Checks] Using PRE and POST ConfigurationAudit SummaryAudit sheets for SummaryAuditComparisson.")
+        print(f"{module_name} Using PRE and POST 'SummaryAudit' sheets from 'ConfigurationAudit' module to generate 'SummaryAuditComparisson' sheet....")
 
         # Add numeric difference column at the end: Value_Pre - Value_Post
         try:
@@ -824,24 +870,9 @@ class ConsistencyChecks:
         excel_cc_cell_relation_long = to_long_path(excel_cc_cell_relation)
 
         # -------------------------------------------------------------------
-        #  Write CellRelations.xlsx
-        # -------------------------------------------------------------------
-        with pd.ExcelWriter(excel_cell_relation_long, engine="openpyxl") as writer:
-            if "GUtranCellRelation" in self.tables:
-                self.tables["GUtranCellRelation"].to_excel(writer, sheet_name="GU_all", index=False)
-            if "NRCellRelation" in self.tables:
-                self.tables["NRCellRelation"].to_excel(writer, sheet_name="NR_all", index=False)
-
-                # -------------------------------------------------------------------
-                #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
-                # -------------------------------------------------------------------
-                # New: apply header style + autofit columns (replaces the manual loop)
-                style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
-
-
-        # -------------------------------------------------------------------
         #  Write ConsistencyChecks_CellRelations.xlsx
         # -------------------------------------------------------------------
+        print(f"{module_name} Saving {excel_cc_cell_relation}...")
         with pd.ExcelWriter(excel_cc_cell_relation_long, engine="openpyxl") as writer:
             # Summary
             summary_rows = []
@@ -849,10 +880,9 @@ class ConsistencyChecks:
                 for name, bucket in results.items():
                     meta = bucket.get("meta", {})
                     pair_stats = bucket.get("pair_stats", pd.DataFrame())
-                    params_disc = int(pair_stats["ParamDiff"].sum()) if not pair_stats.empty else 0
+                    params_disc = int(pair_stats["ParamDiff"].sum()) if not pair_stats.empty and "ParamDiff" in pair_stats.columns else 0
                     ssb_unknown = int(pair_stats["FreqDiff_Unknown"].sum()) if not pair_stats.empty and "FreqDiff_Unknown" in pair_stats.columns else 0
-                    freq_post = int(pair_stats["FreqDiff_SSBPost"].sum()) if not pair_stats.empty and "FreqDiff_SSBPost" in pair_stats.columns else (int(pair_stats["FreqDiff"].sum()) if not pair_stats.empty else 0)
-                    freq_disc = int(freq_post + ssb_unknown)
+                    freq_disc = int(pair_stats["FreqDiff_SSBPost"].sum()) if not pair_stats.empty and "FreqDiff_SSBPost" in pair_stats.columns else 0
 
                     summary_rows.append({
                         "Table": name,
@@ -881,7 +911,7 @@ class ConsistencyChecks:
             summary_df.to_excel(writer, sheet_name="Summary", index=False)
 
             # NEW: add SummaryAuditComparisson sheet if PRE/POST ConfigurationAudit SummaryAudit are available
-            comparison_df = self.summaryaudit_comparison()
+            comparison_df = self.summaryaudit_comparison(module_name=module_name)
             if comparison_df is not None and not comparison_df.empty:
                 comparison_df.to_excel(writer, sheet_name="SummaryAuditComparisson", index=False)
 
@@ -915,12 +945,12 @@ class ConsistencyChecks:
 
                     if not pair_stats.empty:
                         grp = pair_stats.groupby(["Freq_Pre", "Freq_Post"], dropna=False)
-                        params_by_pair = grp["ParamDiff"].sum().astype(int).to_dict()
-                        freq_post_by_pair = (grp["FreqDiff_SSBPost"].sum().astype(int).to_dict() if "FreqDiff_SSBPost" in pair_stats.columns else grp["FreqDiff"].sum().astype(int).to_dict())
+                        params_by_pair = grp["ParamDiff"].sum().astype(int).to_dict() if "ParamDiff" in pair_stats.columns else {}
+                        freq_by_pair = (grp["FreqDiff_SSBPost"].sum().astype(int).to_dict() if "FreqDiff_SSBPost" in pair_stats.columns else {})
                         unknown_by_pair = (grp["FreqDiff_Unknown"].sum().astype(int).to_dict() if "FreqDiff_Unknown" in pair_stats.columns else {})
-                        freq_by_pair = {k: int(freq_post_by_pair.get(k, 0)) + int(unknown_by_pair.get(k, 0)) for k in set(freq_post_by_pair) | set(unknown_by_pair)}
 
                         pairs_present = set(grp.size().index.tolist())
+
                     else:
                         params_by_pair, freq_by_pair, pairs_present = {}, {}, set()
 
@@ -938,7 +968,7 @@ class ConsistencyChecks:
                     miss_by_pair = pair_counts(miss_df)
 
                     neutral_pairs = {(f, f) for f in (set(pre_counts.keys()) | set(post_counts.keys()))}
-                    all_pairs = set(params_by_pair) | set(freq_by_pair) | set(new_by_pair) | set(miss_by_pair) | neutral_pairs | pairs_present
+                    all_pairs = set(params_by_pair) | set(freq_by_pair) | set(unknown_by_pair) | set(new_by_pair) | set(miss_by_pair) | neutral_pairs | pairs_present
 
                     for (fpre, fpost) in sorted(all_pairs, key=lambda t: (t[0], t[1])):
                         detailed_rows.append({
@@ -970,6 +1000,43 @@ class ConsistencyChecks:
 
             detailed_df.to_excel(writer, sheet_name="Summary_CellRelation", index=False)
 
+            # Highlight rows where Freq_Pre or Freq_Post matches old or new SSB frequency (Pre/Post)
+            try:
+                from openpyxl.styles import PatternFill
+
+                ws_main = writer.sheets.get("Summary_CellRelation")
+                if ws_main is not None:
+                    headers = {ws_main.cell(row=1, column=c).value: c for c in range(1, ws_main.max_column + 1)}
+                    col_freq_pre = headers.get("Freq_Pre")
+                    col_freq_post = headers.get("Freq_Post")
+                    if col_freq_pre and col_freq_post:
+                        yellow_fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+                        def _to_int_or_none(v):
+                            try:
+                                if v is None:
+                                    return None
+                                s = str(v).strip()
+                                if not s or s == "<empty>":
+                                    return None
+                                return int(float(s))
+                            except Exception:
+                                return None
+
+                        old_freq = _to_int_or_none(self.n77_ssb_pre)
+                        new_freq = _to_int_or_none(self.n77_ssb_post)
+                        target_freqs = {f for f in [old_freq, new_freq] if f is not None}
+
+                        for r in range(2, ws_main.max_row + 1):
+                            vpre = _to_int_or_none(ws_main.cell(row=r, column=col_freq_pre).value)
+                            vpost = _to_int_or_none(ws_main.cell(row=r, column=col_freq_post).value)
+                            if (vpre in target_freqs) or (vpost in target_freqs):
+                                for c in range(1, ws_main.max_column + 1):
+                                    ws_main.cell(row=r, column=c).fill = yellow_fill
+            except Exception:
+                pass
+
+
             # Collect all dataframes that contain Correction_Cmd to export them later
             correction_cmd_sources: Dict[str, pd.DataFrame] = {}
 
@@ -982,13 +1049,25 @@ class ConsistencyChecks:
                 gu_new_df = enforce_gu_columns(b.get("new_in_post"))
 
                 freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                unknown_text = "SSB Target Unknown"
+
                 if "DiffColumns" in gu_disc_df.columns:
-                    mask_freq_only = gu_disc_df["DiffColumns"].astype(str).str.strip().eq(freq_only_text)
+                    diff_txt = gu_disc_df["DiffColumns"].astype(str).str.strip()
                 else:
-                    mask_freq_only = pd.Series(False, index=gu_disc_df.index)
+                    diff_txt = pd.Series("", index=gu_disc_df.index)
+
+                if "GNodeB_SSB_Target" in gu_disc_df.columns:
+                    tgt_txt = gu_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
+                else:
+                    tgt_txt = pd.Series("", index=gu_disc_df.index)
+
+                mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
+                mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post") & (~tgt_txt.eq("Unknown"))
+                mask_param_only = (~mask_freq_only) & (~mask_unknown)
 
                 gu_freq_disc_df = gu_disc_df[mask_freq_only].copy()
-                gu_param_disc_df = gu_disc_df[~mask_freq_only].copy()
+                gu_param_disc_df = gu_disc_df[mask_param_only].copy()
+                gu_unknown_df = gu_disc_df[mask_unknown].copy()
 
                 # Build correction commands using external helpers (relations as main source)
                 gu_new_df = build_correction_command_gu_new_relations(gu_new_df, gu_rel_df)
@@ -1004,12 +1083,16 @@ class ConsistencyChecks:
                 gu_rel_df.to_excel(writer, sheet_name="GU_relations", index=False)
                 gu_param_disc_cmd_df.to_excel(writer, sheet_name="GU_param_disc", index=False)
                 gu_freq_disc_cmd_df.to_excel(writer, sheet_name="GU_freq_disc", index=False)
+                gu_unknown_df.to_excel(writer, sheet_name="GU_unknown", index=False)
                 gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
                 gu_new_df.to_excel(writer, sheet_name="GU_new", index=False)
+
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="GU_relations", index=False)
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_param_disc", index=False)
                 enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_freq_disc", index=False)
+                enforce_gu_columns(pd.DataFrame()).to_excel(writer, sheet_name="GU_unknown", index=False)
+
                 empty_gu_missing_df = build_correction_command_gu_missing_relations(enforce_gu_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
                 empty_gu_new_df = build_correction_command_gu_new_relations(enforce_gu_columns(pd.DataFrame()), None)
                 empty_gu_missing_df.to_excel(writer, sheet_name="GU_missing", index=False)
@@ -1024,13 +1107,25 @@ class ConsistencyChecks:
                 nr_new_df = enforce_nr_columns(b.get("new_in_post"))
 
                 freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
+                unknown_text = "SSB Target Unknown"
+
                 if "DiffColumns" in nr_disc_df.columns:
-                    mask_freq_only = nr_disc_df["DiffColumns"].astype(str).str.strip().eq(freq_only_text)
+                    diff_txt = nr_disc_df["DiffColumns"].astype(str).str.strip()
                 else:
-                    mask_freq_only = pd.Series(False, index=nr_disc_df.index)
+                    diff_txt = pd.Series("", index=nr_disc_df.index)
+
+                if "GNodeB_SSB_Target" in nr_disc_df.columns:
+                    tgt_txt = nr_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
+                else:
+                    tgt_txt = pd.Series("", index=nr_disc_df.index)
+
+                mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
+                mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post")
+                mask_param_only = (~mask_freq_only) & (~mask_unknown)
 
                 nr_freq_disc_df = nr_disc_df[mask_freq_only].copy()
-                nr_param_disc_df = nr_disc_df[~mask_freq_only].copy()
+                nr_param_disc_df = nr_disc_df[mask_param_only].copy()
+                nr_unknown_df = nr_disc_df[mask_unknown].copy()
 
                 nr_new_df = build_correction_command_nr_new_relations(nr_new_df, nr_rel_df)
                 nr_missing_df = build_correction_command_nr_missing_relations(nr_missing_df, nr_rel_df, self.n77_ssb_pre, self.n77_ssb_post)
@@ -1045,12 +1140,15 @@ class ConsistencyChecks:
                 nr_rel_df.to_excel(writer, sheet_name="NR_relations", index=False)
                 nr_param_disc_cmd_df.to_excel(writer, sheet_name="NR_param_disc", index=False)
                 nr_freq_disc_cmd_df.to_excel(writer, sheet_name="NR_freq_disc", index=False)
+                nr_unknown_df.to_excel(writer, sheet_name="NR_unknown", index=False)
+
                 nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
                 nr_new_df.to_excel(writer, sheet_name="NR_new", index=False)
             else:
                 pd.DataFrame().to_excel(writer, sheet_name="NR_relations", index=False)
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_param_disc", index=False)
                 enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_freq_disc", index=False)
+                enforce_nr_columns(pd.DataFrame()).to_excel(writer, sheet_name="NR_unknown", index=False)
                 empty_nr_missing_df = build_correction_command_nr_missing_relations(enforce_nr_columns(pd.DataFrame()), None, self.n77_ssb_pre, self.n77_ssb_post)
                 empty_nr_new_df = build_correction_command_nr_new_relations(enforce_nr_columns(pd.DataFrame()), None)
                 empty_nr_missing_df.to_excel(writer, sheet_name="NR_missing", index=False)
@@ -1089,3 +1187,20 @@ class ConsistencyChecks:
                 pass
 
 
+
+        # -------------------------------------------------------------------
+        #  Write CellRelations.xlsx
+        # -------------------------------------------------------------------
+        print(f"{module_name} Saving {excel_cell_relation}...")
+
+        with pd.ExcelWriter(excel_cell_relation_long, engine="openpyxl") as writer:
+            if "GUtranCellRelation" in self.tables:
+                self.tables["GUtranCellRelation"].to_excel(writer, sheet_name="GU_all", index=False)
+            if "NRCellRelation" in self.tables:
+                self.tables["NRCellRelation"].to_excel(writer, sheet_name="NR_all", index=False)
+
+                # -------------------------------------------------------------------
+                #  APPLY HEADER STYLING + AUTO-FIT COLUMNS FOR ALL SHEETS
+                # -------------------------------------------------------------------
+                # New: apply header style + autofit columns (replaces the manual loop)
+                style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
