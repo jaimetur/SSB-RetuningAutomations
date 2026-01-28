@@ -182,7 +182,7 @@ class GuiResult:
     export_correction_cmd: bool
 
     # Excel engine (xlsxwriter vs openpyxl)
-    fast_excel_export: bool
+    fast_excel_export: bool = False
 
 
 
@@ -413,10 +413,12 @@ def gui_config_dialog(
     # ConfigurationAudit Options
     export_correction_cmd_label = ttk.Label(right_frame, text="Configuration Audit Options:")
     export_correction_cmd_chk = ttk.Checkbutton(right_frame, text="Export Correction Cmd text files (slow)", variable=export_correction_cmd_var)
+    export_global_options_label = ttk.Label(right_frame, text="Global Options:")
     fast_excel_export_chk = ttk.Checkbutton(right_frame, text="Fast Excel export (xlsxwriter)", variable=fast_excel_export_var)
     export_correction_cmd_label.grid(row=6, column=0, sticky="w", pady=(10, 0))
     export_correction_cmd_chk.grid(row=7, column=0, sticky="w")
-    fast_excel_export_chk.grid(row=8, column=0, sticky="w")
+    export_global_options_label.grid(row=9, column=0, sticky="w", pady=(10, 0))
+    fast_excel_export_chk.grid(row=10, column=0, sticky="w")
 
     def refresh_export_correction_cmd_option(*_e):
         """Show the export option only when it is relevant (ConfigurationAudit / ConsistencyChecks)."""
@@ -565,6 +567,7 @@ def gui_config_dialog(
                 allowed_n77_ssb_post_csv=normalized_allowed_n77_ssb_post,
                 allowed_n77_arfcn_post_csv=normalized_allowed_n77_arfcn_post,
                 export_correction_cmd=bool(export_correction_cmd_var.get()),
+                fast_excel_export=bool(fast_excel_export_var.get()),
             )
         root.destroy()
 
