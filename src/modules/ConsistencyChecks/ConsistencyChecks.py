@@ -948,7 +948,7 @@ class ConsistencyChecks:
             written_sheet_dfs: Dict[str, pd.DataFrame] = {}
 
             if excel_engine == "xlsxwriter":
-                writer_ctx = pd.ExcelWriter(tmp_excel_cc_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+                writer_ctx = pd.ExcelWriter(tmp_excel_cc_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True, "strings_to_urls": False, "strings_to_numbers": False}})
             else:
                 writer_ctx = pd.ExcelWriter(tmp_excel_cc_long, engine="openpyxl")
 
@@ -1268,7 +1268,7 @@ class ConsistencyChecks:
             written_sheet_dfs2: Dict[str, pd.DataFrame] = {}
 
             if excel_engine == "xlsxwriter":
-                writer_ctx2 = pd.ExcelWriter(tmp_excel_cell_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+                writer_ctx2 = pd.ExcelWriter(tmp_excel_cell_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True, "strings_to_urls": False, "strings_to_numbers": False}})
             else:
                 writer_ctx2 = pd.ExcelWriter(tmp_excel_cell_long, engine="openpyxl")
 

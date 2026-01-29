@@ -181,8 +181,8 @@ class GuiResult:
     # ConfigurationAudit: export correction command files (slow)
     export_correction_cmd: bool
 
-    # Excel engine (xlsxwriter vs openpyxl)
-    fast_excel_export: bool = False
+    # Excel export: use xlsxwriter engine for faster writes (reduced styling)
+    fast_excel_export: bool
 
 
 
@@ -1760,7 +1760,7 @@ def main():
     default_allowed_n77_ssb_post_csv = normalize_csv_list(args.allowed_n77_ssb_post or persisted_allowed_ssb_post or DEFAULT_ALLOWED_N77_SSB_POST_CSV)
     default_allowed_n77_arfcn_post_csv = normalize_csv_list(args.allowed_n77_arfcn_post or persisted_allowed_arfcn_post or DEFAULT_ALLOWED_N77_ARFCN_POST_CSV)
     default_export_correction_cmd = persisted_export_correction_cmd
-    default_fast_excel_export = bool(getattr(args, "fast_excel", False)) if getattr(args, "fast_excel", None) is not None else persisted_fast_excel_export
+    default_fast_excel_export = bool(args.fast_excel_export) if args.fast_excel_export is not None else persisted_fast_excel_export
 
     # ====================== MODE 1: GUI (NO ARGS) ===========================
     if no_args:
@@ -1886,6 +1886,7 @@ def main():
                     allowed_n77_ssb_post_csv=sel.allowed_n77_ssb_post_csv,
                     allowed_n77_arfcn_post_csv=sel.allowed_n77_arfcn_post_csv,
                     export_correction_cmd=sel.export_correction_cmd,
+                    fast_excel_export=sel.fast_excel_export,
                     selected_module=sel.module,
                 )
             except Exception as e:
@@ -1955,6 +1956,7 @@ def main():
             allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
             allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
             allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+            fast_excel_export=default_fast_excel_export,
             selected_module=args.module,
         )
         return
@@ -2042,6 +2044,7 @@ def main():
             allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
             allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
             allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+            fast_excel_export=default_fast_excel_export,
             selected_module=args.module,
         )
         return
@@ -2084,6 +2087,7 @@ def main():
         allowed_n77_arfcn_pre_csv=allowed_n77_arfcn_pre_csv,
         allowed_n77_ssb_post_csv=allowed_n77_ssb_post_csv,
         allowed_n77_arfcn_post_csv=allowed_n77_arfcn_post_csv,
+        fast_excel_export=default_fast_excel_export,
         selected_module=args.module,
     )
 

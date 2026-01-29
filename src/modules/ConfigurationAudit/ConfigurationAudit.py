@@ -670,11 +670,14 @@ class ConfigurationAudit:
                             try:
                                 import xlsxwriter  # noqa: F401
                                 excel_engine = "xlsxwriter"
-                            except Exception:
+                            except Exception as e:
+                                _log_info(f"PHASE 5.0: fast_excel_export requested but xlsxwriter is not available ({e}). Falling back to openpyxl.")
                                 excel_engine = "openpyxl"
 
                         if excel_engine == "xlsxwriter":
-                            writer = pd.ExcelWriter(tmp_excel_path_long, engine="xlsxwriter", engine_kwargs={"options": {"constant_memory": True}})
+                            # Performance: disable URL/number auto-detection (can be slow on huge tables)
+                            xlsxwriter_options = {"constant_memory": True, "strings_to_urls": False, "strings_to_numbers": False}
+                            writer = pd.ExcelWriter(tmp_excel_path_long, engine="xlsxwriter", engine_kwargs={"options": xlsxwriter_options})
                         else:
                             writer = pd.ExcelWriter(tmp_excel_path_long, engine="openpyxl")
 
