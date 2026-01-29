@@ -45,8 +45,8 @@ from src.modules.CleanUp.FinalCleanUp import FinalCleanUp
 # ================================ VERSIONING ================================ #
 
 TOOL_NAME           = "SSB_RetuningAutomations"
-TOOL_VERSION        = "0.6.0"
-TOOL_DATE           = "2026-01-28"
+TOOL_VERSION        = "0.6.1"
+TOOL_DATE           = "2026-01-29"
 TOOL_NAME_VERSION   = f"{TOOL_NAME}_v{TOOL_VERSION}"
 COPYRIGHT_TEXT      = "©️ 2025-2026 - Jaime Tur (jaime.tur@ericsson.com)"
 TOOL_DESCRIPTION    = textwrap.dedent(f"""
