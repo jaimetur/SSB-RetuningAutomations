@@ -20,8 +20,8 @@
     - Added a hyperlink in cell A1 on every sheet from `ConfigurationAudit` Excel to jump back to `SummaryAudit`.
     - Added a hyperlink in cell A1 on every sheet from `ConsistencyCheck` Excel to jump back to `Summary_CellRelation`.
     - Now the execution log is also available in output folder for an easier way to identify which log belong to each execution.
-    - When running ConfigurationAudit if a previous ConfigurationAudit folder generated with the same tool version is found in the input folder, ask the user if he wants to run ConfigurationAudit again or not. (Note: When running ConfigurationAudit on batch mode, it automatically skips those folders with a ConfigurationAudit generated with the same tool version is found).
-    - Integrated new Excel Writter engine 'xlsxwriter' for a faster export to Excel. This engine can be activated using the new flag --fast-excel from CLI or using GUI.
+    - When running ConfigurationAudit, if the tool finds a previously generated ConfigurationAudit folder in the input directory created with the same tool version, it prompts the user to decide whether to run the audit again. (Note: in batch mode, the tool automatically skips folders that already contain a ConfigurationAudit generated with the same tool version.)
+    - Integrated a new Excel writer engine (xlsxwriter) to speed up Excel exports (saving to Excel takes approximately half the time compared to the default engine). You can enable it via the new `--fast-excel` CLI flag or from the GUI. Important: this engine has limited formatting support and does not support applying styles such as different row colors in Excel.
 
   - #### 🚀 Enhancements:
     - **ConsistencyChecks module:**

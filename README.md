@@ -232,8 +232,10 @@ SSB_RetuningAutomations.exe/bin --module <module-name> [options]
 --ca-freq-filters            Comma-separated list of frequency substrings to filter pivot columns in Configuration Audit module
 --cc-freq-filters            Comma-separated list of frequency substrings to filter relations in Consistency Check module
 
---export-correction-cmd      Enable (Disabled by default) exporting correction command text files during ConfigurationAudit (slow).  
-                             For ConsistencyChecks, this controls the POST ConfigurationAudit export (PRE is always skipped).
+--export-correction-cmd      Enable (Disabled by default) exporting correction command text files during ConfigurationAudit (slow)  
+                             For ConsistencyChecks, this controls the POST ConfigurationAudit export (PRE is always skipped)
+                             
+--fast-excel                 Enable/disable fast Excel export using xlsxwriter engine (reduced formatting features if compared to openpyxl)
 
 --no-gui                     Disable GUI usage (force CLI mode even with missing arguments)
 ```
