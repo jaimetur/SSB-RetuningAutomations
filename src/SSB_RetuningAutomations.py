@@ -406,8 +406,12 @@ def gui_config_dialog(
     # ConfigurationAudit Options
     export_correction_cmd_label = ttk.Label(right_frame, text="Configuration Audit Options:")
     export_correction_cmd_chk = ttk.Checkbutton(right_frame, text="Export Correction Cmd text files (slow)", variable=export_correction_cmd_var)
+    # export_global_options_label = ttk.Label(right_frame, text="Global Options:")
+    # fast_excel_export_chk = ttk.Checkbutton(right_frame, text="Fast Excel export (xlsxwriter)", variable=fast_excel_export_var)
     export_correction_cmd_label.grid(row=6, column=0, sticky="w", pady=(10, 0))
     export_correction_cmd_chk.grid(row=7, column=0, sticky="w")
+    # export_global_options_label.grid(row=9, column=0, sticky="w", pady=(10, 0))
+    # fast_excel_export_chk.grid(row=10, column=0, sticky="w")
 
     def refresh_export_correction_cmd_option(*_e):
         """Show the export option only when it is relevant (ConfigurationAudit / ConsistencyChecks)."""
@@ -641,9 +645,9 @@ def run_configuration_audit(
     versioned_suffix: Optional[str] = None,
     market_label: Optional[str] = None,
     external_output_dir: Optional[str] = None,
-    profiles_audit: bool = True,                # <<< NEW (default now True because module 4 was removed and the logic have been incorporated to Default Configuration Audit)
-    export_correction_cmd: bool = True,           # <<< NEW: when called from ConsistencyChecks, disable for PRE and enable for POST
-    module_name_override: Optional[str] = None,    # <<< NEW
+    profiles_audit: bool = True,                    # <<< NEW (default now True because module 4 was removed and the logic have been incorporated to Default Configuration Audit)
+    export_correction_cmd: bool = True,             # <<< NEW: when called from ConsistencyChecks, disable for PRE and enable for POST
+    module_name_override: Optional[str] = None,     # <<< NEW
 ) -> Optional[str]:
     """
     Run ConfigurationAudit on a folder or recursively on all its subfolders
@@ -799,12 +803,14 @@ def run_configuration_audit(
         except Exception:
             return None
 
-    def run_for_folder(folder: str) -> Optional[str]:
+    def run_for_folder(folder: str, is_batch_mode: bool = False) -> Optional[str]:
 
         """
         Run ConfigurationAudit for a single folder that is already known
         to contain valid logs.
         """
+        start_marker = f"{module_name} [INFO] === START ConfigurationAudit: '{pretty_path(folder)}' ==="
+        print(start_marker)
         print(f"{module_name} [INFO] Running Audit…")
         print(f"{module_name} [INFO] Input folder: '{pretty_path(folder)}'")
         if ca_freq_filters_csv:
@@ -813,12 +819,27 @@ def run_configuration_audit(
         # Use long-path version for filesystem operations
         folder_fs = to_long_path(folder) if folder else folder
 
-        # NEW: In recursive/batch mode, skip running the audit if we already have a ConfigurationAudit folder with the same TOOL_VERSION
+        # If a ConfigurationAudit of the same TOOL_VERSION already exists:
+        # - In batch mode (recursive scan): auto-skip.
+        # - In normal mode (single folder): ask user whether to reuse or re-run.
         if not external_output_dir:
             existing_excel = _find_existing_ca_excel_same_version(folder_fs)
             if existing_excel:
-                print(f"{module_name} [INFO] Skipping Audit (same version already exists): '{pretty_path(existing_excel)}'")
-                return existing_excel
+                if is_batch_mode:
+                    print(f"{module_name} [INFO] Skipping Audit (same version already exists): '{pretty_path(existing_excel)}'")
+                    return existing_excel
+
+                title = "Existing ConfigurationAudit detected"
+                message = (
+                    f"A ConfigurationAudit (same version) already exists for this folder:\n\n"
+                    f"'{pretty_path(existing_excel)}'\n\n"
+                    f"Do you want to run ConfigurationAudit again?"
+                )
+                if not ask_yes_no_dialog(title, message, default=False):
+                    print(f"{module_name} [INFO] Reusing existing Audit (user selected): '{pretty_path(existing_excel)}'")
+                    return existing_excel
+
+                print(f"{module_name} [INFO] Re-running Audit (user selected) despite existing: '{pretty_path(existing_excel)}'")
 
         # Use timestamp (and optional standardized market) from parent folder for FILE names only
         parent_ts, parent_market = infer_parent_timestamp_and_market(folder_fs)
@@ -855,7 +876,7 @@ def run_configuration_audit(
             output_dir = os.path.join(folder_fs, f"{folder_prefix}_{folder_versioned_suffix}{suffix}")
 
         os.makedirs(output_dir, exist_ok=True)
-        attach_output_log_mirror(output_dir, copy_existing_log=False)
+        attach_output_log_mirror(output_dir, copy_existing_log=True, start_marker=start_marker)
         print(f"{module_name} [INFO] Output folder: '{pretty_path(output_dir)}'")
 
 
@@ -924,7 +945,7 @@ def run_configuration_audit(
 
     # 1) If the base folder itself has valid logs, just run once there.
     if folder_or_zip_has_valid_logs(base_dir_fs):
-        return run_for_folder(base_dir_fs)
+        return run_for_folder(base_dir_fs, is_batch_mode=False)
 
     # 2) Otherwise, ask the user if we should scan subfolders recursively.
     title = "Missing valid logs in input folder"
@@ -982,7 +1003,7 @@ def run_configuration_audit(
     for sub_dir in candidate_dirs:
         print(f"{module_name} [INFO] → Running Configuration Audit in subfolder: '{pretty_path(sub_dir)}'")
         try:
-            excel_path = run_for_folder(sub_dir)
+            excel_path = run_for_folder(sub_dir, is_batch_mode=True)
             if excel_path:
                 last_excel = excel_path
         except Exception as ex:

@@ -737,49 +737,7 @@ class ConfigurationAudit:
 
                             # Apply header color + auto-fit to all sheets
                             # Optimization: default autofit only scans the first N rows (handled inside style_headers_autofilter_and_autofit)
-                            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left")
-
-                            # ------------------------------------------------------------------
-                            # Add A1 hyperlink to SummaryAudit in ALL sheets (keep cell value)
-                            # ------------------------------------------------------------------
-                            try:
-                                wb = writer.book
-                                if "SummaryAudit" in wb.sheetnames:
-                                    for ws in wb.worksheets:
-                                        if ws.title == "SummaryAudit":
-                                            continue
-                                        cell = ws["A1"]
-                                        cell.hyperlink = "#SummaryAudit!A1"
-                                        cell.font = Font(color="0563C1", underline="single")
-                            except Exception:
-                                pass
-
-
-                            # ------------------------------------------------------------------
-                            # Add hyperlinks from SummaryAudit.Category to corresponding sheets
-                            # ------------------------------------------------------------------
-                            ws_summary_audit = writer.sheets.get("SummaryAudit")
-                            if ws_summary_audit is not None:
-                                header = [cell.value for cell in ws_summary_audit[1]]
-                                try:
-                                    category_col_idx = header.index("Category") + 1
-                                except ValueError:
-                                    category_col_idx = None
-
-                                if category_col_idx:
-                                    for row in range(2, ws_summary_audit.max_row + 1):
-                                        cell = ws_summary_audit.cell(row=row, column=category_col_idx)
-                                        raw = str(cell.value).strip() if cell.value else ""
-                                        target_sheet = raw
-
-                                        # 1) If no exists a sheet with that name, try to resolve using the previous mapping
-                                        if target_sheet and target_sheet not in writer.book.sheetnames:
-                                            target_sheet = candidate_to_final_sheet.get(raw, raw)
-
-                                        # 2) If exists a sheet with that name, create hyperlink
-                                        if target_sheet and target_sheet in writer.book.sheetnames:
-                                            cell.hyperlink = f"#{target_sheet}!A1"
-                                            cell.font = Font(color="0563C1", underline="single")
+                            style_headers_autofilter_and_autofit(writer, freeze_header=True, align="left", enable_a1_hyperlink=True, hyperlink_sheet="SummaryAudit", category_sheet_map=candidate_to_final_sheet)
 
                         # ------------------------------------------------------------------
                         # PHASE 5.5: CLOSE / FINALIZE workbook

@@ -959,14 +959,7 @@ class ConsistencyChecks:
                             "SourceFile_Post": pretty_path(meta.get("post_source_file", "")),
                         })
 
-                summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(
-                    columns=[
-                        "Table", "KeyColumns", "FreqColumn", "Relations_Pre", "Relations_Post",
-                        "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations",
-                        "SourceFile_Pre", "SourceFile_Post"
-                    ]
-                )
-
+                summary_df = pd.DataFrame(summary_rows) if summary_rows else pd.DataFrame(columns=["Table", "KeyColumns", "FreqColumn", "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations", "SourceFile_Pre", "SourceFile_Post"])
                 summary_df.to_excel(writer, sheet_name="Summary", index=False)
 
                 # NEW: add SummaryAuditComparisson sheet if PRE/POST ConfigurationAudit SummaryAudit are available
@@ -1041,17 +1034,7 @@ class ConsistencyChecks:
                                 "Missing_Relations": int(miss_by_pair.get((fpre, fpost), 0)),
                             })
 
-                if detailed_rows:
-                    detailed_df = pd.DataFrame(detailed_rows)
-                else:
-                    detailed_df = pd.DataFrame(
-                        columns=[
-                            "Table", "KeyColumns", "FreqColumn", "Freq_Pre", "Freq_Post",
-                            "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown",
-                            "New_Relations", "Missing_Relations"
-                        ]
-                    )
-
+                detailed_df = pd.DataFrame(detailed_rows) if detailed_rows else pd.DataFrame(columns=["Table", "KeyColumns", "FreqColumn", "Freq_Pre", "Freq_Post", "Relations_Pre", "Relations_Post", "Parameters_Discrepancies", "Freq_Discrepancies", "SSB_Unknown", "New_Relations", "Missing_Relations"])
                 detailed_df.to_excel(writer, sheet_name="Summary_CellRelation", index=False)
 
                 # Highlight rows where Freq_Pre or Freq_Post matches old or new SSB frequency (Pre/Post)
@@ -1104,15 +1087,8 @@ class ConsistencyChecks:
                     freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
                     unknown_text = "SSB Target Unknown"
 
-                    if "DiffColumns" in gu_disc_df.columns:
-                        diff_txt = gu_disc_df["DiffColumns"].astype(str).str.strip()
-                    else:
-                        diff_txt = pd.Series("", index=gu_disc_df.index)
-
-                    if "GNodeB_SSB_Target" in gu_disc_df.columns:
-                        tgt_txt = gu_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
-                    else:
-                        tgt_txt = pd.Series("", index=gu_disc_df.index)
+                    diff_txt = gu_disc_df["DiffColumns"].astype(str).str.strip() if "DiffColumns" in gu_disc_df.columns else pd.Series("", index=gu_disc_df.index)
+                    tgt_txt = gu_disc_df["GNodeB_SSB_Target"].astype(str).str.strip() if "GNodeB_SSB_Target" in gu_disc_df.columns else pd.Series("", index=gu_disc_df.index)
 
                     mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
                     mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post") & (~tgt_txt.eq("Unknown"))
@@ -1159,15 +1135,8 @@ class ConsistencyChecks:
                     freq_only_text = "SSB Post-Retuning keeps equal than SSB Pre-Retuning"
                     unknown_text = "SSB Target Unknown"
 
-                    if "DiffColumns" in nr_disc_df.columns:
-                        diff_txt = nr_disc_df["DiffColumns"].astype(str).str.strip()
-                    else:
-                        diff_txt = pd.Series("", index=nr_disc_df.index)
-
-                    if "GNodeB_SSB_Target" in nr_disc_df.columns:
-                        tgt_txt = nr_disc_df["GNodeB_SSB_Target"].astype(str).str.strip()
-                    else:
-                        tgt_txt = pd.Series("", index=nr_disc_df.index)
+                    diff_txt = nr_disc_df["DiffColumns"].astype(str).str.strip() if "DiffColumns" in nr_disc_df.columns else pd.Series("", index=nr_disc_df.index)
+                    tgt_txt = nr_disc_df["GNodeB_SSB_Target"].astype(str).str.strip() if "GNodeB_SSB_Target" in nr_disc_df.columns else pd.Series("", index=nr_disc_df.index)
 
                     mask_unknown = diff_txt.eq(unknown_text) | tgt_txt.eq("Unknown")
                     mask_freq_only = diff_txt.eq(freq_only_text) & tgt_txt.eq("SSB-Post") & (~tgt_txt.eq("Unknown"))

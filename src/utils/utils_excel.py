@@ -190,40 +190,66 @@ def enable_header_filters(writer, freeze_header: bool = True, align_left: bool =
         pass
 
 
-def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, align: str = "left", header_color: str = "CCE5FF", max_width: int = 100, autofit_rows: object = 100) -> None:
+def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, align: str = "left", header_color: str = "CCE5FF", max_width: int = 100, autofit_rows: object = 50, enable_a1_hyperlink: bool = False, hyperlink_sheet: str = "SummaryAudit", category_sheet_map: dict | None = None, summary_category_header: str = "Category", max_summary_category_links: int = 800) -> None:
     """
     Apply header styling (with configurable color), enable auto-filter on the first row,
     freeze header optionally, and auto-fit all column widths.
+
+    Extra (optional) features:
+      - A1 internal hyperlink to a summary sheet (e.g. SummaryAudit or Summary_CellRelation)
+      - Hyperlinks inside the summary sheet: Summary.Category -> target sheet (A1)
 
     Params:
         writer: ExcelWriter object (pandas)
         freeze_header: whether to freeze the first row (default=True)
         align: horizontal alignment for header text ("left", "center", "right")
         header_color: fill color for header row (hex string, default="CCE5FF")
-        max_width: maximum allowed column width when auto-fitting (default=100)
+        max_width: maximum allowed column width when auto-fitting (default=50)
         autofit_rows: number of content rows (starting from row 2) to sample when auto-fitting.
-                     - default: 100
+                     - default: 50
                      - "All": scan all rows
                      - any int <= 0: behaves like 0 (header-only)
+        a1_hyperlink_to_summaryaudit: if True, set A1 hyperlink in every sheet (except summaryaudit_sheet)
+        summaryaudit_sheet: sheet name acting as the summary sheet (default="SummaryAudit")
+        category_sheet_map: optional mapping to resolve Category values to actual sheet names
+        summary_category_header: header name to use for hyperlinking rows in the summary sheet (default="Category")
+        max_summary_category_links: safety limit for how many summary rows will be hyperlinked (default=800)
     """
     workbook = writer.book
 
     # Normalize autofit_rows
     use_all_rows = False
-    rows_to_scan = 100
+    rows_to_scan = 50
     if isinstance(autofit_rows, str) and autofit_rows.strip().lower() == "all":
         use_all_rows = True
     else:
         try:
             rows_to_scan = int(autofit_rows)
         except Exception:
-            rows_to_scan = 100  # safe default
+            rows_to_scan = 50  # safe default
         if rows_to_scan < 0:
             rows_to_scan = 0
 
-    for ws in workbook.worksheets:
+    sheetnames = []
+    try:
+        sheetnames = list(getattr(workbook, "sheetnames", []) or [])
+    except Exception:
+        sheetnames = []
+
+    if not sheetnames:
+        try:
+            sheetnames = [getattr(ws, "title", "") for ws in getattr(workbook, "worksheets", [])]
+        except Exception:
+            sheetnames = []
+
+    has_summary_sheet = bool(hyperlink_sheet) and (hyperlink_sheet in sheetnames)
+
+    for ws in getattr(workbook, "worksheets", []):
         # Skip sheets without content
-        if ws.max_row < 1 or ws.max_column < 1:
+        try:
+            if ws.max_row < 1 or ws.max_column < 1:
+                continue
+        except Exception:
             continue
 
         # --------------------------------------------------------------
@@ -232,52 +258,130 @@ def style_headers_autofilter_and_autofit(writer, freeze_header: bool = True, ali
         header_fill = PatternFill(start_color=header_color, end_color=header_color, fill_type="solid")
         header_alignment = Alignment(horizontal=align, vertical="center", wrap_text=True)
 
-        for cell in ws[1]:
-            cell.fill = header_fill
-            cell.font = Font(bold=True, color="000000")
-            cell.alignment = header_alignment
+        try:
+            for row in ws.iter_rows(min_row=1, max_row=1, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.fill = header_fill
+                    cell.font = Font(bold=True, color="000000")
+                    cell.alignment = header_alignment
+        except Exception:
+            pass
 
         # --------------------------------------------------------------
         # 2) Apply auto-filter on the full table
         # --------------------------------------------------------------
-        first_col = get_column_letter(1)
-        last_col = get_column_letter(ws.max_column)
-        ws.auto_filter.ref = f"{first_col}1:{last_col}{ws.max_row}"
+        try:
+            first_col = get_column_letter(1)
+            last_col = get_column_letter(ws.max_column)
+            ws.auto_filter.ref = f"{first_col}1:{last_col}{ws.max_row}"
+        except Exception:
+            pass
 
         # --------------------------------------------------------------
         # 3) Freeze header row if enabled
         # --------------------------------------------------------------
         if freeze_header:
-            ws.freeze_panes = "A2"
+            try:
+                ws.freeze_panes = "A2"
+            except Exception:
+                pass
 
         # --------------------------------------------------------------
         # 4) Auto-fit column widths (sample first N rows by default)
         # --------------------------------------------------------------
-        # Content starts at row 2
-        if use_all_rows:
-            row_end = ws.max_row
-        else:
-            # scan up to (rows_to_scan) content rows (row 2 counts as 1st content row)
-            row_end = min(ws.max_row, 1 + rows_to_scan)
+        try:
+            if use_all_rows:
+                row_end = ws.max_row
+            else:
+                row_end = min(ws.max_row, 1 + rows_to_scan)
 
-        # Improvement A: Use ws.iter_rows(values_only=True) to reduce openpyxl cell overhead
-        last_row_to_scan = row_end
-        max_lens = [0] * ws.max_column
+            max_lens = [0] * ws.max_column
+            for row in ws.iter_rows(min_row=1, max_row=row_end, min_col=1, max_col=ws.max_column, values_only=True):
+                for j, v in enumerate(row):
+                    try:
+                        s = "" if v is None else str(v)
+                        s = s.replace("\r\n", " ").replace("\n", " ").strip()
+                        l = len(s)
+                        if l > max_lens[j]:
+                            max_lens[j] = l
+                    except Exception:
+                        pass
 
-        for row in ws.iter_rows(min_row=1, max_row=last_row_to_scan, min_col=1, max_col=ws.max_column, values_only=True):
-            for j, v in enumerate(row):
+            for col_idx in range(1, ws.max_column + 1):
+                col_letter = get_column_letter(col_idx)
+                ws.column_dimensions[col_letter].width = min(max_lens[col_idx - 1] + 2, max_width)
+        except Exception:
+            pass
+
+    # ------------------------------------------------------------------
+    # 5) Optional hyperlinks (OpenPyXL engine)
+    # ------------------------------------------------------------------
+    if enable_a1_hyperlink and has_summary_sheet:
+        for ws in getattr(workbook, "worksheets", []):
+            try:
+                if getattr(ws, "title", "") == hyperlink_sheet:
+                    continue
+                cell = ws.cell(row=1, column=1)
+                cell.hyperlink = f"#'{hyperlink_sheet}'!A1"
                 try:
-                    s = "" if v is None else str(v)
-                    s = s.replace("\r\n", " ").replace("\n", " ").strip()
-                    l = len(s)
-                    if l > max_lens[j]:
-                        max_lens[j] = l
+                    cell.font = cell.font.copy(color="0563C1", underline="single")
                 except Exception:
-                    pass
+                    try:
+                        cell.font = Font(name=cell.font.name, sz=cell.font.sz, bold=cell.font.bold, italic=cell.font.italic, vertAlign=cell.font.vertAlign, underline="single", strike=cell.font.strike, color="0563C1")
+                    except Exception:
+                        cell.font = Font(color="0563C1", underline="single")
+            except Exception:
+                pass
 
-        for col_idx in range(1, ws.max_column + 1):
-            col_letter = get_column_letter(col_idx)
-            ws.column_dimensions[col_letter].width = min(max_lens[col_idx - 1] + 2, max_width)
+    if has_summary_sheet and bool(summary_category_header):
+        try:
+            ws_summary = workbook[hyperlink_sheet]
+        except Exception:
+            ws_summary = None
 
+        if ws_summary is not None:
+            try:
+                header_vals = []
+                for row in ws_summary.iter_rows(min_row=1, max_row=1, min_col=1, max_col=ws_summary.max_column, values_only=True):
+                    header_vals = [str(v).strip() if v is not None else "" for v in row]
+
+                try:
+                    category_col_idx = header_vals.index(str(summary_category_header)) + 1
+                except ValueError:
+                    category_col_idx = None
+
+                if category_col_idx:
+                    try:
+                        max_rows = int(max_summary_category_links)
+                    except Exception:
+                        max_rows = 800
+                    if max_rows < 0:
+                        max_rows = 0
+
+                    last_row = ws_summary.max_row
+                    if max_rows and last_row > (1 + max_rows):
+                        last_row = 1 + max_rows
+
+                    for r in range(2, last_row + 1):
+                        try:
+                            cell = ws_summary.cell(row=r, column=category_col_idx)
+                            raw = str(cell.value).strip() if cell.value is not None else ""
+                            if not raw:
+                                continue
+
+                            target_sheet = raw
+                            if category_sheet_map and target_sheet and target_sheet not in sheetnames:
+                                target_sheet = str(category_sheet_map.get(raw, raw))
+
+                            if target_sheet and target_sheet in sheetnames:
+                                cell.hyperlink = f"#'{target_sheet}'!A1"
+                                try:
+                                    cell.font = cell.font.copy(color="0563C1", underline="single")
+                                except Exception:
+                                    cell.font = Font(color="0563C1", underline="single")
+                        except Exception:
+                            pass
+            except Exception:
+                pass
 
 
