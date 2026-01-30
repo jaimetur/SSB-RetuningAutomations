@@ -5,12 +5,13 @@
 ---
 
 ## Release: v0.6.1
-- ### Release Date: 2026-01-29
+- ### Release Date: 2026-01-30
 
 - ### Main Changes:
   
   - #### 🚨 Breaking Changes:
-    - New flag `--fast-excel` (also available on GUI) to enable a new Excel writer engine (xlsxwriter) to speed up Excel exports (saving to Excel takes approximately half the time compared to the default engine). (NOTE: This engine has limited formatting support and does not support applying styles such as different row colors in Excel).
+    - New flag `--fast-excel` (also available on GUI) to enable/disable a new Excel writer engine (xlsxwriter) to speed up Excel exports (saving to Excel takes approximately half the time compared to the default engine). (NOTE: This engine has limited formatting support and does not support applying styles such as different row colors in Excel).
+    - New flag `--profiles-audit` (also available on GUI) to enable/sisable `ProfilesAudit` during a `ConfigurationAudit` execution.
 
   - #### 🌟 New Features:
     - When running `ConfigurationAudit`, if the tool finds a previously generated `ConfigurationAudit` folder in the input directory created with the same tool version, it prompts the user to decide whether to run the audit again. (Note: in batch mode, the tool automatically skips folders that already contain a `ConfigurationAudit` generated with the same tool version.)

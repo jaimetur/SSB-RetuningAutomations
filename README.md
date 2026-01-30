@@ -214,30 +214,32 @@ This tool can be executed either with **GUI mode** (default when no arguments ar
 ```bash
 SSB_RetuningAutomations.exe/bin --module <module-name> [options]
 
---module                     Module to run: configuration-audit | consistency-check | consistency-check-bulk | profiles-audit | final-cleanup
---input                      Input folder to process (single-input modules)
---input-pre                  PRE input folder (only for consistency-check)
---input-post                 POST input folder (only for consistency-check)
+--module                  Module to run: configuration-audit | consistency-check | consistency-check-bulk | profiles-audit | final-cleanup
+--input                   Input folder to process (single-input modules)
+--input-pre               PRE input folder (only for consistency-check)
+--input-post              POST input folder (only for consistency-check)
+   
+--n77-ssb-pre             N77 SSB frequency before refarming (Pre), e.g. 647328
+--n77-ssb-post            N77 SSB frequency after refarming (Post), e.g. 653952
+--n77b-ssb                N77B SSB frequency (ARFCN), e.g. 650334
+   
+--allowed-n77-ssb-pre     Comma-separated allowed N77 SSB (Pre) values for Configuration Audit
+--allowed-n77-arfcn-pre   Comma-separated allowed N77 ARFCN (Pre) values for Configuration Audit
+   
+--allowed-n77-ssb-post    Comma-separated allowed N77 SSB (Post) values for Configuration Audit
+--allowed-n77-arfcn-post  Comma-separated allowed N77 ARFCN (Post) values for Configuration Audit
+   
+--ca-freq-filters         Comma-separated list of frequency substrings to filter pivot columns in Configuration Audit module
+--cc-freq-filters         Comma-separated list of frequency substrings to filter relations in Consistency Check module
+   
+--profiles-audit          Enable/disable Profiles Audit (integrated into Configuration Audit). Default Value: Enabled (use --no-profiles-audit to disable it)
 
---n77-ssb-pre                N77 SSB frequency before refarming (Pre), e.g. 647328
---n77-ssb-post               N77 SSB frequency after refarming (Post), e.g. 653952
---n77b-ssb                   N77B SSB frequency (ARFCN), e.g. 650334
-
---allowed-n77-ssb-pre        Comma-separated allowed N77 SSB (Pre) values for Configuration Audit
---allowed-n77-arfcn-pre      Comma-separated allowed N77 ARFCN (Pre) values for Configuration Audit
-
---allowed-n77-ssb-post       Comma-separated allowed N77 SSB (Post) values for Configuration Audit
---allowed-n77-arfcn-post     Comma-separated allowed N77 ARFCN (Post) values for Configuration Audit
-
---ca-freq-filters            Comma-separated list of frequency substrings to filter pivot columns in Configuration Audit module
---cc-freq-filters            Comma-separated list of frequency substrings to filter relations in Consistency Check module
-
---export-correction-cmd      Enable/disable exporting correction command text files during ConfigurationAudit (slow)  
-                             For ConsistencyChecks, this controls the POST ConfigurationAudit export (PRE is always skipped)
-                             
---fast-excel                 Enable/disable fast Excel export using xlsxwriter engine (reduced formatting features if compared to openpyxl)
-
---no-gui                     Disable GUI usage (force CLI mode even with missing arguments)
+--export-correction-cmd   Enable/disable exporting correction command to text files (slow). Default Value: Enabled (use --no-export-correction-cmd to disable it)
+                          For ConsistencyChecks, this controls the POST ConfigurationAudit export (PRE is always skipped)
+                               
+--fast-excel              Enable/disable fast Excel export using xlsxwriter engine (reduced formatting features if compared to openpyxl) Default Value: Disabled (use --fast-excel to enable enable it)
+   
+--no-gui                  Disable GUI usage (force CLI mode even with missing arguments)
 ```
 
 If `--module` is omitted and **no other arguments** are provided, the GUI will launch automatically unless `--no-gui` is specified.
