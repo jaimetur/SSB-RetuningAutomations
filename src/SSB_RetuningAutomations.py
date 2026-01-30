@@ -1533,14 +1533,16 @@ def run_consistency_checks(
                             pre_key = to_long_path(pre_audit_excel)
                         except Exception:
                             pre_key = pre_audit_excel
-                        pre_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(pre_key) or CONFIG_AUDIT_SUMMARY_CACHE.get(pre_audit_excel)
+                        _tmp = CONFIG_AUDIT_SUMMARY_CACHE.get(pre_key)
+                        pre_summary_df = _tmp if _tmp is not None else CONFIG_AUDIT_SUMMARY_CACHE.get(pre_audit_excel)
 
                     if post_audit_excel and "CONFIG_AUDIT_SUMMARY_CACHE" in globals():
                         try:
                             post_key = to_long_path(post_audit_excel)
                         except Exception:
                             post_key = post_audit_excel
-                        post_summary_df = CONFIG_AUDIT_SUMMARY_CACHE.get(post_key) or CONFIG_AUDIT_SUMMARY_CACHE.get(post_audit_excel)
+                        _tmp = CONFIG_AUDIT_SUMMARY_CACHE.get(post_key)
+                        post_summary_df = _tmp if _tmp is not None else CONFIG_AUDIT_SUMMARY_CACHE.get(post_audit_excel)
 
                     results = app.comparePrePost(freq_before=n77_ssb_pre, freq_after=n77_ssb_post, audit_pre_excel=pre_audit_excel, audit_post_excel=post_audit_excel, audit_pre_summary_audit_df=pre_summary_df, audit_post_summary_audit_df=post_summary_df, module_name=module_name, market_tag=market_tag)
 

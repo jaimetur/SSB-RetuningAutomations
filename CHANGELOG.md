@@ -21,6 +21,7 @@
     - Moved `GNodeB_SSB_Target` column beside `SSB needs update` columnd in MO table `TermpointToGNB`.
 
   - #### 🐛 Bug fixes:
+    - Fixed a pandas error in `ConsistencyCheck` module by avoiding boolean evaluation of DataFrames when selecting cached SummaryAudit data (replaced df1 or df2 with an explicit None check).
     - Minor bug fixing.
     
   - #### 📚 Documentation: 
