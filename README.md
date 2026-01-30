@@ -33,7 +33,8 @@ It ships a single launcher that can run in **GUI** mode (no arguments) or **CLI*
 
 1. **Configuration Audit** — parses raw log folders and builds a curated Excel workbook (module scaffold ready).  
 2. **Consistency Check (Pre/Post Comparison)** — loads Pre and Post datasets, compares relations across frequencies, and generates a clean Excel summary (plus detailed tables).  
-3. **Final Clean-Up (During Maintenance Window)** — helper utilities to tidy final outputs (module scaffold ready).
+3. **Consistency Check (bulk mode)** — run an Smart Consistency Check in all markets detected in the input folder, selecting the most suitable folder for Pre and Post for each market.  
+4. **Final Clean-Up (During Maintenance Window)** — helper utilities to tidy final outputs (module scaffold ready).
 
 The tool automatically adds a **timestamped + versioned suffix** to outputs, which makes artifacts fully traceable (e.g., `20251106-153245_v0.2.0`).
 
@@ -67,7 +68,19 @@ You can find a detailed [Technical User Guide here.](https://github.com/jaimetur
      ├─ ConfigurationAudit_<timestamp>_<version>.xlsx
      └─ ConfigurationAudit_<timestamp>_<version>.pptx
   ```
-
+- If Profiles Audit is enabled, this module will also run a Enhanced Network Configuration Audit (including Profiles Audit) to detect any Inconsistency or Discrepancy on the following Profiles tables:
+  - McpcPCellNrFreqRelProfileUeCfg (MOid: McpcPCellNrFreqRelProfileId)
+  - McpcPCellProfileUeCfg (MOid: McpcPCellProfileId)
+  - UlQualMcpcMeasCfg (MOid: UlQualMcpcMeasCfgId)
+  - McpcPSCellProfileUeCfg (MOid: McpcPSCellProfileId)
+  - McfbCellProfile (MOid: McfbCellProfileId)
+  - McfbCellProfileUeCfg (MOid: McfbCellProfileId)
+  - TrStSaCellProfile (MOid: TrStSaCellProfileId)
+  - TrStSaCellProfileUeCfg (MOid: TrStSaCellProfileId)
+  - McpcPCellEUtranFreqRelProfile (MOid: McpcPCellEUtranFreqRelProfileId)
+  - McpcPCellEUtranFreqRelProfileUeCfg (MOid: McpcPCellEUtranFreqRelProfileId)
+  - UeMCEUtranFreqRelProfile (MOid: UeMCEUtranFreqRelProfileId)
+  - UeMCEUtranFreqRelProfileUeCfg (MOid: UeMCEUtranFreqRelProfileId)
 ---
 
 ### `2. Consistency Check (Pre/Post Comparison)`
@@ -166,26 +179,7 @@ The feature to auto-detect Pre/Post folders given only one Input folder with a p
 
 ---
 
-### `4. Profiles Audit (During Maintenance Window)`
-**Purpose:** Utility to execute a Profiles Audit during Maintainance Window (after retuning).
-
-This module will run a Enhanced Network Configuration Audit (including Profiles Audit) to detect any Inconsistency or Discrepancy on the following Profiles tables
-  - McpcPCellNrFreqRelProfileUeCfg (MOid: McpcPCellNrFreqRelProfileId)
-  - McpcPCellProfileUeCfg (MOid: McpcPCellProfileId)
-  - UlQualMcpcMeasCfg (MOid: UlQualMcpcMeasCfgId)
-  - McpcPSCellProfileUeCfg (MOid: McpcPSCellProfileId)
-  - McfbCellProfile (MOid: McfbCellProfileId)
-  - McfbCellProfileUeCfg (MOid: McfbCellProfileId)
-  - TrStSaCellProfile (MOid: TrStSaCellProfileId)
-  - TrStSaCellProfileUeCfg (MOid: TrStSaCellProfileId)
-  - McpcPCellEUtranFreqRelProfile (MOid: McpcPCellEUtranFreqRelProfileId)
-  - McpcPCellEUtranFreqRelProfileUeCfg (MOid: McpcPCellEUtranFreqRelProfileId)
-  - UeMCEUtranFreqRelProfile (MOid: UeMCEUtranFreqRelProfileId)
-  - UeMCEUtranFreqRelProfileUeCfg (MOid: UeMCEUtranFreqRelProfileId)
-
----
-
-### `5. Final Clean-Up (When retune is finished)`
+### `4. Final Clean-Up (When retune is finished)`
 **Purpose:** Utility to sanitize final cluster (delete profiles , etc.) when the retuning has finished.
 
 **Notes**
