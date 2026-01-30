@@ -106,8 +106,47 @@ You can find a detailed [Technical User Guide here.](https://github.com/jaimetur
      └─ ConfigurationAudit_Pre_<timestamp>_<version>.xlsx
      ├─ CellRelation_<timestamp>_<version>.xlsx
      └─ ConsistencyChecks_CellRelation_<timestamp>_<version>.xlsx
-     └─ FoldersCompared.txt
-     └─ Correction_Cmd/
+     └─ FoldersCompared.txt   
+  
+     └─ Correction_Cmd_CA/
+       └─ NRCellRelation/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_NRCellRelation.txt
+             └─ <NODE_NAME>_NRCellRelation.txt
+       └─ GUtranCellRelation/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_GUtranCellRelation.txt
+             └─ <NODE_NAME>_GUtranCellRelation.txt
+       └─ ExternalNRCellCU/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_ExternalNRCellCU.txt
+             └─ <NODE_NAME>_ExternalNRCellCU.txt
+          └─ Unknown/
+             └─ <NODE_NAME>_ExternalNRCellCU.txt
+             └─ <NODE_NAME>_ExternalNRCellCU.txt
+       └─ ExternalGUtranCell/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_ExternalGUtranCell.txt
+             └─ <NODE_NAME>_ExternalGUtranCell.txt
+          └─ Unknown/
+             └─ <NODE_NAME>_ExternalGUtranCell.txt
+             └─ <NODE_NAME>_ExternalGUtranCell.txt
+       └─ TermPointToGNodeB/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_TermPointToGNodeB.txt
+             └─ <NODE_NAME>_TermPointToGNodeB.txt
+          └─ Unknown/
+             └─ <NODE_NAME>_TermPointToGNodeB.txt
+             └─ <NODE_NAME>_TermPointToGNodeB.txt
+       └─ TermPointToGNB/
+          └─ SSB-Post/
+             └─ <NODE_NAME>_TermPointToGNB.txt
+             └─ <NODE_NAME>_TermPointToGNB.txt
+          └─ Unknown/
+             └─ <NODE_NAME>_TermPointToGNB.txt
+             └─ <NODE_NAME>_TermPointToGNB.txt
+  
+     └─ Correction_Cmd_CC/
         └─ NewRelations/
            └─ NR/
               └─ <NODE_NAME>_NR_New.txt
@@ -129,34 +168,6 @@ You can find a detailed [Technical User Guide here.](https://github.com/jaimetur
            └─ GU/
               └─ <NODE_NAME>_GU_Disc.txt
               └─ <NODE_NAME>_GU_Disc.txt
-        └─ ExternalNRCellCU/
-           └─ SSB-Post/
-              └─ <NODE_NAME>_ExternalNRCellCU.txt
-              └─ <NODE_NAME>_ExternalNRCellCU.txt
-           └─ Unknown/
-              └─ <NODE_NAME>_ExternalNRCellCU.txt
-              └─ <NODE_NAME>_ExternalNRCellCU.txt
-        └─ ExternalGUtranCell/
-           └─ SSB-Post/
-              └─ <NODE_NAME>_ExternalGUtranCell.txt
-              └─ <NODE_NAME>_ExternalGUtranCell.txt
-           └─ Unknown/
-              └─ <NODE_NAME>_ExternalGUtranCell.txt
-              └─ <NODE_NAME>_ExternalGUtranCell.txt
-        └─ TermPointToGNodeB/
-           └─ SSB-Post/
-              └─ <NODE_NAME>_TermPointToGNodeB.txt
-              └─ <NODE_NAME>_TermPointToGNodeB.txt
-           └─ Unknown/
-              └─ <NODE_NAME>_TermPointToGNodeB.txt
-              └─ <NODE_NAME>_TermPointToGNodeB.txt
-        └─ TermPointToGNB/
-           └─ SSB-Post/
-              └─ <NODE_NAME>_TermPointToGNB.txt
-              └─ <NODE_NAME>_TermPointToGNB.txt
-           └─ Unknown/
-              └─ <NODE_NAME>_TermPointToGNB.txt
-              └─ <NODE_NAME>_TermPointToGNB.txt
    ```
 
 ---

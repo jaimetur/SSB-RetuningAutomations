@@ -414,7 +414,7 @@ def export_external_and_termpoint_commands(audit_post_excel: str, output_dir: st
         if export_to_zip:
             import zipfile
             os.makedirs(base_dir, exist_ok=True)
-            zip_path = to_long_path(os.path.join(base_dir, "Termpoints_Externals.zip"))
+            zip_path = to_long_path(os.path.join(base_dir, "CellRelation_Externals_Termpoints.zip"))
             zip_file = zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED)
 
         # If we export to filesystem, ensure directories exist
